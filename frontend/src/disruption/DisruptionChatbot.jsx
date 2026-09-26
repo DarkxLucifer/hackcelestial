@@ -4,7 +4,8 @@ import {
   AlertTriangle, ArrowRight, X, Minimize2, Maximize2, 
   FileText, ShieldCheck, Clock, RefreshCw, Volume2, Copy, Check,
   Settings, Key, Bot, Code, HelpCircle, Trash2, UploadCloud,
-  MessageSquare, Map, ExternalLink, Compass, Layers, Train, Plane
+  MessageSquare, Map, ExternalLink, Compass, Layers, Train, Plane,
+  Bus, Sun, Moon, Sunrise, Sunset, Calendar
 } from 'lucide-react';
 
 export default function DisruptionChatbot({
@@ -254,6 +255,7 @@ export default function DisruptionChatbot({
           provider: provider,
           text: replyText,
           structuredCard: cardToShow,
+          buses: data.buses || null,
           allTickets: uploadedTickets,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -944,6 +946,133 @@ export default function DisruptionChatbot({
                       </button>
 
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Structured Intercity Bus Departures Card */}
+              {msg.buses && msg.buses.length > 0 && (
+                <div className="mt-4 pt-3.5 border-t border-slate-200/80 space-y-3 font-poppins">
+                  <div className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs space-y-3">
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-[#FFF1DA] text-[#DF6951] flex items-center justify-center font-bold">
+                          <Bus className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-xs text-[#181E4B] block">
+                            {msg.buses[0]?.origin_point?.replace(/\s*\([^)]*\)/g, '').trim()} ➔ {msg.buses[0]?.drop_point?.replace(/\s*\([^)]*\)/g, '').trim()}
+                          </span>
+                          <span className="text-[10px] text-[#5E6282] font-mono">
+                            {msg.buses.length} Verified Services (MSRTC & Premier Sleeper)
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        VERIFIED TIMETABLE
+                      </span>
+                    </div>
+
+                    {/* Time of Day Inquiry with Quick Chips */}
+                    <div className="p-2.5 rounded-xl bg-[#FAF9F6] border border-slate-200/70 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#181E4B]">
+                        <Clock className="w-3.5 h-3.5 text-[#DF6951]" />
+                        <span>What time do you plan to depart?</span>
+                      </div>
+                      <p className="text-[11px] text-[#5E6282]">
+                        Filter departures by your preferred travel window:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage(`Show me morning departures between 6 AM and 12 PM for ${msg.buses[0]?.origin_point?.split(' ')[0]} to ${msg.buses[0]?.drop_point?.split(' ')[0]}`)}
+                          className="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-white hover:bg-[#FFF1DA] text-[#181E4B] hover:text-[#DF6951] border border-slate-200 hover:border-[#DF6951]/40 transition shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <Sunrise className="w-3 h-3 text-amber-500" />
+                          <span>Morning (06:00–12:00)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage(`Show me afternoon departures between 12 PM and 6 PM for ${msg.buses[0]?.origin_point?.split(' ')[0]} to ${msg.buses[0]?.drop_point?.split(' ')[0]}`)}
+                          className="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-white hover:bg-[#FFF1DA] text-[#181E4B] hover:text-[#DF6951] border border-slate-200 hover:border-[#DF6951]/40 transition shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <Sun className="w-3 h-3 text-orange-500" />
+                          <span>Afternoon (12:00–18:00)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage(`Show me overnight sleeper buses after 8 PM for ${msg.buses[0]?.origin_point?.split(' ')[0]} to ${msg.buses[0]?.drop_point?.split(' ')[0]}`)}
+                          className="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-white hover:bg-[#FFF1DA] text-[#181E4B] hover:text-[#DF6951] border border-slate-200 hover:border-[#DF6951]/40 transition shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <Moon className="w-3 h-3 text-indigo-500" />
+                          <span>Night Sleeper (18:00+)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage(`Show the cheapest bus options under ₹400 for ${msg.buses[0]?.origin_point?.split(' ')[0]} to ${msg.buses[0]?.drop_point?.split(' ')[0]}`)}
+                          className="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-white hover:bg-emerald-50 text-[#181E4B] hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <span>💰 Lowest Fare</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Departures Grid */}
+                    <div className="space-y-2">
+                      {msg.buses.map((bus, bIdx) => (
+                        <div 
+                          key={bIdx}
+                          className="p-3 rounded-xl bg-slate-50/80 border border-slate-200 hover:border-slate-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                        >
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-xs text-[#181E4B]">{bus.operator}</span>
+                              <span className="px-2 py-0.5 rounded text-[9px] font-semibold bg-white text-slate-700 border border-slate-200">
+                                {bus.bus_type}
+                              </span>
+                              {bus.rating && (
+                                <span className="text-[10px] text-amber-600 font-bold flex items-center gap-0.5">
+                                  ⭐ {bus.rating}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="text-[11px] text-[#5E6282] flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 font-mono">{bus.departure_time}</span>
+                              <span className="text-[10px] text-slate-500">({bus.origin_point})</span>
+                              <ArrowRight className="w-3 h-3 text-[#DF6951]" />
+                              <span className="font-bold text-slate-900 font-mono">{bus.arrival_time}</span>
+                              <span className="text-[10px] text-slate-500">({bus.drop_point})</span>
+                            </div>
+
+                            {bus.route && (
+                              <div className="text-[10px] text-slate-500">
+                                🛣️ {bus.route}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
+                            <div className="text-left sm:text-right">
+                              <span className="font-mono font-extrabold text-sm text-[#181E4B]">₹{bus.fare_inr}</span>
+                              <span className="text-[10px] text-[#84829A] block font-mono">{bus.duration}</span>
+                            </div>
+                            <a
+                              href={bus.booking_link || "https://npublic.msrtcors.com"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10.5px] font-bold text-white bg-[#181E4B] hover:bg-[#28327a] transition shadow-2xs"
+                            >
+                              <span>Book</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
                   </div>
                 </div>
               )}

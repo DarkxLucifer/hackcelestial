@@ -112,11 +112,70 @@ class AgentState(TypedDict):
     live_context: Optional[str]
     error: Optional[str]
 
+def get_groq_keys(custom_key: Optional[str] = None) -> List[str]:
+    """Retrieves all configured Groq API keys with support for comma-separated or numbered env vars."""
+    keys = []
+    if custom_key:
+        keys.extend([k.strip() for k in custom_key.split(",") if k.strip()])
+    
+    # Check GROQ_API_KEYS (comma, space, or newline separated)
+    env_multi = os.getenv("GROQ_API_KEYS", "")
+    if env_multi:
+        keys.extend([k.strip() for k in re.split(r'[,;\n\s]+', env_multi) if k.strip()])
+        
+    for var in ["GROQ_API_KEY", "GROQ_KEY"]:
+        val = os.getenv(var, "").strip()
+        if val:
+            keys.extend([k.strip() for k in val.split(",") if k.strip()])
+            
+    for i in range(1, 10):
+        val = os.getenv(f"GROQ_API_KEY_{i}", "").strip()
+        if val:
+            keys.append(val)
+            
+    seen = set()
+    uniq = []
+    for k in keys:
+        if k not in seen:
+            seen.add(k)
+            uniq.append(k)
+    return uniq
+
+def get_gemini_keys(custom_key: Optional[str] = None) -> List[str]:
+    """Retrieves all configured Gemini API keys with support for comma-separated or numbered env vars."""
+    keys = []
+    if custom_key:
+        keys.extend([k.strip() for k in custom_key.split(",") if k.strip()])
+        
+    env_multi = os.getenv("GEMINI_API_KEYS", "")
+    if env_multi:
+        keys.extend([k.strip() for k in re.split(r'[,;\n\s]+', env_multi) if k.strip()])
+        
+    for var in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
+        val = os.getenv(var, "").strip()
+        if val:
+            keys.extend([k.strip() for k in val.split(",") if k.strip()])
+            
+    for i in range(1, 10):
+        val = os.getenv(f"GEMINI_API_KEY_{i}", "").strip()
+        if val:
+            keys.append(val)
+            
+    seen = set()
+    uniq = []
+    for k in keys:
+        if k not in seen:
+            seen.add(k)
+            uniq.append(k)
+    return uniq
+
 def get_groq_key(custom_key: Optional[str] = None) -> Optional[str]:
-    return custom_key or os.getenv("GROQ_API_KEY") or os.getenv("GROQ_KEY")
+    keys = get_groq_keys(custom_key)
+    return keys[0] if keys else None
 
 def get_gemini_key(custom_key: Optional[str] = None) -> Optional[str]:
-    return custom_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    keys = get_gemini_keys(custom_key)
+    return keys[0] if keys else None
 
 def get_system_prompt_with_ticket(state: AgentState) -> str:
     prompt = SYSTEM_PROMPT
@@ -146,9 +205,6 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
             formatted_messages.append({"role": "user", "content": state["user_query"]})
 
         candidate_models = [
-            "qwen/qwen3.8-27b",
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant"
         ]
@@ -160,7 +216,8 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
                     model=model_name,
                     messages=formatted_messages,
                     temperature=0.4,
-                    max_tokens=2048
+                    max_tokens=2048,
+                    timeout=8.0
                 )
                 reply = completion.choices[0].message.content
                 if reply and reply.strip():
@@ -183,10 +240,8 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
         genai.configure(api_key=gemini_key)
         candidate_models = [
             "gemini-2.5-flash",
-            "gemini-flash-latest",
             "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-2.5-pro"
+            "gemini-1.5-flash"
         ]
 
         chat_history = []
@@ -680,7 +735,8 @@ def run_ai_chat(
                         f"VERIFIED INTERCITY BUS & TRAVEL OPERATOR SCHEDULE ({orig_clean} ➔ {dest_clean}):\n"
                         + "\n".join(bus_lines) +
                         f"\n\nINSTRUCTION: The user is specifically asking for travel/bus options between {orig_clean} and {dest_clean}. "
-                        "Give a comprehensive, well-structured breakdown featuring these exact departures with specific operators, departure times, boarding stands, drop points, exact fares in INR, and booking guidance. Do NOT output generic high-level text."
+                        "1. Give a comprehensive, structured breakdown featuring these departures with specific operators, departure times, boarding stands, drop points, exact fares in INR, and booking guidance. "
+                        "2. IMPORTANT: At the end of your response, explicitly ask the traveler what time of day or specific hour they prefer to depart (e.g. 🌅 Morning 06:00–12:00, ☀️ Afternoon 12:00–18:00, or 🌙 Overnight Sleeper after 20:00), so you can narrow down or suggest the best schedule for them."
                     )
             except Exception as e:
                 pass
@@ -697,38 +753,45 @@ def run_ai_chat(
         "error": None
     }
 
-    g_key = get_groq_key(groq_api_key)
-    gem_key = get_gemini_key(gemini_api_key)
+    # 1. Attempt Google Gemini with multi-key failover
+    gem_keys = get_gemini_keys(gemini_api_key)
+    if gem_keys and genai is not None:
+        for gk in gem_keys:
+            try:
+                state = call_gemini(state, gk)
+                if state.get("response"):
+                    res = {
+                        "reply": state["response"],
+                        "provider": "Voyage AI Engine (Gemini)",
+                        "success": True
+                    }
+                    if extracted_train_card:
+                        res["structured_ticket"] = extracted_train_card
+                    if buses_result:
+                        res["buses"] = buses_result
+                    return res
+            except Exception:
+                continue
 
-    # 1. Attempt Google Gemini
-    if gem_key and genai is not None:
-        state = call_gemini(state, gem_key)
-        if state.get("response"):
-            res = {
-                "reply": state["response"],
-                "provider": "Voyage AI Engine",
-                "success": True
-            }
-            if extracted_train_card:
-                res["structured_ticket"] = extracted_train_card
-            if buses_result:
-                res["buses"] = buses_result
-            return res
-
-    # 2. Attempt Groq
-    if g_key and Groq is not None:
-        state = call_groq(state, g_key)
-        if state.get("response"):
-            res = {
-                "reply": state["response"],
-                "provider": "Voyage AI Engine",
-                "success": True
-            }
-            if extracted_train_card:
-                res["structured_ticket"] = extracted_train_card
-            if buses_result:
-                res["buses"] = buses_result
-            return res
+    # 2. Attempt Groq with multi-key failover
+    gr_keys = get_groq_keys(groq_api_key)
+    if gr_keys and Groq is not None:
+        for qk in gr_keys:
+            try:
+                state = call_groq(state, qk)
+                if state.get("response"):
+                    res = {
+                        "reply": state["response"],
+                        "provider": "Voyage AI Engine (Groq)",
+                        "success": True
+                    }
+                    if extracted_train_card:
+                        res["structured_ticket"] = extracted_train_card
+                    if buses_result:
+                        res["buses"] = buses_result
+                    return res
+            except Exception:
+                continue
 
     # 3. Fallback to Local Voyage Expert Engine
     state = call_expert_engine(state)
@@ -952,47 +1015,49 @@ Document Content:
 {extracted_text[:4000]}
 \"\"\"
 """
-    # 1. Try Gemini
-    gem_key = get_gemini_key()
-    if gem_key and genai is not None:
-        try:
-            genai.configure(api_key=gem_key)
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            response = model.generate_content(prompt)
-            if response and response.text:
-                raw = response.text.strip()
+    # 1. Try Gemini with multi-key failover
+    gem_keys = get_gemini_keys()
+    if gem_keys and genai is not None:
+        for gk in gem_keys:
+            try:
+                genai.configure(api_key=gk)
+                model = genai.GenerativeModel("gemini-2.5-flash")
+                response = model.generate_content(prompt)
+                if response and response.text:
+                    raw = response.text.strip()
+                    if raw.startswith("```"):
+                        raw = re.sub(r'^```(?:json)?\n', '', raw)
+                        raw = re.sub(r'\n```$', '', raw)
+                    data = json.loads(raw)
+                    if isinstance(data, dict) and data.get("origin") and data.get("destination"):
+                        return data
+            except Exception:
+                continue
+
+    # 2. Try Groq with multi-key failover
+    gr_keys = get_groq_keys()
+    if gr_keys and Groq is not None:
+        for qk in gr_keys:
+            try:
+                client = Groq(api_key=qk)
+                completion = client.chat.completions.create(
+                    model="qwen/qwen3.8-27b",
+                    messages=[
+                        {"role": "system", "content": "You are a ticket extraction parser. Output strict JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=1000
+                )
+                raw = completion.choices[0].message.content.strip()
                 if raw.startswith("```"):
                     raw = re.sub(r'^```(?:json)?\n', '', raw)
                     raw = re.sub(r'\n```$', '', raw)
                 data = json.loads(raw)
                 if isinstance(data, dict) and data.get("origin") and data.get("destination"):
                     return data
-        except Exception:
-            pass
-
-    # 2. Try Groq
-    g_key = get_groq_key()
-    if g_key and Groq is not None:
-        try:
-            client = Groq(api_key=g_key)
-            completion = client.chat.completions.create(
-                model="qwen/qwen3.8-27b",
-                messages=[
-                    {"role": "system", "content": "You are a ticket extraction parser. Output strict JSON only."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=1000
-            )
-            raw = completion.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = re.sub(r'^```(?:json)?\n', '', raw)
-                raw = re.sub(r'\n```$', '', raw)
-            data = json.loads(raw)
-            if isinstance(data, dict) and data.get("origin") and data.get("destination"):
-                return data
-        except Exception:
-            pass
+            except Exception:
+                continue
 
     return None
 
