@@ -798,43 +798,80 @@ def run_ai_chat(
     extracted_train_card = None
     buses_result = None
 
-    # 1. Detect train query (5-digit Indian Railways train number)
+    # 1. Detect train query (5-digit Indian Railways train number) or reference to active ticket train
     train_match = re.search(r'\b([012]\d{4})\b', query)
+    act_service = str(active_ticket.get("service_number", "")) if active_ticket else ""
+    act_train_match = re.search(r'\b([012]\d{4})\b', act_service)
+    target_train_num = None
     if train_match:
-        train_num = train_match.group(1)
+        target_train_num = train_match.group(1)
+    elif act_train_match and any(w in query.lower() for w in ["train", "status", "track", "delay", "running", "location", "where", "ticket", "trip", "journey", "my", "schedule", "info", "pnr", "summary", "give"]):
+        target_train_num = act_train_match.group(1)
+
+    if target_train_num:
         try:
             from .travel_retrieval import RailRadarTracker
-            t_data = RailRadarTracker.get_live_train_status(train_num)
+            t_data = RailRadarTracker.get_live_train_status(target_train_num)
             if t_data and t_data.get("train_name"):
                 delay_val = t_data.get('delay_minutes', 0)
                 delay_str = f"+{delay_val} mins delay" if delay_val > 0 else "Running Right Time (On-Time)"
+
+                # Check if active_ticket is for this train
+                is_ticket_for_train = bool(active_ticket and (
+                    (target_train_num and target_train_num in str(active_ticket.get("service_number", ""))) or
+                    "train" in str(active_ticket.get("carrier", "")).lower() or
+                    "rail" in str(active_ticket.get("carrier", "")).lower()
+                ))
+
+                ticket_origin = active_ticket.get("origin") if (active_ticket and is_ticket_for_train) else None
+                ticket_dest = active_ticket.get("destination") if (active_ticket and is_ticket_for_train) else None
+
+                orig_disp = ticket_origin or t_data.get("origin", "Origin")
+                dest_disp = ticket_dest or t_data.get("destination", "Destination")
+
+                route_segment_info = f"- Passenger Booked Ticket Segment: {orig_disp} ➔ {dest_disp}\n" if (ticket_origin and ticket_dest) else ""
+                route_segment_info += f"- Full Train Operational Run: {t_data.get('origin', '')} ({t_data.get('origin_code', '')}) ➔ {t_data.get('destination', '')} ({t_data.get('destination_code', '')})"
+
+                dest_instruction = ""
+                if ticket_dest and ticket_dest != t_data.get("destination"):
+                    dest_instruction = (
+                        f"\n\nCRITICAL PASSENGER ROUTE INSTRUCTION:\n"
+                        f"The passenger's booked ticket destination is strictly {dest_disp}, boarding at {orig_disp}.\n"
+                        f"Although train #{t_data['train_number']}'s full terminus is {t_data.get('destination')}, the passenger DEBARKS at {dest_disp}.\n"
+                        f"Always address the passenger's journey as traveling to {dest_disp}. Do NOT tell them they are traveling to {t_data.get('destination')}."
+                    )
+
                 live_context_parts.append(
-                    f"REAL-TIME RAILRADAR TELEMETRY FOR TRAIN #{t_data['train_number']}:\n"
+                    f"REAL-TIME RAILRADAR TELEMETRY FOR TRAIN #{t_data['train_number']} ({t_data['train_name']}):\n"
                     f"- Service: #{t_data['train_number']} {t_data['train_name']}\n"
-                    f"- Route Corridor: {t_data.get('origin', '')} ({t_data.get('origin_code', '')}) ➔ {t_data.get('destination', '')} ({t_data.get('destination_code', '')})\n"
+                    f"{route_segment_info}\n"
                     f"- Status: {t_data.get('status', 'running')} (Live GPS Tracking: {t_data.get('is_live', True)})\n"
                     f"- Current Location: Approaching/at {t_data.get('current_location', 'In transit')}\n"
                     f"- Next Station / Halt: {t_data.get('upcoming_station', 'En route')}\n"
                     f"- Previous Station: {t_data.get('prev_station', 'N/A')}\n"
                     f"- Current Delay: {delay_str}\n"
-                    f"- Distance Remaining: {t_data.get('distance_remaining_km', 0)} km\n"
+                    f"- Distance Remaining on full service: {t_data.get('distance_remaining_km', 0)} km\n"
                     f"- Average Speed: {t_data.get('avg_speed_kmh', 0)} km/h\n"
                     f"- IRCTC TDR Refund: {'Eligible (100% refund, delay >= 3 hrs)' if t_data.get('tdr_refund_eligible') else 'Nominal (delay < 3 hrs)'}\n"
-                    "INSTRUCTION: When answering, provide these accurate real-time live telemetry details for this train."
+                    f"INSTRUCTION: When answering, provide these accurate real-time live telemetry details for this train.{dest_instruction}"
                 )
                 extracted_train_card = {
                     "carrier": "Indian Railways",
                     "service_number": f"#{t_data['train_number']} {t_data['train_name']}",
-                    "origin": t_data.get("origin", "Origin"),
-                    "destination": t_data.get("destination", "Destination"),
+                    "origin": orig_disp,
+                    "destination": dest_disp,
                     "delay_minutes": delay_val,
                     "is_cancellation": False,
-                    "is_past_journey": False,
+                    "is_past_journey": active_ticket.get("is_past_journey", False) if (active_ticket and is_ticket_for_train) else False,
                     "disruption_reason": f"Live location: {t_data.get('current_location', 'In transit')} • {delay_str}",
-                    "pnr": f"VY-LIVE-{t_data['train_number']}",
+                    "pnr": active_ticket.get("pnr") if (active_ticket and is_ticket_for_train) else f"VY-LIVE-{t_data['train_number']}",
+                    "ticket_cost": active_ticket.get("ticket_cost", 1250.0) if (active_ticket and is_ticket_for_train) else 1250.0,
+                    "currency": active_ticket.get("currency", "INR") if active_ticket else "INR",
                     "current_location": t_data.get("current_location"),
                     "upcoming_station": t_data.get("upcoming_station"),
                     "status": t_data.get("status"),
+                    "train_terminus_origin": t_data.get("origin"),
+                    "train_terminus_destination": t_data.get("destination"),
                     "source": "RailRadar Live API v1"
                 }
         except Exception as e:
@@ -1038,12 +1075,30 @@ def run_ai_chat(
 
     live_context_str = "\n\n".join(live_context_parts) if live_context_parts else None
 
+    # Determine structured ticket for agent state and UI response
+    if active_ticket and extracted_train_card:
+        merged_ticket = dict(active_ticket)
+        merged_ticket.update({
+            "current_location": extracted_train_card.get("current_location"),
+            "upcoming_station": extracted_train_card.get("upcoming_station"),
+            "delay_minutes": extracted_train_card.get("delay_minutes", active_ticket.get("delay_minutes", 0)),
+            "disruption_reason": extracted_train_card.get("disruption_reason"),
+            "status": extracted_train_card.get("status"),
+            "source": extracted_train_card.get("source"),
+            # ALWAYS PRESERVE passenger ticket origin and destination!
+            "origin": active_ticket.get("origin") or extracted_train_card.get("origin"),
+            "destination": active_ticket.get("destination") or extracted_train_card.get("destination"),
+        })
+        final_ticket = merged_ticket
+    else:
+        final_ticket = extracted_train_card or active_ticket
+
     state: AgentState = {
         "messages": messages,
         "user_query": query,
         "response": None,
         "provider": None,
-        "structured_ticket": extracted_train_card or active_ticket,
+        "structured_ticket": final_ticket,
         "live_context": live_context_str,
         "error": None
     }
@@ -1060,8 +1115,8 @@ def run_ai_chat(
                         "provider": "Voyage AI Engine (Gemini)",
                         "success": True
                     }
-                    if extracted_train_card:
-                        res["structured_ticket"] = extracted_train_card
+                    if final_ticket and (extracted_train_card or any(k in query.lower() for k in ["trip", "ticket", "train", "flight", "status", "detail", "pnr", "my", "delay", "summary"])):
+                        res["structured_ticket"] = final_ticket
                     if buses_result:
                         res["buses"] = buses_result
                     return res
@@ -1080,8 +1135,8 @@ def run_ai_chat(
                         "provider": "Voyage AI Engine (Groq)",
                         "success": True
                     }
-                    if extracted_train_card:
-                        res["structured_ticket"] = extracted_train_card
+                    if final_ticket and (extracted_train_card or any(k in query.lower() for k in ["trip", "ticket", "train", "flight", "status", "detail", "pnr", "my", "delay", "summary"])):
+                        res["structured_ticket"] = final_ticket
                     if buses_result:
                         res["buses"] = buses_result
                     return res
@@ -1095,8 +1150,8 @@ def run_ai_chat(
         "provider": "Voyage AI Engine",
         "success": True
     }
-    if extracted_train_card:
-        res["structured_ticket"] = extracted_train_card
+    if final_ticket and (extracted_train_card or any(k in query.lower() for k in ["trip", "ticket", "train", "flight", "status", "detail", "pnr", "my", "delay", "summary"])):
+        res["structured_ticket"] = final_ticket
     if buses_result:
         res["buses"] = buses_result
     return res
@@ -1158,7 +1213,7 @@ KNOWN_LOCATIONS = {
     "kop": {"name": "Kolhapur (KOP)", "city": "Kolhapur", "code": "KOP", "lat": 16.7050, "lng": 74.2433, "aliases": ["kolhapur", "kop"]},
     "sur": {"name": "Solapur (SUR)", "city": "Solapur", "code": "SUR", "lat": 17.6599, "lng": 75.9064, "aliases": ["solapur", "sur"]},
     # Mumbai Suburban & Commuter Rail Stations
-    "pnvl": {"name": "Panvel (PNVL)", "city": "Panvel", "code": "PNVL", "lat": 18.9943, "lng": 73.1104, "aliases": ["panvel", "pnvl", "new panvel"]},
+    "pnvl": {"name": "Panvel (PNVL)", "city": "Panvel", "code": "PNVL", "lat": 18.9943, "lng": 73.1104, "aliases": ["panvel", "pnvl", "new panvel", "panvel jn"]},
     "vsl": {"name": "Vasai Road (BSR)", "city": "Vasai", "code": "BSR", "lat": 19.3636, "lng": 72.8296, "aliases": ["vasai", "vasai road", "bsr", "bassein road"]},
     "vr": {"name": "Virar (VR)", "city": "Virar", "code": "VR", "lat": 19.4613, "lng": 72.8056, "aliases": ["virar", "vr"]},
     "diva": {"name": "Diva Jn. (DIVA)", "city": "Diva", "code": "DIVA", "lat": 19.2167, "lng": 73.0667, "aliases": ["diva", "diva jn"]},
@@ -1174,6 +1229,15 @@ KNOWN_LOCATIONS = {
     "bct": {"name": "Mumbai Central (BCT)", "city": "Mumbai", "code": "BCT", "lat": 18.9711, "lng": 72.8193, "aliases": ["mumbai central", "bct", "mmct"]},
     "bvi": {"name": "Borivali (BVI)", "city": "Borivali", "code": "BVI", "lat": 19.2322, "lng": 72.8568, "aliases": ["borivali", "bvi"]},
     "andheri": {"name": "Andheri (ADH)", "city": "Mumbai", "code": "ADH", "lat": 19.1197, "lng": 72.8468, "aliases": ["andheri", "adh"]},
+    # Konkan Railway & Western Regional Corridors
+    "rn": {"name": "Ratnagiri (RN)", "city": "Ratnagiri", "code": "RN", "lat": 16.9902, "lng": 73.3120, "aliases": ["ratnagiri", "rn", "ratnagiri jn"]},
+    "chi": {"name": "Chiplun (CHI)", "city": "Chiplun", "code": "CHI", "lat": 17.5323, "lng": 73.5186, "aliases": ["chiplun", "chi"]},
+    "kkw": {"name": "Kankavali (KKW)", "city": "Kankavali", "code": "KKW", "lat": 16.2736, "lng": 73.7128, "aliases": ["kankavali", "kankavli", "kkw"]},
+    "kudl": {"name": "Kudal (KUDL)", "city": "Kudal", "code": "KUDL", "lat": 16.0108, "lng": 73.6874, "aliases": ["kudal", "kudl"]},
+    "swv": {"name": "Sawantwadi Road (SWV)", "city": "Sawantwadi", "code": "SWV", "lat": 15.9080, "lng": 73.8183, "aliases": ["sawantwadi", "swv", "sawantwadi road"]},
+    "krmi": {"name": "Karmali (KRMI)", "city": "Karmali", "code": "KRMI", "lat": 15.5173, "lng": 73.9189, "aliases": ["karmali", "krmi", "old goa"]},
+    "khed": {"name": "Khed (KHED)", "city": "Khed", "code": "KHED", "lat": 17.7188, "lng": 73.3934, "aliases": ["khed"]},
+    "roha": {"name": "Roha (ROHA)", "city": "Roha", "code": "ROHA", "lat": 18.4357, "lng": 73.1197, "aliases": ["roha", "roha jn"]},
     # Global Airports (only major hubs with real flight connections from India)
     "lhr": {"name": "London (LHR)", "city": "London", "code": "LHR", "lat": 51.4700, "lng": -0.4543, "aliases": ["london", "lhr", "heathrow", "gatwick", "lgw"]},
     "zrh": {"name": "Zurich (ZRH)", "city": "Zurich", "code": "ZRH", "lat": 47.4582, "lng": 8.5555, "aliases": ["zurich", "zrh"]},
@@ -1191,34 +1255,68 @@ KNOWN_LOCATIONS = {
 }
 
 def lookup_location(query: str) -> Optional[Dict[str, Any]]:
-    """Intelligently matches a location name, airport name, or 3-letter IATA code against KNOWN_LOCATIONS."""
+    """Intelligently matches a location name, airport name, or station/IATA code against KNOWN_LOCATIONS."""
     if not query or not isinstance(query, str):
         return None
-    clean_q = re.sub(r'[^a-zA-Z0-9\s]', ' ', query).strip().lower()
+    raw_str = query.strip()
+    clean_q = re.sub(r'[^a-zA-Z0-9\s]', ' ', raw_str).strip().lower()
     if not clean_q:
         return None
 
-    # 1. Exact alias match
+    # 1. Exact alias match, key match, or station/airport code match
     for key, loc in KNOWN_LOCATIONS.items():
-        if clean_q in loc["aliases"] or clean_q == key or clean_q == loc["code"].lower():
+        loc_code = loc["code"].lower()
+        if clean_q in loc["aliases"] or clean_q == key or clean_q == loc_code:
             return loc
 
-    # 2. Token-level match with word boundary
-    tokens = clean_q.split()
-    for tok in tokens:
-        if len(tok) < 3:
-            continue
+    # 2. Station or airport code in parentheses, e.g. "Ratnagiri (RN)" or "Panvel (PNVL)"
+    code_match = re.search(r'\(([a-zA-Z]{2,5})\)', raw_str)
+    if code_match:
+        cand_code = code_match.group(1).lower()
         for key, loc in KNOWN_LOCATIONS.items():
-            if tok in loc["aliases"] or tok == key or tok == loc["code"].lower():
+            if cand_code == loc["code"].lower() or cand_code == key or cand_code in loc["aliases"]:
                 return loc
 
-    # 3. Substring match for longer city names (>= 4 characters)
+    # 3. Token-level match with word boundary (allowing 2-letter station codes like 'rn', 'st', 'et', 'vr')
+    stop_words = {"to", "in", "at", "on", "by", "of", "is", "or", "me", "my", "we", "he", "it", "so", "as", "no", "an", "am", "pm", "the", "for", "from", "and"}
+    tokens = [t for t in clean_q.split() if t not in stop_words]
+    for tok in tokens:
+        for key, loc in KNOWN_LOCATIONS.items():
+            if tok == loc["code"].lower() or tok == key:
+                return loc
+            if len(tok) >= 3 and tok in loc["aliases"]:
+                return loc
+            elif len(tok) == 2 and tok in loc["aliases"] and tok not in stop_words:
+                return loc
+
+    # 4. Strict whole-word substring match for longer city names (>= 4 characters)
+    # Note: NEVER do `clean_q in alias` (prevents 'rn' falsely matching 'suvarnabhumi')!
     for key, loc in KNOWN_LOCATIONS.items():
         for alias in loc["aliases"]:
-            if len(alias) >= 4 and (alias in clean_q or clean_q in alias):
-                return loc
+            if len(alias) >= 4:
+                if re.search(rf'\b{re.escape(alias)}\b', clean_q):
+                    return loc
 
     return None
+
+def is_consistent_match(raw_text: str, match_loc: Optional[Dict[str, Any]]) -> bool:
+    """Validates that a resolved location candidate shares genuine tokens, station code, or city with raw extracted text."""
+    if not match_loc or not raw_text:
+        return False
+    raw_lower = re.sub(r'[^a-zA-Z0-9\s]', ' ', str(raw_text)).lower()
+    raw_tokens = set(raw_lower.split())
+    code = match_loc.get("code", "").lower()
+    city = match_loc.get("city", "").lower()
+    aliases = [a.lower() for a in match_loc.get("aliases", [])]
+
+    if code and (code in raw_tokens or code in raw_lower):
+        return True
+    if city and (city in raw_tokens or city in raw_lower):
+        return True
+    for a in aliases:
+        if len(a) >= 3 and (a in raw_tokens or a in raw_lower):
+            return True
+    return False
 
 def detect_locations_from_text(text: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
@@ -1227,15 +1325,15 @@ def detect_locations_from_text(text: str) -> Tuple[Dict[str, Any], Dict[str, Any
     """
     text_lower = text.lower()
     
-    # 1. Check explicit directional travel patterns (e.g. 'Sector: BLR - HYD', 'From: Bengaluru To: Hyderabad')
+    # 1. Check explicit directional travel patterns (e.g. 'Sector: BLR - HYD', 'From: Bengaluru To: Hyderabad', 'Ratnagiri → Panvel')
     directional_patterns = [
-        r'(?:sector|route|flight|journey)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30}?)\s*(?:to|➔|->|--|-)\s*([a-zA-Z\s\(\)]{3,30})',
+        r'(?:sector|route|flight|journey)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30}?)\s*(?:to|➔|->|→|⟶|--|-)\s*([a-zA-Z\s\(\)]{3,30})',
         r'(?:from|departure|departing|origin|originating|boarding)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30}?)\s*(?:to|arrival|arriving|dest|destination|deboarding)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30})',
-        r'\b([a-zA-Z]{3,15})\s*(?:to|➔|->)\s*([a-zA-Z]{3,15})\b'
+        r'\b([a-zA-Z]{3,15})\s*(?:to|➔|->|→|⟶)\s*([a-zA-Z]{3,15})\b'
     ]
 
     for pat in directional_patterns:
-        match = re.search(pat, text_lower)
+        match = re.search(pat, text, re.IGNORECASE) or re.search(pat, text_lower)
         if match:
             cand1 = match.group(1).strip()
             cand2 = match.group(2).strip()
@@ -1248,9 +1346,15 @@ def detect_locations_from_text(text: str) -> Tuple[Dict[str, Any], Dict[str, Any
     occurrences: List[Tuple[int, Dict[str, Any]]] = []
     for key, loc in KNOWN_LOCATIONS.items():
         for alias in loc["aliases"]:
-            pattern = rf'\b{re.escape(alias)}\b'
-            for m in re.finditer(pattern, text_lower):
-                occurrences.append((m.start(), loc))
+            # For short 1-2 char aliases (like codes 'rn', 'st', 'et', 'r'), require uppercase in raw text
+            if len(alias) <= 2:
+                pattern = rf'\b{re.escape(alias.upper())}\b'
+                for m in re.finditer(pattern, text):
+                    occurrences.append((m.start(), loc))
+            else:
+                pattern = rf'\b{re.escape(alias)}\b'
+                for m in re.finditer(pattern, text_lower):
+                    occurrences.append((m.start(), loc))
 
     # Sort sequentially by order of appearance in the document
     occurrences.sort(key=lambda x: x[0])
@@ -1428,10 +1532,29 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         orig_match = lookup_location(ai_data.get("origin_code") or raw_origin)
         dest_match = lookup_location(ai_data.get("destination_code") or raw_destination)
 
-        origin_name = orig_match["name"] if orig_match else raw_origin
-        dest_name = dest_match["name"] if dest_match else raw_destination
-        origin_coords = {"lat": orig_match["lat"], "lng": orig_match["lng"]} if orig_match else {"lat": 20.9374, "lng": 77.7796}
-        dest_coords = {"lat": dest_match["lat"], "lng": dest_match["lng"]} if dest_match else {"lat": 21.0455, "lng": 75.8011}
+        # Discard false positive matches that don't match the authentic raw ticket text
+        if orig_match and not is_consistent_match(raw_origin, orig_match) and not is_consistent_match(ai_data.get("origin_code", ""), orig_match):
+            orig_match = None
+        if dest_match and not is_consistent_match(raw_destination, dest_match) and not is_consistent_match(ai_data.get("destination_code", ""), dest_match):
+            dest_match = None
+
+        # CRITICAL: Preserve authentic ticket text extracted by AI vision/OCR
+        if raw_origin and raw_origin.strip() not in ["Origin", "Departure", "From", "Unknown", ""]:
+            origin_name = orig_match["name"] if (orig_match and orig_match["name"] != "Origin") else raw_origin.strip()
+        elif orig_match:
+            origin_name = orig_match["name"]
+        else:
+            origin_name = "Origin"
+
+        if raw_destination and raw_destination.strip() not in ["Destination", "Arrival", "To", "Unknown", ""]:
+            dest_name = dest_match["name"] if (dest_match and dest_match["name"] != "Destination") else raw_destination.strip()
+        elif dest_match:
+            dest_name = dest_match["name"]
+        else:
+            dest_name = "Destination"
+
+        origin_coords = {"lat": orig_match["lat"], "lng": orig_match["lng"]} if orig_match else {"lat": 16.9902, "lng": 73.3120}
+        dest_coords = {"lat": dest_match["lat"], "lng": dest_match["lng"]} if dest_match else {"lat": 18.9943, "lng": 73.1104}
     else:
         # 2. Heuristic Regex Fallback with Strict Word Boundaries
         origin_loc, dest_loc = detect_locations_from_text(combined_text)
