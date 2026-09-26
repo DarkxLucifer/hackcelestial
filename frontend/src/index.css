@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Glassmorphism Navigation Bar Pill matching the reference image media_1790403958115.png */
+.voyare-pill-nav {
+  background: rgba(16, 44, 46, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.voyare-glass-card {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 20px 40px -15px rgba(24, 30, 75, 0.08);
+}
+
+/* Jet Contrail Animation Effect */
+@keyframes jetPulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.05);
+  }
+}
+
+.jet-pulse {
+  animation: jetPulse 2.5s infinite ease-in-out;
+}
+
+/* Radar Pulse */
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep {
+  animation: radarSweep 4s linear infinite;
+}
+
+/* Plane Flight Trajectory Glow */
+.flight-trail-line {
+  stroke-dasharray: 8 6;
+  animation: flightDash 20s linear infinite;
+}
+
+@keyframes flightDash {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #df6951;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c5533c;
+}

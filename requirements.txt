@@ -1,0 +1,11 @@
+# Core Backend API & Server
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+python-multipart>=0.0.9
+
+# Knowledge Graph & Critical Path Method (CPM)
+networkx>=3.2.0
+
+# Combinatorial Multi-Objective Solver (Pareto Frontier)
+ortools>=9.9.3963
