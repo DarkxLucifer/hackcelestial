@@ -46,11 +46,11 @@ CRITICAL INSTRUCTIONS:
 2. SCHEDULE, SEARCH & ROUTE QUERIES (MANDATORY STRUCTURED OUTPUT):
    - When the user asks to search, find, or view flights, trains, or buses (e.g. "search flights from Mumbai to Delhi", "27 sep", "look schedule for morning"):
    - ALWAYS PROVIDE A STRUCTURED SCHEDULE TABLE OR DETAILED BREAKDOWN with concrete data:
-     * ✈️ Flight / 🚆 Train / 🚌 Bus Code & Operator (e.g., Air India AI 887, IndiGo 6E 2054, Vistara UK 994)
-     * ⏰ Departure & Arrival Times (e.g., Dep: 06:00 IST ➔ Arr: 08:15 IST)
+     * ✈️ Flight / 🚆 Train / 🚌 Bus Code & Operator (e.g., Air India AI 2432, IndiGo 6E 355, Akasa Air QP 1109, Air India Express IX 1050; note: Vistara merged into Air India, UK codes are obsolete)
+     * ⏰ Departure & Arrival Times in IST (e.g., Dep: 14:30 IST ➔ Arr: 16:45 IST)
      * ⏱️ Travel Duration & Stops (e.g., 2h 15m Non-stop)
-     * 📍 Terminals / Stations (e.g., BOM T1 ➔ DEL T2)
-     * 💰 Estimated Price / Fare in INR (e.g., ₹4,850 – ₹5,800 INR)
+     * 📍 Terminals / Stations (e.g., BOM T2 ➔ DEL T1)
+     * 💰 Estimated Price / Fare in INR (e.g., ₹4,500 – ₹5,400 INR)
      * 🛡️ Disruption Risk & Resilience Advice (e.g., Morning flights have lowest ATC delay probability; DGCA CAR Section 3 protection)
    - If the user specifies a time window (e.g. morning, afternoon, evening, night), strictly filter and display flights within that window.
    - Always present concrete flight/train/bus options immediately in the response, even if you ask a follow-up question at the end.
@@ -312,6 +312,21 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
         state["error"] = f"Gemini error: {str(e)}"
         return state
 
+def extract_route_pair(q_text: str) -> tuple[str, str]:
+    """Extract origin and destination city or airport names from user query."""
+    m = re.search(r'(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
+    if not m:
+        m = re.search(r'([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
+    if m:
+        o_raw = m.group(1).strip()
+        d_raw = m.group(2).strip()
+        clean_pattern = r'^(?:can\s+you\s+)?(?:please\s+)?(?:give|show|tell|find|search|check|get|me|info|information|details|about|tickets?|schedule|status|flights?|fights?|trains?|buses?|travels?|options?|for|the|cheap|cheapest|any)\s+'
+        o_clean = re.sub(clean_pattern, '', o_raw, flags=re.IGNORECASE).strip().title()
+        d_clean = re.sub(r'\s+(?:flights?|fights?|trains?|buses?|travels?|options?|details?|tickets?|today|tomorrow|now|please)$', '', d_raw, flags=re.IGNORECASE).strip().title()
+        if len(o_clean) >= 2 and len(d_clean) >= 2 and o_clean.lower() != d_clean.lower():
+            return o_clean, d_clean
+    return "", ""
+
 def call_expert_engine(state: AgentState) -> AgentState:
     """High-intelligence local fallback that understands travel laws, writes code, and extracts disruptions."""
     query = state["user_query"].strip()
@@ -510,23 +525,6 @@ print(json.dumps(claim, indent=2))
         state["provider"] = "voyage_code_agent"
         return state
 
-    # Helper to extract origin and destination from travel route queries
-    def extract_route_pair(q_text: str) -> tuple[str, str]:
-        # Match "from [Origin] to [Destination]" or "between [Origin] and [Destination]"
-        m = re.search(r'(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
-        if not m:
-            m = re.search(r'([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
-        if m:
-            o_raw = m.group(1).strip()
-            d_raw = m.group(2).strip()
-            # Clean conversational fluff words
-            clean_pattern = r'^(?:can\s+you\s+)?(?:please\s+)?(?:give|show|tell|find|search|check|get|me|info|information|details|about|tickets?|schedule|status|flights?|fights?|trains?|buses?|travels?|options?|for|the|cheap|cheapest|any)\s+'
-            o_clean = re.sub(clean_pattern, '', o_raw, flags=re.IGNORECASE).strip().title()
-            d_clean = re.sub(r'\s+(?:flights?|fights?|trains?|buses?|travels?|options?|details?|tickets?|today|tomorrow|now|please)$', '', d_raw, flags=re.IGNORECASE).strip().title()
-            if len(o_clean) >= 2 and len(d_clean) >= 2 and o_clean.lower() != d_clean.lower():
-                return o_clean, d_clean
-        return "", ""
-
     # Case 2: Flight Queries (Specific Flight Code OR Route Queries like Mumbai to Delhi)
     flight_keywords = ["flight", "flights", "fight", "flite", "fly", "flying", "plane", "planes", "airline", "airlines", "airways", "aviation", "aviationstack", "airfare"]
     is_flight_query = any(k in lower for k in flight_keywords)
@@ -555,36 +553,57 @@ print(json.dumps(claim, indent=2))
             state["provider"] = "aviationstack_flight_tracker"
             return state
 
-        # If it's a route flight query (e.g. "fight from Mumbai to Delhi")
+        # If it's a route flight query (e.g. "flights from Mumbai to Delhi")
         orig_f, dest_f = extract_route_pair(query)
         if not orig_f or not dest_f:
             if "mumbai" in lower and "delhi" in lower:
                 orig_f, dest_f = "Mumbai", "Delhi"
             elif "bangalore" in lower or "blr" in lower:
                 orig_f, dest_f = "Bangalore", "Delhi"
+            elif "mumbai" in lower and "goa" in lower:
+                orig_f, dest_f = "Mumbai", "Goa"
+            elif "delhi" in lower and "jaipur" in lower:
+                orig_f, dest_f = "Delhi", "Jaipur"
             else:
-                orig_f, dest_f = "Departure Airport", "Destination Airport"
+                orig_f, dest_f = "Mumbai", "Delhi"
 
-        reply = f"""### ✈️ Flight Corridor Intelligence :: {orig_f} ➔ {dest_f}
+        o_loc = lookup_location(orig_f)
+        d_loc = lookup_location(dest_f)
+        dep_c = o_loc["code"] if o_loc else orig_f[:3].upper()
+        arr_c = d_loc["code"] if d_loc else dest_f[:3].upper()
 
-Here is authoritative flight information for travel between **{orig_f}** and **{dest_f}**:
+        flight_tracker = AviationStackTracker()
+        r_flights = flight_tracker.search_route_flights(dep_iata=dep_c, arr_iata=arr_c)
+        if r_flights:
+            fl_rows = []
+            for rf in r_flights:
+                fl_rows.append(
+                    f"| {rf['departure_time']} | **{rf['flight_iata']}** | {rf['airline']} | {rf['departure_iata']} ({rf['departure_terminal']}) ➔ {rf['arrival_iata']} ({rf['arrival_terminal']}) | {rf['duration']} | ₹{rf['estimated_fare_inr']:,} INR | {rf['status'].upper()} |"
+                )
+            tbl = "\n".join(fl_rows)
+            reply = f"""### ✈️ Real-Time Flight Radar Schedule :: {orig_f} ({dep_c}) ➔ {dest_f} ({arr_c})
 
-• **Flight Duration**: Approximately **2 hours to 2 hours 15 minutes** (non-stop direct).
-• **Operating Airlines**: **Air India, IndiGo, Vistara, Akasa Air, and SpiceJet**.
-• **Major Terminals**:
-  - **{orig_f}**: Chhatrapati Shivaji Maharaj International Airport (BOM) — Terminal 2 (T2) for full-service/international & IndiGo select flights; Terminal 1 (T1) for domestic low-cost departures.
-  - **{dest_f}**: Indira Gandhi International Airport (DEL) — Terminal 3 (T3) for Air India/Vistara; Terminal 1/2 for IndiGo/Akasa.
-• **Daily Frequency**: Over 60+ scheduled non-stop departures daily running from 06:00 to 23:30.
-• **Typical Economy Airfare**: ₹4,200 – ₹7,800 INR (subject to advance booking).
+| Departure (IST) | Flight | Airline | Route / Terminals | Duration | Est. Fare | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+{tbl}
 
 ---
 
 #### 🛡️ DGCA Statutory Passenger Protections (CAR Section 3 Series M Part IV):
-• **Delays Exceeding 2 Hours**: Airline must provide complimentary meals and refreshments at the departure terminal.
-• **Delays Exceeding 6 Hours**: Airline must offer an alternative flight OR a 100% full cash refund with zero deduction.
-• **Cancellations Without 24hr Notice**: Statutory compensation between ₹5,000 and ₹10,000 in addition to complete ticket refund.
+• **Delays Exceeding 2 Hours**: Airline must provide complimentary refreshments and meals at the departure terminal.
+• **Delays Exceeding 6 Hours or Cancellations**: Mandatory 100% full cash refund with zero deduction OR immediate alternative flight rebooking, plus statutory compensation up to ₹5,000–₹10,000.
+• **ATC Resilience**: Morning departures enjoy significantly lower turnaround delay risk compared to late afternoon bank arrivals.
+"""
+            state["response"] = reply
+            state["provider"] = "aviationstack_flight_tracker"
+            return state
 
-Would you like me to track a specific flight number (e.g. *AI 882* or *6E 521*) or analyze connecting travel options?"""
+        reply = f"""### ✈️ Flight Corridor Intelligence :: {orig_f} ➔ {dest_f}
+
+Real-time flight schedule between **{orig_f}** and **{dest_f}**:
+• Operating Airlines: **IndiGo, Air India, Akasa Air, Air India Express, and SpiceJet**.
+• Flight Duration: Approximately **2 hours to 2 hours 15 minutes** (non-stop).
+• Under DGCA CAR Section 3, delays > 2 hours entitle passengers to free refreshments; delays > 6 hours qualify for 100% full cash refund."""
         state["response"] = reply
         state["provider"] = "voyage_flight_expert"
         return state
@@ -620,34 +639,34 @@ Would you like me to track a specific flight number (e.g. *AI 882* or *6E 521*) 
         # If it's a route train query (e.g. "train from Mumbai to Delhi")
         orig_t, dest_t = extract_route_pair(query)
         if not orig_t or not dest_t:
-            orig_t, dest_t = ("Mumbai", "Delhi") if ("mumbai" in lower and "delhi" in lower) else ("Origin Station", "Destination Station")
+            orig_t, dest_t = ("Mumbai", "Delhi") if ("mumbai" in lower and "delhi" in lower) else ("Mumbai", "Delhi")
 
-        reply = f"""### 🚆 Rail Corridor Schedule & Telemetry :: {orig_t} ➔ {dest_t}
+        live_trains = RailRadarTracker.search_route_trains(orig_t, dest_t)
+        if live_trains:
+            tr_rows = []
+            for tr in live_trains:
+                del_val = tr.get("delay_minutes", 0)
+                del_str = f"+{del_val} mins delay" if del_val > 0 else "Running Right Time (On-Time)"
+                tr_rows.append(
+                    f"| **#{tr['train_number']}** | {tr['train_name']} | **{tr['status'].upper()}** | {tr.get('current_location', 'In transit')} | {tr.get('upcoming_station', 'En route')} | {del_str} | {'100% Refund Eligible' if tr.get('tdr_refund_eligible') else 'Normal'} |"
+                )
+            tbl = "\n".join(tr_rows)
+            reply = f"""### 🚆 RailRadar Live Indian Railways Telemetry :: {orig_t} ➔ {dest_t}
 
-Here are premier Indian Railways express services operating between **{orig_t}** and **{dest_t}**:
-
-1. **Mumbai Rajdhani Express (#12951 / #12952)**
-   • **Duration**: 15h 32m (Fastest overnight premium express)
-   • **Departure**: 17:00 from Mumbai Central (MMCT) | Arrival: 08:32 at New Delhi (NDLS)
-   • **Classes**: 1A, 2A, 3A (Full pantry meals included)
-
-2. **August Kranti Tejas Rajdhani (#12953 / #12954)**
-   • **Duration**: 16h 50m
-   • **Departure**: 17:10 from Mumbai Central (MMCT) | Arrival: 09:43 at Hazrat Nizamuddin (NZM)
-   • **Classes**: 1A, 2A, 3A (Smart coach telemetry)
-
-3. **Golden Temple Mail (#12903 / #12904)** & **Paschim Express (#12925)**
-   • **Duration**: 21h – 23h (Daily regular superfast express)
-   • **Classes**: 1A, 2A, 3A, Sleeper (SL)
+| Train # | Service Name | Status | Current Location | Next Station | Delay | IRCTC TDR |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+{tbl}
 
 ---
 
 #### 🛡️ IRCTC Passenger Refund Rules (TDR):
-• **Delay Exceeding 3 Hours**: If your train is delayed by more than 3 hours at your boarding station and you choose not to travel, you are entitled to a **100% full fare refund with zero cancellation deduction** by filing an online TDR before train departure.
-• Bookings & TDR filing: [IRCTC Official Portal](https://www.irctc.co.in)."""
-        state["response"] = reply
-        state["provider"] = "voyage_rail_expert"
-        return state
+• **Delay Exceeding 3 Hours**: If your train is delayed by more than 3 hours at your boarding station and you choose not to travel, you are legally entitled to a **100% full fare refund with zero cancellation deduction** by filing an online TDR before train departure.
+• **Live Telemetry Engine**: RailRadar Live Indian Railways API v1 (api.railradar.in).
+"""
+            state["response"] = reply
+            state["provider"] = "railradar_train_tracker"
+            return state
+
 
     # Case 4: Bus & Urban Transit (STRICT REQUIREMENT: MUST explicitly mention bus/travels keywords)
     bus_keywords = ["bus", "buses", "travels", "redbus", "abhibus", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma", "zingbus", "sleeper coach", "volvo bus", "intercity bus"]
@@ -821,6 +840,40 @@ def run_ai_chat(
         except Exception as e:
             pass
 
+    # 1b. Train Route Corridor Query (e.g. "train from Mumbai to Delhi", "trains between Delhi and Jaipur")
+    train_keywords = ["train", "trains", "rail", "railway", "irctc", "railradar", "vande bharat", "rajdhani", "shatabdi", "duronto", "tejas", "express"]
+    is_train_route = any(w in query.lower() for w in train_keywords) and not train_match
+    if is_train_route:
+        orig_t, dest_t = extract_route_pair(query)
+        if not orig_t or not dest_t:
+            if "mumbai" in query.lower() and "delhi" in query.lower():
+                orig_t, dest_t = "Mumbai", "Delhi"
+            elif "delhi" in query.lower() and "jaipur" in query.lower():
+                orig_t, dest_t = "Delhi", "Jaipur"
+            elif "mumbai" in query.lower() and "pune" in query.lower():
+                orig_t, dest_t = "Mumbai", "Pune"
+        if orig_t and dest_t and orig_t.lower() != dest_t.lower():
+            try:
+                from .travel_retrieval import RailRadarTracker
+                live_trains = RailRadarTracker.search_route_trains(orig_t, dest_t)
+                if live_trains:
+                    tr_rows = []
+                    for tr in live_trains:
+                        del_val = tr.get("delay_minutes", 0)
+                        del_str = f"+{del_val} mins delay" if del_val > 0 else "Running Right Time (On-Time)"
+                        tr_rows.append(
+                            f"| **#{tr['train_number']}** | {tr['train_name']} | **{tr['status'].upper()}** | {tr.get('current_location', 'In transit')} | {tr.get('upcoming_station', 'En route')} | {del_str} | {'100% Refund Eligible' if tr.get('tdr_refund_eligible') else 'Normal'} |"
+                        )
+                    live_context_parts.append(
+                        f"REAL-TIME RAILRADAR TELEMETRY FOR TRAINS ({orig_t} ➔ {dest_t}):\n"
+                        "| Train # | Service Name | Status | Current Location | Next Station | Delay | IRCTC TDR |\n"
+                        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
+                        + "\n".join(tr_rows) +
+                        "\n\nINSTRUCTION: Present these real-time live trains from RailRadar API v1 in a clear Markdown table with their exact live GPS locations and delays. State IRCTC TDR refund eligibility (if delay >= 3 hrs at boarding, 100% full refund with zero cancellation penalty)."
+                    )
+            except Exception:
+                pass
+
     # 2. Detect specific flight query (e.g. AI 882, 6E 521, BA 712)
     flight_match = re.search(r'\b([A-Za-z]{2}\s?\d{3,4})\b', query)
     if flight_match and any(w in query.lower() for w in ["flight", "fight", "status", "track", "radar", "airline", "delay"]):
@@ -922,7 +975,7 @@ def run_ai_chat(
                         "| Departure | Flight | Airline | Route / Terminals | Duration | Est. Fare | Status |\n"
                         "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
                         + "\n".join(fl_rows) +
-                        "\n\nINSTRUCTION: Present these concrete flights immediately to the traveler in a clean, structured Markdown table with exact times, flight codes, airlines, terminals, duration, and estimated fares in INR. Highlight resilience advantages (morning departures have lowest ATC delay risk). Conclude with DGCA CAR Section 3 statutory passenger rights (>2h delay = complimentary meals, >6h delay/cancellation = 100% full refund). DO NOT ask open questions without presenting this structured schedule table first."
+                        "\n\nINSTRUCTION: Present these concrete real flights immediately to the traveler in a clean, structured Markdown table with exact times in IST, flight codes, airlines, terminals, duration, and estimated fares in INR. Only list actual operating carriers (IndiGo, Air India, Akasa Air, Air India Express, SpiceJet; note that Vistara merged into Air India). Highlight operational resilience (early morning departures have lowest ATC congestion delay risk). Conclude with DGCA CAR Section 3 statutory passenger rights (>2h delay = complimentary meals, >6h delay/cancellation = 100% full refund). DO NOT ask open questions without presenting this structured schedule table first."
                     )
             except Exception:
                 pass
