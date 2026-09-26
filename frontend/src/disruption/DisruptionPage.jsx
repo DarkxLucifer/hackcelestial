@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   AlertTriangle, ShieldCheck, Zap, ArrowLeft, ArrowRight, 
   RotateCcw, CheckCircle2, Clock, Train, Plane, Building2, 
@@ -33,6 +33,10 @@ export default function DisruptionPage({
   
   // Real Ingested Disruption Record (null if no dispute occurred)
   const [disruptedTicket, setDisruptedTicket] = useState(null);
+
+  // File upload ref for uploading other tickets from active view
+  const pageFileInputRef = useRef(null);
+  const [isPageUploading, setIsPageUploading] = useState(false);
 
   // Refund policy modal state
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
@@ -69,6 +73,45 @@ export default function DisruptionPage({
 
   const handleTicketProcessed = (record) => {
     setDisruptedTicket(record);
+    // Smoothly minimize chatbot into "Contact Us" pill and directly scroll to connection map
+    setIsChatMinimized(true);
+    setTimeout(() => {
+      const mapElement = document.getElementById('connection-map-section');
+      if (mapElement) {
+        mapElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
+  };
+
+  const handlePageMultiFileUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsPageUploading(true);
+    let lastRecord = null;
+
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('/api/ai/upload-document', {
+          method: 'POST',
+          body: formData
+        });
+        const resData = await response.json();
+        if (resData.structured_data) {
+          lastRecord = resData.structured_data;
+        }
+      } catch (err) {
+        console.error("Multi upload error:", err);
+      }
+    }
+
+    if (lastRecord) {
+      handleTicketProcessed(lastRecord);
+    }
+    setIsPageUploading(false);
+    if (pageFileInputRef.current) pageFileInputRef.current.value = '';
   };
 
   const handleEndChat = (record) => {
@@ -256,7 +299,28 @@ export default function DisruptionPage({
               </div>
             </div>
 
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => {
+                  setHasEndedChat(false);
+                  setIsChatMinimized(false);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-3.5 py-2 rounded-xl font-bold text-xs text-[#181E4B] bg-white hover:bg-slate-100 border border-slate-300 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-[#181E4B]" />
+                <span>Chat with Assistant</span>
+              </button>
+
+              <button
+                onClick={() => pageFileInputRef.current?.click()}
+                disabled={isPageUploading}
+                className="px-3.5 py-2 rounded-xl font-bold text-xs text-purple-800 bg-purple-100 hover:bg-purple-200 border border-purple-300 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <UploadCloud className="w-3.5 h-3.5 text-purple-700" />
+                <span>{isPageUploading ? "Uploading..." : "Upload Other Tickets"}</span>
+              </button>
+
               <button
                 onClick={() => handleOpenRefundModal(disruptedTicket)}
                 className="px-3.5 py-2 rounded-xl font-bold text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300/80 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-2xs"
@@ -267,8 +331,18 @@ export default function DisruptionPage({
             </div>
           </div>
 
+          {/* Hidden multi-file upload for uploading other tickets */}
+          <input
+            type="file"
+            ref={pageFileInputRef}
+            onChange={handlePageMultiFileUpload}
+            accept=".pdf,.png,.jpg,.jpeg,.txt"
+            multiple
+            className="hidden"
+          />
+
           {/* SECTION 1: Interactive Connection Graph / Map */}
-          <div className="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200/70 shadow-2xs space-y-4">
+          <div id="connection-map-section" className="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200/70 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-volkhov font-bold text-xl text-[#181E4B]">

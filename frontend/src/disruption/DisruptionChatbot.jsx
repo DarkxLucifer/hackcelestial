@@ -3,7 +3,7 @@ import {
   Send, Mic, MicOff, Paperclip, Sparkles, CheckCircle2, 
   AlertTriangle, ArrowRight, X, Minimize2, Maximize2, 
   FileText, ShieldCheck, Clock, RefreshCw, Volume2, Copy, Check,
-  Settings, Key, Bot, Code, HelpCircle, Trash2
+  Settings, Key, Bot, Code, HelpCircle, Trash2, UploadCloud
 } from 'lucide-react';
 
 export default function DisruptionChatbot({
@@ -227,72 +227,71 @@ export default function DisruptionChatbot({
     }
   };
 
-  // Real document file upload handler (PDF / TXT / Image)
+  // Real document file upload handler (Multiple PDF / TXT / Image files supported)
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     setIsUploading(true);
-    const fileName = file.name;
+    let lastRecord = null;
 
-    // Add user upload message
-    setMessages(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        sender: 'user',
-        text: `Uploaded ticket file: ${fileName}`,
-        isFile: true,
-        fileName,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = file.name;
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/ai/upload-document', {
-        method: 'POST',
-        body: formData
-      });
-
-      const resData = await response.json();
-      const parsedRecord = resData.structured_data;
-
-      if (parsedRecord) {
-        setCurrentDisruption(parsedRecord);
-        if (onTicketProcessed) onTicketProcessed(parsedRecord);
-      }
-
+      // Add user upload message
       setMessages(prev => [
         ...prev,
         {
-          id: Date.now() + 1,
-          sender: 'bot',
-          provider: 'Voyage Document Intelligence (PyPDF / Vision)',
-          text: `Successfully parsed e-ticket "${fileName}". The travel manifest has been ingested and stored in the secure Voyage Disruption Database.`,
-          structuredCard: parsedRecord,
+          id: Date.now() + i * 2,
+          sender: 'user',
+          text: `Uploaded ticket file: ${fileName}`,
+          isFile: true,
+          fileName,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
 
-    } catch (err) {
-      console.error("File upload error:", err);
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          sender: 'bot',
-          provider: 'Voyage Parser',
-          text: `Document uploaded. Extracted travel parameters and recorded disruption status in database.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/ai/upload-document', {
+          method: 'POST',
+          body: formData
+        });
+
+        const resData = await response.json();
+        const parsedRecord = resData.structured_data;
+
+        if (parsedRecord) {
+          lastRecord = parsedRecord;
+          setCurrentDisruption(parsedRecord);
         }
-      ]);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now() + i * 2 + 1,
+            sender: 'bot',
+            provider: 'Voyage AI Engine',
+            text: `Successfully parsed ticket "${fileName}". Extracted ${parsedRecord?.carrier || 'Carrier'} (${parsedRecord?.service_number || 'Transit'}) with delay +${parsedRecord?.delay_minutes || 45}m. Synchronized with your Connection Map.`,
+            structuredCard: parsedRecord,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+
+      } catch (err) {
+        console.error("File upload error:", err);
+      }
     }
+
+    if (lastRecord && onTicketProcessed) {
+      onTicketProcessed(lastRecord);
+    }
+
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Copy code snippet helper
@@ -373,27 +372,31 @@ export default function DisruptionChatbot({
     );
   };
 
-  // If chatbot is minimized: Display only the floating Voyage logo in bottom-right corner ("bottom right crack")
+  // If chatbot is minimized: Display floating "Contact Us" pill matching media_1790440125685.jpg
   if (isMinimized) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <button
           onClick={onRestore}
-          title="Open Voyage Disruption Concierge"
-          className="group flex items-center gap-3 bg-white hover:bg-slate-50 text-[#181E4B] pl-3.5 pr-4 py-2.5 rounded-full shadow-2xl border border-slate-200/90 transition-all transform hover:scale-105 cursor-pointer ring-4 ring-[#181E4B]/5"
+          title="Open Voyage AI Assistant (Contact Us)"
+          className="group flex items-center gap-2.5 bg-white text-black pl-4 pr-5 py-2.5 rounded-full border-2 border-[#6D28D9] shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer select-none font-poppins"
         >
-          <div className="relative flex items-center justify-center">
-            <img 
-              src="/voyage_logo.png" 
-              alt="Voyage" 
-              className="h-6 w-auto object-contain"
-            />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
-          </div>
-          <div className="text-left font-googleSans">
-            <div className="text-xs font-bold text-[#181E4B] leading-none">Voyage AI</div>
-            <div className="text-[10px] text-[#A35645] font-semibold leading-tight mt-0.5">Disruption Assistant</div>
-          </div>
+          {/* Chat bubble icon with 3 horizontal dots inside matching media_1790440125685.jpg */}
+          <svg
+            className="w-5 h-5 text-black shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <circle cx="8.5" cy="10" r="1" fill="currentColor" />
+            <circle cx="12" cy="10" r="1" fill="currentColor" />
+            <circle cx="15.5" cy="10" r="1" fill="currentColor" />
+          </svg>
+          <span className="text-sm font-semibold text-black tracking-tight">Contact Us</span>
         </button>
       </div>
     );
@@ -580,10 +583,18 @@ export default function DisruptionChatbot({
                     </button>
 
                     <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-googleSans text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Upload Other Tickets</span>
+                    </button>
+
+                    <button
                       onClick={() => onEndChat && onEndChat(msg.structuredCard)}
                       className="px-3 py-1.5 rounded-xl bg-[#181E4B] text-white hover:bg-[#232a68] font-googleSans text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                     >
-                      <span>View Recovery Plans</span>
+                      <span>View Connection Map &amp; Plans</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -650,6 +661,7 @@ export default function DisruptionChatbot({
             ref={fileInputRef}
             onChange={handleFileUpload}
             accept=".pdf,.png,.jpg,.jpeg,.txt"
+            multiple
             className="hidden"
           />
           <button

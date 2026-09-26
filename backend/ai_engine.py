@@ -540,15 +540,17 @@ def run_ai_chat(
         "success": True
     }
 
-def parse_document_file(file_bytes: bytes, filename: str, content_type: str = "application/pdf") -> Dict[str, Any]:
+def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content_type: Optional[str] = "application/pdf") -> Dict[str, Any]:
     """
     Parses real document file (PDF, TXT, Image), extracts travel details,
     and stores structured disruption in SQLite database.
     """
     extracted_text = ""
+    safe_fn = (filename or "ticket.pdf").lower()
+    safe_ct = (content_type or "").lower()
 
     # PDF extraction
-    if filename.lower().endswith(".pdf") or "pdf" in content_type.lower():
+    if safe_fn.endswith(".pdf") or "pdf" in safe_ct:
         if pypdf is not None:
             try:
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
