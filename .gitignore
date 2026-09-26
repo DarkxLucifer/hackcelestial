@@ -55,3 +55,6 @@ desktop.ini
 *.swp
 *.swo
 *~
+*.db
+*.sqlite3
+
