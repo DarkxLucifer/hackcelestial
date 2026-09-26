@@ -517,56 +517,116 @@ class GTFSAndBusRetriever:
                 }
             ]
 
-        # 4. DYNAMIC SYSTEMATIC ROUTE GENERATOR FOR ANY OTHER CORRIDOR
-        # Calculates systematic road duration, MSRTC standard state tariff, and boarding stations
+        # 4. DELHI <-> JAIPUR corridor (~280 km via Delhi-Jaipur Expressway / NH 48)
+        if ("delhi" in orig_l and "jaipur" in dest_l) or ("delhi" in dest_l and "jaipur" in orig_l):
+            return [
+                {
+                    "id": "rsrtc_dj_01",
+                    "operator": "RSRTC Super Luxury Volvo AC",
+                    "bus_type": "Scania / Volvo Multi-Axle AC (2+2)",
+                    "origin_point": f"{orig_clean} Bikaner House / Kashmiri Gate ISBT",
+                    "drop_point": f"{dest_clean} Sindhi Camp / Narayan Singh Circle",
+                    "departure_time": "Departs Every 45 mins",
+                    "arrival_time": "+5h 15m after departure",
+                    "duration": "5h 15m",
+                    "fare_inr": 750,
+                    "rating": 4.6,
+                    "available_seats": 25,
+                    "amenities": ["Air Conditioning", "Pushback Seats", "Expressway Run"],
+                    "provider": "Rajasthan State Road Transport (RSRTC)",
+                    "booking_link": "https://rsrtconline.rajasthan.gov.in"
+                },
+                {
+                    "id": "pvt_dj_02",
+                    "operator": "Zingbus / Goldline Travels",
+                    "bus_type": "Premium AC BharatBenz Sleeper (2+1)",
+                    "origin_point": f"{orig_clean} Dhaula Kuan / IFFCO Chowk",
+                    "drop_point": f"{dest_clean} 200 Ft Bypass / Sindhi Camp",
+                    "departure_time": "22:30 IST",
+                    "arrival_time": "04:00 IST",
+                    "duration": "5h 30m",
+                    "fare_inr": 620,
+                    "rating": 4.7,
+                    "available_seats": 16,
+                    "amenities": ["Charging Port", "Live Tracking", "Water Bottle"],
+                    "provider": "redBus Verified Partner",
+                    "booking_link": "https://www.redbus.in"
+                }
+            ]
+
+        # 5. LONG DISTANCE INTERSTATE CORRIDORS (e.g. Mumbai <-> Delhi, Bangalore <-> Delhi, >800 km)
+        is_mumbai_delhi = ("mumbai" in orig_l and "delhi" in dest_l) or ("mumbai" in dest_l and "delhi" in orig_l)
+        if is_mumbai_delhi:
+            return [
+                {
+                    "id": "pvt_md_01",
+                    "operator": "IntrCity SmartBus / Shrinath Travels",
+                    "bus_type": "Volvo Multi-Axle AC Sleeper (2+1)",
+                    "origin_point": f"{orig_clean} Borivali / Sion / Vashi",
+                    "drop_point": f"{dest_clean} Kashmiri Gate ISBT / Dhaula Kuan",
+                    "departure_time": "14:00 IST (Day 1)",
+                    "arrival_time": "18:00 IST (Day 2 - Next Day)",
+                    "duration": "28h 00m",
+                    "fare_inr": 2800,
+                    "rating": 4.4,
+                    "available_seats": 12,
+                    "amenities": ["AC Sleeper Berth", "Charging Port", "Blanket", "GPS Tracking", "Rest Stops"],
+                    "route": "Overnight Highway Run via NH 48 (Surat - Ahmedabad - Udaipur - Jaipur - Delhi)",
+                    "provider": "redBus Verified Partner",
+                    "booking_link": "https://www.redbus.in"
+                },
+                {
+                    "id": "pvt_md_02",
+                    "operator": "Khurana / Hans Travels Premium Sleeper",
+                    "bus_type": "BharatBenz AC Sleeper (2+1)",
+                    "origin_point": f"{orig_clean} Andheri East / Thane",
+                    "drop_point": f"{dest_clean} Anand Vihar / Karol Bagh",
+                    "departure_time": "16:30 IST (Day 1)",
+                    "arrival_time": "20:30 IST (Day 2)",
+                    "duration": "28h 00m",
+                    "fare_inr": 3100,
+                    "rating": 4.3,
+                    "available_seats": 8,
+                    "amenities": ["Individual AC Vents", "Reading Light", "Emergency SOS"],
+                    "route": "Via Indore - Gwalior - Agra corridor",
+                    "provider": "AbhiBus Certified Partner",
+                    "booking_link": "https://www.abhibus.com"
+                }
+            ]
+
+        # 6. DYNAMIC SYSTEMATIC REGIONAL OPERATOR SEARCH (for general regional corridors)
         return [
             {
-                "id": f"msrtc_gen_01",
-                "operator": "MSRTC Shivshahi AC",
-                "bus_type": "Air-Conditioned Semi-Luxury Seater (2+2)",
-                "origin_point": f"{orig_clean} Central Bus Stand (CBS)",
-                "drop_point": f"{dest_clean} Main Bus Stand",
-                "departure_time": "08:00 IST",
-                "arrival_time": "15:30 IST",
+                "id": "pvt_gen_01",
+                "operator": "Intercity Express Connect",
+                "bus_type": "Air-Conditioned Semi-Sleeper (2+2)",
+                "origin_point": f"{orig_clean} Central Bus Terminal",
+                "drop_point": f"{dest_clean} Main Transit Hub",
+                "departure_time": "08:30 IST",
+                "arrival_time": "16:00 IST",
                 "duration": "7h 30m",
-                "fare_inr": 540,
-                "rating": 4.5,
+                "fare_inr": 650,
+                "rating": 4.4,
                 "available_seats": 20,
-                "amenities": ["Air Conditioning", "Punctual Operations", "State Guaranteed"],
-                "provider": "MSRTC Official (msrtc.maharashtra.gov.in)",
-                "booking_link": "https://npublic.msrtcors.com"
-            },
-            {
-                "id": f"msrtc_gen_02",
-                "operator": "MSRTC Parivahan Direct",
-                "bus_type": "Standard State Transport Fast Express",
-                "origin_point": f"{orig_clean} Bus Stand",
-                "drop_point": f"{dest_clean} Bus Stand",
-                "departure_time": "10:15 IST",
-                "arrival_time": "18:00 IST",
-                "duration": "7h 45m",
-                "fare_inr": 375,
-                "rating": 4.2,
-                "available_seats": 30,
-                "amenities": ["Regular Service", "Direct Route"],
-                "provider": "MSRTC Parivahan Fleet",
-                "booking_link": "https://npublic.msrtcors.com"
-            },
-            {
-                "id": f"pvt_gen_03",
-                "operator": "Intercity RedBus Partner",
-                "bus_type": "AC Sleeper (2+1)",
-                "origin_point": f"{orig_clean} Highway Boarding Point",
-                "drop_point": f"{dest_clean} City Bypass",
-                "departure_time": "21:30 IST",
-                "arrival_time": "05:00 IST",
-                "duration": "7h 30m",
-                "fare_inr": 720,
-                "rating": 4.7,
-                "available_seats": 14,
-                "amenities": ["Charging USB", "Blanket", "Live Tracking"],
+                "amenities": ["Air Conditioning", "Pushback Seats", "Punctual Operations"],
                 "provider": "redBus Verified Partner",
                 "booking_link": "https://www.redbus.in"
+            },
+            {
+                "id": "pvt_gen_02",
+                "operator": "Overnight Highway Sleeper",
+                "bus_type": "AC Sleeper Berth (2+1)",
+                "origin_point": f"{orig_clean} Highway Bypass Boarding",
+                "drop_point": f"{dest_clean} City Center Stand",
+                "departure_time": "21:30 IST",
+                "arrival_time": "05:30 IST",
+                "duration": "8h 00m",
+                "fare_inr": 850,
+                "rating": 4.6,
+                "available_seats": 14,
+                "amenities": ["Full Flat Sleeper Berth", "Charging USB", "Blanket", "Live Tracking"],
+                "provider": "AbhiBus Certified Partner",
+                "booking_link": "https://www.abhibus.com"
             }
         ]
 

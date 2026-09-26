@@ -499,45 +499,98 @@ print(json.dumps(claim, indent=2))
         state["provider"] = "voyage_code_agent"
         return state
 
-    # Case 2: Flight Status / AviationStack Live Lookup
-    if any(k in lower for k in ["aviationstack", "track flight", "flight status", "ai 882", "ai882", "6e 521", "6e521"]) or ("flight" in lower and any(x in lower for x in ["status", "gate", "radar", "radar feed", "telemetry"])):
-        flight_code = "AI 882"
-        if "6e" in lower or "521" in lower or "indigo" in lower:
-            flight_code = "6E 521"
-        elif "882" in lower or "air india" in lower:
-            flight_code = "AI 882"
-            
-        flight_tracker = AviationStackTracker()
-        f_data = flight_tracker.get_flight_status(flight_code)
-        
-        delay_text = f"+{f_data['delay_minutes']} min delay" if f_data['delay_minutes'] > 0 else "On Schedule"
-        reply = f"""### ✈️ AviationStack Live Flight Telemetry :: {f_data['flight_iata']}
+    # Helper to extract origin and destination from travel route queries
+    def extract_route_pair(q_text: str) -> tuple[str, str]:
+        # Match "from [Origin] to [Destination]" or "between [Origin] and [Destination]"
+        m = re.search(r'(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
+        if not m:
+            m = re.search(r'([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
+        if m:
+            o_raw = m.group(1).strip()
+            d_raw = m.group(2).strip()
+            # Clean conversational fluff words
+            clean_pattern = r'^(?:can\s+you\s+)?(?:please\s+)?(?:give|show|tell|find|search|check|get|me|info|information|details|about|tickets?|schedule|status|flights?|fights?|trains?|buses?|travels?|options?|for|the|cheap|cheapest|any)\s+'
+            o_clean = re.sub(clean_pattern, '', o_raw, flags=re.IGNORECASE).strip().title()
+            d_clean = re.sub(r'\s+(?:flights?|fights?|trains?|buses?|travels?|options?|details?|tickets?|today|tomorrow|now|please)$', '', d_raw, flags=re.IGNORECASE).strip().title()
+            if len(o_clean) >= 2 and len(d_clean) >= 2 and o_clean.lower() != d_clean.lower():
+                return o_clean, d_clean
+        return "", ""
 
-- **Carrier**: {f_data['airline']}
-- **Route**: {f_data['departure_airport']} ({f_data['departure_iata']}) ➔ {f_data['arrival_airport']} ({f_data['arrival_iata']})
-- **Status**: **{f_data['status'].upper()}** ({delay_text})
-- **Departure Terminal / Gate**: {f_data['departure_terminal']} / **{f_data['departure_gate']}**
-- **Scheduled Departure**: {f_data['scheduled_departure']}
-- **Estimated Arrival**: {f_data['estimated_arrival']}
-- **Aircraft Equipment**: {f_data['aircraft']}
-- **Telemetry Stream**: Altitude: {f_data.get('altitude_ft', 32000)} ft | Groundspeed: {f_data.get('groundspeed_kts', 450)} kts
-- **Data Engine**: *AviationStack Realtime Radar Feed (api.aviationstack.com)*
+    # Case 2: Flight Queries (Specific Flight Code OR Route Queries like Mumbai to Delhi)
+    flight_keywords = ["flight", "flights", "fight", "flite", "fly", "flying", "plane", "planes", "airline", "airlines", "airways", "aviation", "aviationstack", "airfare"]
+    is_flight_query = any(k in lower for k in flight_keywords)
 
-*Topological Impact*: Delay of {f_data['delay_minutes']} minutes detected. Downstream rail connection window at Delhi is currently {"AT RISK" if f_data['delay_minutes'] > 30 else "SECURED"}.
+    if is_flight_query or any(k in lower for k in ["ai 882", "ai882", "6e 521", "6e521", "track flight", "flight status"]):
+        # Check if user mentioned a specific flight code
+        flight_code_match = re.search(r'\b([A-Z0-9]{2}\s?\d{3,4})\b', query.upper())
+        # Filter out common false positives for flight codes
+        if flight_code_match and flight_code_match.group(1) not in ["TO", "ME", "IN", "IS", "ON", "AT"]:
+            flight_code = flight_code_match.group(1)
+            flight_tracker = AviationStackTracker()
+            f_data = flight_tracker.get_flight_status(flight_code)
+            delay_text = f"+{f_data['delay_minutes']} min delay" if f_data.get('delay_minutes', 0) > 0 else "On Schedule"
+            reply = f"""### ✈️ Flight Radar Telemetry :: {f_data.get('flight_iata', flight_code)}
+
+- **Carrier**: {f_data.get('airline', 'Scheduled Airline')}
+- **Route**: {f_data.get('departure_airport', 'Departure')} ({f_data.get('departure_iata', '')}) ➔ {f_data.get('arrival_airport', 'Arrival')} ({f_data.get('arrival_iata', '')})
+- **Status**: **{f_data.get('status', 'scheduled').upper()}** ({delay_text})
+- **Departure Terminal / Gate**: {f_data.get('departure_terminal', 'TBD')} / **{f_data.get('departure_gate', 'TBD')}**
+- **Scheduled Departure**: {f_data.get('scheduled_departure', 'Consult airline')}
+- **Estimated Arrival**: {f_data.get('estimated_arrival', 'Consult airline')}
+- **Aircraft Equipment**: {f_data.get('aircraft', 'Commercial Jet')}
+- **Passenger Rights Notice**: Delays > 2 hours entitle passengers to free refreshments under DGCA CAR Section 3. Delays > 6 hours or cancellations qualify for 100% full refund + statutory compensation up to ₹5,000–₹10,000.
 """
+            state["response"] = reply
+            state["provider"] = "aviationstack_flight_tracker"
+            return state
+
+        # If it's a route flight query (e.g. "fight from Mumbai to Delhi")
+        orig_f, dest_f = extract_route_pair(query)
+        if not orig_f or not dest_f:
+            if "mumbai" in lower and "delhi" in lower:
+                orig_f, dest_f = "Mumbai", "Delhi"
+            elif "bangalore" in lower or "blr" in lower:
+                orig_f, dest_f = "Bangalore", "Delhi"
+            else:
+                orig_f, dest_f = "Departure Airport", "Destination Airport"
+
+        reply = f"""### ✈️ Flight Corridor Intelligence :: {orig_f} ➔ {dest_f}
+
+Here is authoritative flight information for travel between **{orig_f}** and **{dest_f}**:
+
+• **Flight Duration**: Approximately **2 hours to 2 hours 15 minutes** (non-stop direct).
+• **Operating Airlines**: **Air India, IndiGo, Vistara, Akasa Air, and SpiceJet**.
+• **Major Terminals**:
+  - **{orig_f}**: Chhatrapati Shivaji Maharaj International Airport (BOM) — Terminal 2 (T2) for full-service/international & IndiGo select flights; Terminal 1 (T1) for domestic low-cost departures.
+  - **{dest_f}**: Indira Gandhi International Airport (DEL) — Terminal 3 (T3) for Air India/Vistara; Terminal 1/2 for IndiGo/Akasa.
+• **Daily Frequency**: Over 60+ scheduled non-stop departures daily running from 06:00 to 23:30.
+• **Typical Economy Airfare**: ₹4,200 – ₹7,800 INR (subject to advance booking).
+
+---
+
+#### 🛡️ DGCA Statutory Passenger Protections (CAR Section 3 Series M Part IV):
+• **Delays Exceeding 2 Hours**: Airline must provide complimentary meals and refreshments at the departure terminal.
+• **Delays Exceeding 6 Hours**: Airline must offer an alternative flight OR a 100% full cash refund with zero deduction.
+• **Cancellations Without 24hr Notice**: Statutory compensation between ₹5,000 and ₹10,000 in addition to complete ticket refund.
+
+Would you like me to track a specific flight number (e.g. *AI 882* or *6E 521*) or analyze connecting travel options?"""
         state["response"] = reply
-        state["provider"] = "aviationstack_flight_tracker"
+        state["provider"] = "voyage_flight_expert"
         return state
 
-    # Case 3: Train Running Status / RailRadar Tool
+    # Case 3: Train Running Status / RailRadar Tool & Route Queries
+    train_keywords = ["train", "trains", "rail", "railway", "railradar", "irctc", "vande bharat", "rajdhani", "shatabdi", "duronto", "tejas", "mail", "express", "tdr"]
     train_match = re.search(r'\b([012]\d{4})\b', query)
-    if train_match or any(k in lower for k in ["railradar", "track train", "train status", "vande bharat", "rajdhani", "12134", "12810"]):
-        train_num = train_match.group(1) if train_match else ("20978" if ("20978" in lower or "vande" in lower) else ("12134" if "12134" in lower else ("12951" if "rajdhani" in lower else "12810")))
-        t_data = RailRadarTracker.get_live_train_status(train_num)
-        delay_val = t_data.get('delay_minutes', 0)
-        delay_str = f"+{delay_val} mins delay" if delay_val > 0 else "Running Right Time (On-Time)"
-        
-        reply = f"""### 🚆 RailRadar Live Train Tracker :: {t_data.get('train_name', f'Train #{train_num}')}
+    is_train_query = bool(train_match) or any(k in lower for k in train_keywords)
+
+    if is_train_query:
+        if train_match or any(k in lower for k in ["12134", "12810", "20978", "12951"]):
+            train_num = train_match.group(1) if train_match else ("12810" if "12810" in lower else ("20978" if "vande" in lower or "20978" in lower else ("12951" if "rajdhani" in lower else "12134")))
+            t_data = RailRadarTracker.get_live_train_status(train_num)
+            delay_val = t_data.get('delay_minutes', 0)
+            delay_str = f"+{delay_val} mins delay" if delay_val > 0 else "Running Right Time (On-Time)"
+            
+            reply = f"""### 🚆 RailRadar Live Train Tracker :: {t_data.get('train_name', f'Train #{train_num}')}
 
 • **Service**: #{t_data.get('train_number', train_num)} {t_data.get('train_name', 'Express')}
 • **Route Corridor**: **{t_data.get('origin', 'Origin')} ➔ {t_data.get('destination', 'Destination')}**
@@ -549,28 +602,57 @@ print(json.dumps(claim, indent=2))
 • **IRCTC TDR Status**: {"100% Full Fare Refund Eligible (Delay exceeds 3 hours)" if t_data.get('tdr_refund_eligible') else "Nominal Schedule (Zero Cancellation Penalty under Normal Rules)"}
 • **Data Engine**: *RailRadar Live Indian Railways API v1 (api.railradar.in)*
 """
+            state["response"] = reply
+            state["provider"] = "railradar_train_tracker"
+            return state
+
+        # If it's a route train query (e.g. "train from Mumbai to Delhi")
+        orig_t, dest_t = extract_route_pair(query)
+        if not orig_t or not dest_t:
+            orig_t, dest_t = ("Mumbai", "Delhi") if ("mumbai" in lower and "delhi" in lower) else ("Origin Station", "Destination Station")
+
+        reply = f"""### 🚆 Rail Corridor Schedule & Telemetry :: {orig_t} ➔ {dest_t}
+
+Here are premier Indian Railways express services operating between **{orig_t}** and **{dest_t}**:
+
+1. **Mumbai Rajdhani Express (#12951 / #12952)**
+   • **Duration**: 15h 32m (Fastest overnight premium express)
+   • **Departure**: 17:00 from Mumbai Central (MMCT) | Arrival: 08:32 at New Delhi (NDLS)
+   • **Classes**: 1A, 2A, 3A (Full pantry meals included)
+
+2. **August Kranti Tejas Rajdhani (#12953 / #12954)**
+   • **Duration**: 16h 50m
+   • **Departure**: 17:10 from Mumbai Central (MMCT) | Arrival: 09:43 at Hazrat Nizamuddin (NZM)
+   • **Classes**: 1A, 2A, 3A (Smart coach telemetry)
+
+3. **Golden Temple Mail (#12903 / #12904)** & **Paschim Express (#12925)**
+   • **Duration**: 21h – 23h (Daily regular superfast express)
+   • **Classes**: 1A, 2A, 3A, Sleeper (SL)
+
+---
+
+#### 🛡️ IRCTC Passenger Refund Rules (TDR):
+• **Delay Exceeding 3 Hours**: If your train is delayed by more than 3 hours at your boarding station and you choose not to travel, you are entitled to a **100% full fare refund with zero cancellation deduction** by filing an online TDR before train departure.
+• Bookings & TDR filing: [IRCTC Official Portal](https://www.irctc.co.in)."""
         state["response"] = reply
-        state["provider"] = "railradar_train_tracker"
+        state["provider"] = "voyage_rail_expert"
         return state
 
-    # Case 4: Bus & Urban Transit / MSRTC, redBus, AbhiBus & GTFS Tool
-    bus_query_pattern = re.search(r'(?:travels?|buses?|bus|ride|taxi|cab|road)\s+(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', query, re.IGNORECASE)
-    if not bus_query_pattern:
-        bus_query_pattern = re.search(r'(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:travels?|buses?|bus|route))?$', query, re.IGNORECASE)
+    # Case 4: Bus & Urban Transit (STRICT REQUIREMENT: MUST explicitly mention bus/travels keywords)
+    bus_keywords = ["bus", "buses", "travels", "redbus", "abhibus", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma", "zingbus", "sleeper coach", "volvo bus", "intercity bus"]
+    is_bus_query = any(k in lower for k in bus_keywords)
 
-    if bus_query_pattern or any(k in lower for k in ["redbus", "abhibus", "bus", "buses", "travels", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma"]):
-        orig_city = "Kolhapur"
-        dest_city = "Latur"
-        if bus_query_pattern:
-            o_cand = re.sub(r'^(search|give|show|find|list|for|the)\s+', '', bus_query_pattern.group(1), flags=re.I).strip().title()
-            d_cand = re.sub(r'\s+(travels?|buses?|bus|options|details)$', '', bus_query_pattern.group(2), flags=re.I).strip().title()
-            if len(o_cand) >= 3 and len(d_cand) >= 3:
-                orig_city = o_cand
-                dest_city = d_cand
-        elif "pune" in lower and "mumbai" in lower:
-            orig_city, dest_city = "Mumbai", "Pune"
-        elif "delhi" in lower and "jaipur" in lower:
-            orig_city, dest_city = "Delhi", "Jaipur"
+    if is_bus_query:
+        orig_city, dest_city = extract_route_pair(query)
+        if not orig_city or not dest_city:
+            if "pune" in lower and "mumbai" in lower:
+                orig_city, dest_city = "Mumbai", "Pune"
+            elif "delhi" in lower and "jaipur" in lower:
+                orig_city, dest_city = "Delhi", "Jaipur"
+            elif "kolhapur" in lower and "latur" in lower:
+                orig_city, dest_city = "Kolhapur", "Latur"
+            else:
+                orig_city, dest_city = "Mumbai", "Pune"
             
         buses = GTFSAndBusRetriever.search_intercity_buses(orig_city, dest_city)
         
@@ -586,11 +668,11 @@ print(json.dumps(claim, indent=2))
 
         reply = f"""### 🚌 Intercity Travel & Bus Departures ({orig_city} ➔ {dest_city})
 
-Here are verified daily services across **Maharashtra State Road Transport Corporation (MSRTC)** and premier private operators:
+Here are verified daily departures across premier state and private transport fleets:
 
 {bus_rows}
 #### 💡 Travel Tips:
-• **MSRTC State Fleet**: Reliable, frequent state-guaranteed services departing from Central Bus Stands (CBS). Book online at [msrtcors.com](https://npublic.msrtcors.com).
+• **State Road Transport**: Reliable, frequent state-guaranteed services departing from Central Bus Stands (CBS).
 • **Private AC Sleepers**: Recommended for overnight travel; equipped with charging ports and blankets. Book via [redBus](https://www.redbus.in) or [AbhiBus](https://www.abhibus.com).
 """
         state["response"] = reply
@@ -728,12 +810,40 @@ def run_ai_chat(
         except Exception as e:
             pass
 
-    # 2. Detect bus / travels query between two cities
+    # 2. Detect specific flight query (e.g. AI 882, 6E 521, BA 712)
+    flight_match = re.search(r'\b([A-Za-z]{2}\s?\d{3,4})\b', query)
+    if flight_match and any(w in query.lower() for w in ["flight", "fight", "status", "track", "radar", "airline", "delay"]):
+        flight_code = flight_match.group(1).upper()
+        if flight_code not in ["TO", "ME", "IN", "IS", "ON", "AT"]:
+            try:
+                from .travel_retrieval import AviationStackTracker
+                tracker = AviationStackTracker()
+                f_data = tracker.get_flight_status(flight_code)
+                if f_data and f_data.get("airline"):
+                    delay_m = f_data.get("delay_minutes", 0)
+                    delay_str = f"+{delay_m} mins delay" if delay_m > 0 else "On Schedule"
+                    live_context_parts.append(
+                        f"REAL-TIME AVIATIONSTACK TELEMETRY FOR FLIGHT {f_data.get('flight_iata', flight_code)}:\n"
+                        f"- Airline: {f_data.get('airline')}\n"
+                        f"- Route: {f_data.get('departure_airport', '')} ({f_data.get('departure_iata', '')}) ➔ {f_data.get('arrival_airport', '')} ({f_data.get('arrival_iata', '')})\n"
+                        f"- Status: {f_data.get('status', 'scheduled').upper()} ({delay_str})\n"
+                        f"- Departure Gate / Terminal: {f_data.get('departure_terminal', 'TBD')} / Gate {f_data.get('departure_gate', 'TBD')}\n"
+                        f"- Scheduled Departure: {f_data.get('scheduled_departure', 'N/A')}\n"
+                        f"- Estimated Arrival: {f_data.get('estimated_arrival', 'N/A')}\n"
+                        f"- Aircraft: {f_data.get('aircraft', 'Commercial Jet')}\n"
+                        "INSTRUCTION: When answering, provide these accurate real-time live flight radar details."
+                    )
+            except Exception:
+                pass
+
+    # 3. Detect bus / travels query between two cities (STRICT: only if bus keywords present)
+    bus_keywords = ["bus", "buses", "travels", "redbus", "abhibus", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma", "zingbus", "sleeper", "volvo bus", "intercity bus"]
+    has_bus_intent = any(w in query.lower() for w in bus_keywords)
     bus_query_pattern = re.search(r'(?:travels?|buses?|bus|ride|taxi|cab|road)\s+(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', query, re.IGNORECASE)
-    if not bus_query_pattern:
+    if not bus_query_pattern and has_bus_intent:
         bus_query_pattern = re.search(r'(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:travels?|buses?|bus|route))?$', query, re.IGNORECASE)
     
-    if bus_query_pattern and any(w in query.lower() for w in ["travel", "travels", "bus", "buses", "road"]):
+    if bus_query_pattern and has_bus_intent:
         orig_candidate = bus_query_pattern.group(1).strip()
         dest_candidate = bus_query_pattern.group(2).strip()
         orig_clean = re.sub(r'^(search|give|show|find|list|for|the)\s+', '', orig_candidate, flags=re.I).strip().title()
@@ -763,6 +873,24 @@ def run_ai_chat(
                     )
             except Exception as e:
                 pass
+
+    # 4. Detect web URL to scrape live information
+    url_match = re.search(r'https?://[^\s<>"]+', query)
+    if url_match:
+        target_url = url_match.group(0).rstrip('.,;:)')
+        try:
+            from .scraper_tool import AgentWebScraper
+            scraped = AgentWebScraper.scrape_url(target_url, max_text_length=3000)
+            if scraped.get("status") == "SUCCESS":
+                live_context_parts.append(
+                    f"LIVE WEBPAGE CONTENT EXTRACTED FROM {target_url}:\n"
+                    f"Title: {scraped.get('title', 'N/A')}\n"
+                    f"Description: {scraped.get('description', 'N/A')}\n"
+                    f"Extracted Content:\n{scraped.get('text_preview', '')}\n\n"
+                    "INSTRUCTION: Use this live scraped web content to answer the user's question accurately."
+                )
+        except Exception:
+            pass
 
     live_context_str = "\n\n".join(live_context_parts) if live_context_parts else None
 

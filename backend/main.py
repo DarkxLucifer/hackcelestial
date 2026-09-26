@@ -882,11 +882,20 @@ def get_gtfs_metro_endpoint():
     """Returns GTFS 2.0 specification schedule for Delhi Airport Express Metro."""
     return GTFSAndBusRetriever.get_gtfs_airport_metro()
 
-@app.get("/api/tools/web-scrape")
-def web_scrape_endpoint(url: str = "https://gtfs.org"):
-    """Scrapes and extracts content from any random web domain using AgentWebScraper."""
+@app.api_route("/api/tools/web-scrape", methods=["GET", "POST"])
+async def web_scrape_endpoint(request: Request, url: Optional[str] = None):
+    """Scrapes and extracts content from any web domain using AgentWebScraper (GET or POST)."""
     from .scraper_tool import AgentWebScraper
-    return AgentWebScraper.scrape_url(url)
+    target_url = url
+    if not target_url and request.method == "POST":
+        try:
+            body = await request.json()
+            target_url = body.get("url")
+        except Exception:
+            pass
+    if not target_url:
+        target_url = "https://gtfs.org"
+    return AgentWebScraper.scrape_url(target_url)
 
 if __name__ == "__main__":
     import uvicorn
