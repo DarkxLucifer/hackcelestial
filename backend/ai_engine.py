@@ -458,36 +458,51 @@ def parse_document_file(file_bytes: bytes, filename: str, content_type: str = "a
     # Extract travel parameters using heuristic regex and keyword scanner
     lower = (extracted_text + " " + filename).lower()
 
-    carrier = "Air India"
-    if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
-    elif "spicejet" in lower or "sg" in lower: carrier = "SpiceJet"
-    elif "vande bharat" in lower or "train" in lower or "rail" in lower or "irctc" in lower: carrier = "Indian Railways"
-    elif "vistara" in lower or "uk" in lower: carrier = "Vistara"
+    # 1. Check for Train (Indian Railways / RailRadar)
+    train_num_match = re.search(r'\b(1\d{4}|2\d{4}|12\d{3}|20\d{3}|22\d{3})\b', lower)
+    is_train = bool(train_num_match) or any(k in lower for k in ["train", "vande bharat", "railway", "irctc", "express", "shatabdi", "rajdhani"])
 
-    # Flight or service number extraction
-    service_match = re.search(r'(6e|ai|sg|uk|ba|aa|dl)[\s-]?(\d{3,4})', lower)
-    if service_match:
-        service_number = f"{service_match.group(1).upper()} {service_match.group(2)}"
+    if is_train:
+        carrier = "Indian Railways"
+        train_num = train_num_match.group(1) if train_num_match else "20978"
+        t_data = RailRadarTracker.get_live_train_status(train_num)
+        service_number = f"#{t_data['train_number']} {t_data['train_name']}"
+        origin = t_data.get("origin", "New Delhi (NDLS)")
+        destination = t_data.get("destination", "Jaipur Junction (JP)")
+        live_delay = t_data.get("delay_minutes", 0)
+        mode = "train"
     else:
-        service_number = "6E 521" if "IndiGo" in carrier else "AI 882"
+        mode = "flight"
+        carrier = "Air India"
+        if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
+        elif "spicejet" in lower or "sg" in lower: carrier = "SpiceJet"
+        elif "vistara" in lower or "uk" in lower: carrier = "Vistara"
+
+        # Flight or service number extraction
+        service_match = re.search(r'(6e|ai|sg|uk|ba|aa|dl)[\s-]?(\d{3,4})', lower)
+        if service_match:
+            service_number = f"{service_match.group(1).upper()} {service_match.group(2)}"
+        else:
+            service_number = "6E 521" if "IndiGo" in carrier else "AI 882"
+
+        # Route extraction for flights
+        origin = "Mumbai (BOM)"
+        destination = "Delhi (DEL)"
+        if "delhi" in lower and "jaipur" in lower:
+            origin = "Delhi (DEL)"
+            destination = "Jaipur (JAI)"
+        elif "bangalore" in lower or "blr" in lower:
+            origin = "Bangalore (BLR)"
+            destination = "Delhi (DEL)"
+        live_delay = 45
 
     # PNR extraction
     pnr_match = re.search(r'pnr[\s:=-]+([a-z0-9]{6,10})', lower)
     pnr = f"VY-{pnr_match.group(1).upper()}" if pnr_match else f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN"
 
-    # Route extraction
-    origin = "Mumbai (BOM)"
-    destination = "Delhi (DEL)"
-    if "delhi" in lower and "jaipur" in lower:
-        origin = "Delhi (DEL)"
-        destination = "Jaipur (JAI)"
-    elif "bangalore" in lower or "blr" in lower:
-        origin = "Bangalore (BLR)"
-        destination = "Delhi (DEL)"
-
     # Delay / Cancellation extraction
     is_cancellation = "cancel" in lower or "cancelled" in lower
-    delay_minutes = 210
+    delay_minutes = live_delay if live_delay > 0 else 120
     delay_match = re.search(r'(\d+)\s*(mins?|minutes?|hrs?|hours?)', lower)
     if delay_match:
         val = int(delay_match.group(1))
@@ -498,7 +513,7 @@ def parse_document_file(file_bytes: bytes, filename: str, content_type: str = "a
 
     # Fare extraction
     fare_match = re.search(r'(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{2})?)', lower)
-    ticket_cost = 6450.0
+    ticket_cost = 1850.0 if mode == "train" else 6450.0
     if fare_match:
         try:
             ticket_cost = float(fare_match.group(1).replace(",", ""))
@@ -516,7 +531,7 @@ def parse_document_file(file_bytes: bytes, filename: str, content_type: str = "a
         "destination": destination,
         "delay_minutes": delay_minutes,
         "is_cancellation": is_cancellation,
-        "disruption_reason": "Air Traffic Delay & Carrier Technical Inspection" if not is_cancellation else "Carrier Operational Schedule Cancellation",
+        "disruption_reason": f"Operational Delay on {service_number}" if not is_cancellation else f"Service Cancellation on {service_number}",
         "ticket_cost": ticket_cost,
         "currency": "INR"
     }
