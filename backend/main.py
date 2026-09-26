@@ -803,13 +803,25 @@ async def ai_transcribe_voice(
     }
 
 @app.get("/api/travel/live-telemetry")
-def get_travel_telemetry():
-    """Returns real-time multi-modal telemetry across Flight, GTFS Metro, RailRadar, and Buses."""
-    return get_live_connection_graph_telemetry()
+def get_travel_telemetry(
+    flight: str = "",
+    train: str = "",
+    origin: str = "Mumbai",
+    destination: str = "Delhi"
+):
+    """Returns real-time multi-modal telemetry. Pass ?flight=AI882&train=12810&origin=Nagpur&destination=Mumbai for real data."""
+    return get_live_connection_graph_telemetry(
+        flight_iata=flight,
+        train_number=train,
+        origin=origin,
+        destination=destination
+    )
 
 @app.get("/api/travel/flight-status")
-def get_flight_status_endpoint(flight: str = "AI 882"):
-    """Fetches real-time flight status and radar telemetry via AviationStack API."""
+def get_flight_status_endpoint(flight: str):
+    """Fetches real-time flight status via AviationStack API. Pass ?flight=AI882"""
+    if not flight:
+        return {"error": "Provide ?flight=IATA_CODE e.g. ?flight=AI882", "delay_minutes": 0}
     tracker = AviationStackTracker()
     return tracker.get_flight_status(flight)
 
