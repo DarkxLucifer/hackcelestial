@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import PeeledSheetPull from './components/PeeledSheetPull';
-import AirplaneScrollPull from './components/AirplaneScrollPull';
 import Hero from './components/Hero';
-import ItineraryGraph from './components/ItineraryGraph';
-import DisruptionSimulator from './components/DisruptionSimulator';
-import BlastRadiusView from './components/BlastRadiusView';
-import DominoRiskGauge from './components/DominoRiskGauge';
-import PersonaWeightSliders from './components/PersonaWeightSliders';
+import ResilienceLogs from './components/ResilienceLogs';
+import ResiliencePlans from './components/ResiliencePlans';
 import RecoveryComparison from './components/RecoveryComparison';
 import PassengerRightsBridge from './components/PassengerRightsBridge';
 import AgenticSagaModal from './components/AgenticSagaModal';
+import AuthModal from './components/AuthModal';
+import BookingModal from './components/BookingModal';
 import TravelAgencySections from './components/TravelAgencySections';
 import Footer from './components/Footer';
+import { translations } from './translations';
 
 import {
   fetchItinerary,
@@ -33,6 +32,16 @@ export default function App() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   
+  // Internationalization Language state ('en' | 'mr' | 'hi')
+  const [language, setLanguage] = useState('en');
+  const t = translations[language] || translations.en;
+
+  // Authentication & Booking Routing state
+  const [user, setUser] = useState({ name: 'Elena Vance', email: 'elena.vance@voyage.io', tier: 'Plus' });
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authInitialTab, setAuthInitialTab] = useState('login');
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+
   // Saga Modal state
   const [isSagaOpen, setIsSagaOpen] = useState(false);
   const [selectedPlanForSaga, setSelectedPlanForSaga] = useState(null);
@@ -49,7 +58,6 @@ export default function App() {
         setItinerary(data.itinerary);
         setRiskAnalysis(data.risk_analysis);
       } else {
-        // Fallback demo state if backend not responding yet
         setItinerary({
           id: "itinerary_alpine_cascade",
           title: "The Alpine Expedition: London to Zermatt",
@@ -79,13 +87,11 @@ export default function App() {
         });
       }
 
-      // Preload recovery plans
       const plansData = await fetchRecoveryPlans();
       if (plansData && plansData.plans) {
         setRecoveryPlans(plansData.plans);
       }
 
-      // Preload rights data
       const rightsData = await fetchPassengerRights();
       if (rightsData) {
         setPassengerRights(rightsData);
@@ -98,110 +104,53 @@ export default function App() {
   const handleSimulateDisruption = async (disruptionPayload) => {
     setIsSimulating(true);
     try {
-      const res = await simulateDisruption(disruptionPayload);
-      if (res) {
-        setItinerary(res.itinerary);
-        setActiveImpact(res.impact);
-        setRiskAnalysis(res.risk_analysis);
-        setActiveDisruption(disruptionPayload);
-      } else {
-        // Fallback local simulation if backend offline
-        setActiveDisruption(disruptionPayload);
-        const updatedNodes = itinerary.nodes.map(n => {
-          if (n.id === disruptionPayload.node_id) {
-            return { ...n, status: "delayed", slack_minutes: -10, details: { revised_end_time: "17:50" } };
-          }
-          if (n.id === "node_train_1") {
-            return { ...n, status: "missed", slack_minutes: -18, details: { revised_start_time: "19:02" } };
-          }
-          if (n.id === "node_hotel_1") {
-            return { ...n, status: "at_risk", details: { revised_start_time: "22:15" } };
-          }
-          return n;
-        });
-        setItinerary(prev => ({
-          ...prev,
-          nodes: updatedNodes,
-          domino_risk_index: 99.0
-        }));
-        setActiveImpact({
-          disrupted_node_id: disruptionPayload.node_id,
-          delay_minutes: disruptionPayload.delay_minutes,
-          blast_radius_node_ids: ["node_transfer_1", "node_train_1", "node_train_2", "node_hotel_1"],
-          missed_connection_node_ids: ["node_train_1", "node_train_2"],
-          at_risk_reservation_ids: ["node_hotel_1"],
-          total_downstream_delay: 150,
-          estimated_financial_loss: 418.0,
-          domino_risk_index_before: 48.2,
-          domino_risk_index_after: 99.0,
-          summary: `Disruption on flight (+${disruptionPayload.delay_minutes}m) breached MCT buffer (-10m) and caused missed rail connections.`
-        });
+      const data = await simulateDisruption(disruptionPayload || {
+        node_id: "node_flight_1",
+        delay_minutes: 65,
+        is_cancellation: false,
+        reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
+      });
+      if (data) {
+        setActiveDisruption(data.disruption);
+        setActiveImpact(data.impact);
+        setRiskAnalysis(data.risk_analysis);
+        if (data.recovery_plans) {
+          setRecoveryPlans(data.recovery_plans);
+        }
       }
-
-      // Re-fetch optimal plans with the new disruption state
-      const plansRes = await fetchRecoveryPlans();
-      if (plansRes && plansRes.plans) {
-        setRecoveryPlans(plansRes.plans);
-      }
-
-      // Re-fetch rights
-      const rightsRes = await fetchPassengerRights();
-      if (rightsRes) setPassengerRights(rightsRes);
-
-      // Smooth scroll to impact section
-      setTimeout(() => {
-        const el = document.querySelector('#blast-radius');
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }, 300);
-
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error("Simulation error:", e);
     } finally {
       setIsSimulating(false);
     }
   };
 
-  const handleReset = async () => {
-    setActiveDisruption(null);
-    setActiveImpact(null);
-    await resetItinerary("alpine");
-    await loadInitialData();
-  };
-
-  const handleUpdatePersonaWeights = async (weights) => {
-    setIsOptimizing(true);
-    try {
-      const plansRes = await fetchRecoveryPlans(weights);
-      if (plansRes && plansRes.plans) {
-        setRecoveryPlans(plansRes.plans);
-      }
-    } catch (e) {
-      console.warn("Failed updating persona weights:", e);
-    } finally {
-      setIsOptimizing(false);
-    }
-  };
-
   const handleOpenSagaModal = (plan) => {
-    setSelectedPlanForSaga(plan || recoveryPlans[1] || recoveryPlans[0]);
+    setSelectedPlanForSaga(plan || recoveryPlans[0]);
     setIsSagaOpen(true);
   };
 
-  const handleCommitSuccess = async (plan) => {
-    try {
-      await commitRecoveryPlan(plan);
-      setActiveDisruption(null);
-      setActiveImpact(null);
-      await loadInitialData();
-    } catch (e) {
-      console.warn("Commit error:", e);
-    }
+  const handleCommitSuccess = (committedPlan) => {
+    setIsSagaOpen(false);
+    setActiveDisruption(null);
+    loadInitialData();
+  };
+
+  const handleOpenAuth = (tab = 'login') => {
+    setAuthInitialTab(tab);
+    setIsAuthOpen(true);
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setIsAuthOpen(false);
+    setIsBookingOpen(true);
   };
 
   return (
     <div className="min-h-screen relative flex flex-col bg-[#FAF9F6] text-voyare-navy font-poppins selection:bg-voyare-coral selection:text-white">
       
-      {/* 1. Floating Pill Glassmorphic Navbar (appears on scroll) */}
+      {/* 1. Navbar matching media_1790416291459.png with EN/MR/HI, Book Now, Resolve Disruption */}
       <Navbar
         activeDisruption={activeDisruption}
         onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
@@ -211,9 +160,16 @@ export default function App() {
           is_cancellation: false,
           reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
         })}
+        user={user}
+        onLogout={() => setUser(null)}
+        onOpenAuth={handleOpenAuth}
+        onOpenBooking={() => setIsBookingOpen(true)}
+        language={language}
+        onSelectLanguage={setLanguage}
+        t={t}
       />
 
-      {/* 2. Fullscreen Island & Airplane 3D Peeled Sheet Scroll Engine (matching reference images) */}
+      {/* 2. Fullscreen Island & Airplane 3D Peeled Sheet Scroll Engine */}
       <PeeledSheetPull
         activeDisruption={activeDisruption}
         onSimulateAlpine={() => handleSimulateDisruption({
@@ -222,8 +178,9 @@ export default function App() {
           is_cancellation: false,
           reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
         })}
+        t={t}
       >
-        {/* Mission Telemetry & Active Trip Summary Card */}
+        {/* Section 1: Hero with Demo Journey in Format of Map (Replaced div[1] per user request) */}
         <Hero
           itinerary={itinerary}
           activeDisruption={activeDisruption}
@@ -234,68 +191,23 @@ export default function App() {
             reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
           })}
           onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
+          t={t}
         />
 
-        {/* Spatio-Temporal Knowledge Graph & Critical Path Method Visualizer */}
-        <ItineraryGraph
+        {/* Section 2: Minimal Logs Format (Replaces CPM / Sliders / Simulators per user request) */}
+        <ResilienceLogs
           itinerary={itinerary}
           activeDisruption={activeDisruption}
-          onSelectNode={(node) => console.log("Selected node:", node)}
+          t={t}
         />
 
-        {/* Live Disruption Radar & Injection Simulator */}
-        <DisruptionSimulator
-          itinerary={itinerary}
-          activeDisruption={activeDisruption}
-          onSimulate={handleSimulateDisruption}
-          onReset={handleReset}
-          isSimulating={isSimulating}
+        {/* Section 3: Plans in Format like Plan Images (Matching media_1790415846480.jpg) */}
+        <ResiliencePlans
+          onSelectPlan={(tier) => handleOpenSagaModal(recoveryPlans[0])}
+          t={t}
         />
 
-        {/* CPM Downstream Ripple Propagation & Blast Radius View */}
-        <BlastRadiusView
-          activeImpact={activeImpact}
-          itinerary={itinerary}
-          onReviewRecovery={() => {
-            const el = document.querySelector('#recovery');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }}
-        />
-
-        {/* Domino Risk Index (DRI 0-100) Gauge */}
-        <DominoRiskGauge
-          riskAnalysis={riskAnalysis}
-          itinerary={itinerary}
-        />
-
-        {/* Interactive Persona Multi-Objective Tuning Sliders */}
-        <PersonaWeightSliders
-          onUpdateWeights={handleUpdatePersonaWeights}
-          isOptimizing={isOptimizing}
-        />
-
-        {/* Tri-Archetype Recovery Plan Framework & Visual Git-Diff Comparison */}
-        <RecoveryComparison
-          recoveryPlans={recoveryPlans}
-          onSelectPlan={handleOpenSagaModal}
-          activeDisruption={activeDisruption}
-        />
-
-        {/* Deterministic Statutory Passenger Rights & Parametric Liquidity Advance */}
-        <PassengerRightsBridge
-          passengerRights={passengerRights}
-          onApplyLiquidity={() => handleOpenSagaModal(recoveryPlans[0])}
-        />
-
-        {/* Atomic Distributed Saga Orchestration Modal */}
-        <AgenticSagaModal
-          plan={selectedPlanForSaga}
-          isOpen={isSagaOpen}
-          onClose={() => setIsSagaOpen(false)}
-          onCommitSuccess={handleCommitSuccess}
-        />
-
-        {/* Travel Agency Figma UI Sections (Services, Top Destinations, Easy Steps, Testimonials, Partner Logos) */}
+        {/* Section 4: Travel Agency Sections from Figma (Services, Top Destinations, 3 Easy Steps, Testimonials) */}
         <TravelAgencySections
           onSimulateAlpine={() => handleSimulateDisruption({
             node_id: "node_flight_1",
@@ -305,11 +217,39 @@ export default function App() {
           })}
           onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
           activeDisruption={activeDisruption}
+          t={t}
         />
 
-        {/* Footer (matching user's specification) */}
+        {/* Section 5: Footer */}
         <Footer />
       </PeeledSheetPull>
+
+      {/* Auth Modal (Login / Sign Up) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+        initialTab={authInitialTab}
+        t={t}
+      />
+
+      {/* Bookings Dashboard Modal */}
+      <BookingModal
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        user={user}
+        itinerary={itinerary}
+        activeDisruption={activeDisruption}
+        t={t}
+      />
+
+      {/* Atomic Distributed Saga Orchestration Modal */}
+      <AgenticSagaModal
+        plan={selectedPlanForSaga}
+        isOpen={isSagaOpen}
+        onClose={() => setIsSagaOpen(false)}
+        onCommitSuccess={handleCommitSuccess}
+      />
 
     </div>
   );

@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { Menu, X, ChevronDown, Lock, UserPlus } from 'lucide-react';
+import { Menu, X, ChevronDown, User, LogOut, ShieldCheck, Check } from 'lucide-react';
 
-export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }) {
+export default function Navbar({ 
+  activeDisruption, 
+  onOpenSaga, 
+  onQuickSimulate,
+  user,
+  onLogout,
+  onOpenAuth,
+  onOpenBooking,
+  language,
+  onSelectLanguage,
+  t
+}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [authModal, setAuthModal] = useState(null); // 'login' | 'signup' | null
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authSubmitted, setAuthSubmitted] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
 
   const scrollTo = (id) => {
     setMobileMenuOpen(false);
@@ -21,81 +29,137 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
   };
 
   const navItems = [
-    { label: 'Destinations', target: '#destinations' },
-    { label: 'Hotels', target: '#easy-steps' },
-    { label: 'Flights', target: '#itinerary' },
-    { label: 'Bookings', target: '#recovery' },
+    { label: t?.destinations || 'Destinations', target: '#destinations' },
+    { label: t?.hotels || 'Hotels', target: '#easy-steps' },
+    { label: t?.flights || 'Flights', target: '#demo-journey' },
+    { 
+      label: t?.bookings || 'Bookings', 
+      isAction: true,
+      onClick: () => {
+        if (!user) {
+          onOpenAuth('login');
+        } else {
+          onOpenBooking();
+        }
+      }
+    },
   ];
 
-  const handleDisruptionSolving = () => {
-    if (activeDisruption && onOpenSaga) {
-      onOpenSaga();
-    } else if (onQuickSimulate) {
-      onQuickSimulate();
-      const el = document.querySelector('#simulator');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
+  const handleBookNow = () => {
+    if (!user) {
+      onOpenAuth('signup');
+    } else {
+      onOpenBooking();
     }
   };
 
-  const handleBookNow = () => {
-    scrollTo('#easy-steps');
+  const handleDisruptionSolving = () => {
+    if (onOpenSaga) {
+      onOpenSaga();
+    } else if (onQuickSimulate) {
+      onQuickSimulate();
+    }
   };
 
-  const handleAuthSubmit = (e) => {
-    e.preventDefault();
-    setAuthSubmitted(true);
-    setTimeout(() => {
-      setAuthModal(null);
-      setAuthSubmitted(false);
-      setAuthEmail('');
-      setAuthPassword('');
-    }, 1200);
-  };
+  const languages = [
+    { code: 'en', label: 'English (EN)' },
+    { code: 'mr', label: 'मराठी (MR)' },
+    { code: 'hi', label: 'हिन्दी (HI)' }
+  ];
 
   return (
     <>
       {/* ========================================================================= */}
-      {/* 1. TOP UTILITY NAVBAR (DIFFERENT NAVBAR FOR LOGIN & SIGN UP)              */}
-      {/* Exact Figma reference font structure: Google Sans 500, Rectangle 4 border */}
+      {/* 1. TOP UTILITY BAR (EN Dropdown, Login, Sign up)                          */}
+      {/* Matching media_1790416291459.png exact top-right layout                   */}
       {/* ========================================================================= */}
-      <div className="fixed top-2.5 sm:top-3 right-4 sm:right-10 z-50 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-4 sm:gap-6 px-4 py-1.5 rounded-full bg-[#0b272c]/40 backdrop-blur-md border border-white/15 shadow-sm text-white/90">
+      <div className="fixed top-2.5 sm:top-3.5 right-4 sm:right-10 z-50 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-3.5 sm:gap-5 px-4 py-1.5 rounded-full bg-[#07191d]/60 backdrop-blur-md border border-white/15 shadow-sm text-white/90">
           
-          {/* EN Dropdown (Figma Vector arrow, 17px) */}
-          <div className="flex items-center gap-1 font-googleSans font-medium text-[14px] sm:text-[16px] leading-[22px] text-white/80 hover:text-white cursor-pointer transition-colors">
-            <span>EN</span>
-            <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+          {/* Language Switcher Dropdown (EN, Marathi, Hindi) */}
+          <div className="relative">
+            <button
+              onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+              className="flex items-center gap-1 font-googleSans font-medium text-[13px] sm:text-[15px] text-white/90 hover:text-white cursor-pointer transition-colors"
+            >
+              <span>{language?.toUpperCase() || 'EN'}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+            </button>
+
+            {langDropdownOpen && (
+              <div className="absolute top-8 right-0 w-36 bg-[#0c2328] border border-white/20 rounded-xl shadow-2xl overflow-hidden py-1 z-50">
+                {languages.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => {
+                      onSelectLanguage(l.code);
+                      setLangDropdownOpen(false);
+                    }}
+                    className={`w-full px-3.5 py-2 text-left text-xs font-poppins flex items-center justify-between transition-colors ${
+                      language === l.code ? 'bg-white/15 text-white font-bold' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span>{l.label}</span>
+                    {language === l.code && <Check className="w-3 h-3 text-[#F1A501]" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="w-px h-3.5 bg-white/25" />
 
-          {/* Login (Figma Google Sans 500 17px) */}
-          <button
-            onClick={() => setAuthModal('login')}
-            className="font-googleSans font-medium text-[14px] sm:text-[16px] leading-[22px] text-white/90 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-          >
-            Login
-          </button>
+          {/* User Logged In Profile or Login / Sign Up */}
+          {user ? (
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={onOpenBooking}
+                className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white font-googleSans font-medium cursor-pointer"
+              >
+                <div className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold text-[10px]">
+                  {user.name.charAt(0)}
+                </div>
+                <span className="hidden sm:inline">{user.name.split(' ')[0]}</span>
+              </button>
+              <button 
+                onClick={onLogout}
+                title={t?.logout || "Logout"}
+                className="text-white/60 hover:text-white cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Login */}
+              <button
+                onClick={() => onOpenAuth('login')}
+                className="font-googleSans font-medium text-[13px] sm:text-[15px] leading-[22px] text-white/90 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+              >
+                {t?.login || "Login"}
+              </button>
 
-          {/* Sign up (Figma Rectangle 4: border 1px solid, radius 5px) */}
-          <button
-            onClick={() => setAuthModal('signup')}
-            className="font-googleSans font-medium text-[13px] sm:text-[15px] leading-[20px] text-white px-3.5 py-1 rounded-[5px] border border-white/60 hover:border-white hover:bg-white/10 transition-all cursor-pointer whitespace-nowrap"
-          >
-            Sign up
-          </button>
+              {/* Sign up */}
+              <button
+                onClick={() => onOpenAuth('signup')}
+                className="font-googleSans font-medium text-[12px] sm:text-[14px] leading-[20px] text-white px-3 py-0.8 rounded-[6px] border border-white/60 hover:border-white hover:bg-white/10 transition-all cursor-pointer whitespace-nowrap"
+              >
+                {t?.signup || "Sign up"}
+              </button>
+            </>
+          )}
+
         </div>
       </div>
 
-
       {/* ========================================================================= */}
-      {/* 2. MAIN FLOATING CAPSULE NAVBAR                                           */}
-      {/* Spacious, uncrowded, neat separation. NO STICKERS, NO ICONS in button!    */}
+      {/* 2. MAIN FLOATING NAVBAR CAPSULE                                           */}
+      {/* Matching media_1790416291459.png: Dark green capsule, Book Now, Resolve   */}
       {/* ========================================================================= */}
       <header className="fixed top-12 sm:top-14 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
-        <nav className="pointer-events-auto w-full max-w-4xl lg:max-w-5xl rounded-full px-6 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between bg-[#0b272c]/85 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.38)] transition-all duration-300">
+        <nav className="pointer-events-auto w-full max-w-4xl lg:max-w-5xl rounded-full px-6 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between bg-[#072422]/90 backdrop-blur-xl border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-all duration-300">
           
-          {/* LEFT: VOYAGE LOGO (Isolated with clean right spacing) */}
+          {/* LEFT: VOYAGE LOGO */}
           <div className="flex items-center shrink-0 pr-6 mr-2 sm:mr-4">
             <a 
               href="#hero" 
@@ -112,45 +176,43 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
           </div>
 
           {/* CENTER: NAV ITEMS (Destinations, Hotels, Flights, Bookings) */}
-          {/* Ample room, will NEVER collide with buttons! */}
           <div className="hidden md:flex items-center gap-7 lg:gap-10">
             {navItems.map((item) => (
               <a
                 key={item.label}
-                href={item.target}
+                href={item.target || "#"}
                 onClick={(e) => {
                   e.preventDefault();
-                  scrollTo(item.target);
+                  if (item.isAction) {
+                    item.onClick();
+                  } else {
+                    scrollTo(item.target);
+                  }
                 }}
-                className="font-googleSans font-normal text-[15px] lg:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors duration-200 whitespace-nowrap hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+                className="font-googleSans font-normal text-[15px] lg:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors duration-200 whitespace-nowrap hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)] cursor-pointer"
               >
                 {item.label}
               </a>
             ))}
           </div>
 
-          {/* RIGHT: ACTION BUTTONS (Book Now secondary, Disruption Solver main) */}
-          {/* NO STICKERS / NO ICONS - Pure clean typography! */}
+          {/* RIGHT: ACTION BUTTONS (Book Now secondary, Resolve Disruption terracotta) */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0 pl-4 sm:pl-6">
             
-            {/* SECONDARY ACTION: Book Now */}
+            {/* BUTTON 1: Book Now (Clean dark outlined pill) */}
             <button
               onClick={handleBookNow}
-              className="hidden sm:inline-flex px-4 py-1.5 sm:py-2 rounded-full border border-white/35 bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap"
+              className="hidden sm:inline-flex px-5 py-2 rounded-full border border-white/35 bg-white/5 hover:bg-white/15 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap cursor-pointer"
             >
-              Book Now
+              {t?.bookNow || "Book Now"}
             </button>
 
-            {/* MAIN PRIMARY ACTION: Disruption Solver */}
+            {/* BUTTON 2: Resolve Disruption (Terracotta filled pill #A35645) */}
             <button
               onClick={handleDisruptionSolving}
-              className={`px-5 sm:px-6 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 shadow-lg active:scale-95 whitespace-nowrap ${
-                activeDisruption
-                  ? 'bg-gradient-to-r from-[#DF6951] to-[#FF7D68] text-white shadow-[#DF6951]/50 animate-pulse'
-                  : 'bg-white text-[#0b272c] hover:bg-slate-100 hover:shadow-xl'
-              }`}
+              className="px-5 sm:px-6 py-2 rounded-full font-bold text-xs sm:text-sm text-white bg-[#A35645] hover:bg-[#b8614e] transition-all duration-200 shadow-md active:scale-95 whitespace-nowrap cursor-pointer"
             >
-              {activeDisruption ? "Resolve Disruption" : "Disruption Solver"}
+              {t?.resolveDisruption || "Resolve Disruption"}
             </button>
 
             {/* Mobile Menu Toggle Button */}
@@ -161,184 +223,54 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
+
           </div>
 
         </nav>
-
-        {/* ========================================================================= */}
-        {/* MOBILE NAVIGATION DRAWER                                                  */}
-        {/* ========================================================================= */}
-        {mobileMenuOpen && (
-          <div className="pointer-events-auto absolute top-16 left-4 right-4 rounded-2xl bg-[#0b272c]/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl flex flex-col gap-3 md:hidden animate-in fade-in slide-in-from-top-3 duration-200">
-            {navItems.map((item) => (
-              <a
-                key={item.label}
-                href={item.target}
-                onClick={(e) => {
-                  e.preventDefault();
-                  scrollTo(item.target);
-                }}
-                className="font-googleSans text-white/90 hover:text-white font-medium text-base py-2 px-3 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                {item.label}
-              </a>
-            ))}
-
-            <div className="pt-3 border-t border-white/15 flex flex-col gap-2.5">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleDisruptionSolving();
-                }}
-                className="w-full py-2.5 rounded-full bg-white text-[#0b272c] font-bold text-sm shadow-md"
-              >
-                {activeDisruption ? "Resolve Disruption" : "Disruption Solver"}
-              </button>
-
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleBookNow();
-                }}
-                className="w-full py-2 rounded-full border border-white/30 text-white font-medium text-sm text-center"
-              >
-                Book Now
-              </button>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setAuthModal('login');
-                  }}
-                  className="py-2 text-center text-white/90 hover:text-white font-googleSans text-sm font-medium border border-white/20 rounded-[5px]"
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setAuthModal('signup');
-                  }}
-                  className="py-2 text-center text-white font-googleSans text-sm font-medium border border-white/60 bg-white/10 rounded-[5px]"
-                >
-                  Sign up
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* ========================================================================= */}
-      {/* INTERACTIVE AUTH MODAL (Login & Sign Up)                                  */}
-      {/* ========================================================================= */}
-      {authModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 space-y-6">
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setAuthModal(null)}
-              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
-            >
-              <X className="w-4 h-4" />
+      {/* Mobile Drawer Navigation */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-30 bg-[#072422]/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 space-y-6 md:hidden">
+          <div className="w-full flex justify-between items-center pb-4 border-b border-white/10">
+            <img src="/voyage_logo_crop.png" alt="Voyage" className="h-6 w-auto" />
+            <button onClick={() => setMobileMenuOpen(false)} className="text-white p-2">
+              <X className="w-6 h-6" />
             </button>
+          </div>
 
-            {/* Modal Header */}
-            <div className="text-center space-y-1">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#FFF1DA] text-[#DF6951] mb-2">
-                {authModal === 'login' ? <Lock className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
-              </div>
-              <h3 className="font-volkhov font-bold text-2xl text-[#181E4B]">
-                {authModal === 'login' ? 'Sign In to Voyage' : 'Create Voyage Account'}
-              </h3>
-              <p className="font-poppins text-xs text-[#5E6282]">
-                {authModal === 'login' 
-                  ? 'Access your autonomous disruption recovery dashboard' 
-                  : 'Join Voyage for self-healing travel & EU261 liquidity'}
-              </p>
-            </div>
-
-            {/* Toggle Tabs */}
-            <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-sm font-googleSans font-medium">
+          <div className="flex flex-col items-center gap-5 w-full">
+            {navItems.map((item) => (
               <button
-                onClick={() => setAuthModal('login')}
-                className={`py-2 rounded-lg transition-all ${
-                  authModal === 'login' ? 'bg-white text-[#181E4B] shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                }`}
+                key={item.label}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (item.isAction) {
+                    item.onClick();
+                  } else {
+                    scrollTo(item.target);
+                  }
+                }}
+                className="text-lg font-googleSans text-white/90 hover:text-white font-medium py-1"
               >
-                Login
+                {item.label}
               </button>
-              <button
-                onClick={() => setAuthModal('signup')}
-                className={`py-2 rounded-lg transition-all ${
-                  authModal === 'signup' ? 'bg-white text-[#181E4B] shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Sign Up
-              </button>
-            </div>
+            ))}
+          </div>
 
-            {authSubmitted ? (
-              <div className="py-8 text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                  ✓
-                </div>
-                <h4 className="font-poppins font-bold text-lg text-[#181E4B]">Welcome Aboard!</h4>
-                <p className="text-xs text-[#5E6282]">Redirecting to your flight resilience portal...</p>
-              </div>
-            ) : (
-              <form onSubmit={handleAuthSubmit} className="space-y-4 font-poppins">
-                {authModal === 'signup' && (
-                  <div>
-                    <label className="text-xs font-semibold text-[#5E6282] block mb-1">Full Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Elena Vance"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#DF6951]"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs font-semibold text-[#5E6282] block mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    value={authEmail}
-                    onChange={(e) => setAuthEmail(e.target.value)}
-                    placeholder="elena.vance@corporate.com"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#DF6951]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-[#5E6282] block mb-1">Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#DF6951]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-[#DF6951] text-white font-semibold text-sm shadow-md hover:bg-[#c8563e] active:scale-95 transition-all mt-2"
-                >
-                  {authModal === 'login' ? 'Sign In' : 'Create Free Account'}
-                </button>
-              </form>
-            )}
-
-            <div className="pt-2 text-center text-xs text-[#84829A] font-poppins">
-              Protected by Voyage 256-bit GDS Encryption &amp; EU261 Liquidity Bridge
-            </div>
-
+          <div className="w-full pt-4 border-t border-white/10 flex flex-col gap-3">
+            <button
+              onClick={() => { setMobileMenuOpen(false); handleBookNow(); }}
+              className="w-full py-3 rounded-xl border border-white/35 text-white font-medium text-sm"
+            >
+              {t?.bookNow || "Book Now"}
+            </button>
+            <button
+              onClick={() => { setMobileMenuOpen(false); handleDisruptionSolving(); }}
+              className="w-full py-3 rounded-xl bg-[#A35645] text-white font-bold text-sm"
+            >
+              {t?.resolveDisruption || "Resolve Disruption"}
+            </button>
           </div>
         </div>
       )}

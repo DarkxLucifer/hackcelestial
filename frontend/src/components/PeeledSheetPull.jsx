@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
-export default function PeeledSheetPull({ children, activeDisruption, onSimulateAlpine }) {
+export default function PeeledSheetPull({ children, activeDisruption, onSimulateAlpine, t }) {
   const [scrollY, setScrollY] = useState(0);
   const [windowHeight, setWindowHeight] = useState(
     typeof window !== 'undefined' ? window.innerHeight : 900
@@ -126,9 +126,7 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
 
       {/* ========================================================================= */}
       {/* 2. CENTER HERO TAGLINE (z-10)                                             */}
-      {/* ONLY THIS TAGLINE, ALL OTHER REMOVED per user instruction:                */}
-      {/* "in landing page keep only this tag line remove all other                */}
-      {/*  When Journeys Disrupt, Voyage Finds a Way Forward"                       */}
+      {/* Matching font in image media_1790415846481.jpg & WHITE UNDERLINE LINE       */}
       {/* ========================================================================= */}
       {progress < 0.65 && (
         <div 
@@ -139,11 +137,17 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
             willChange: 'opacity, transform'
           }}
         >
-          <h1 className="font-volkhov font-bold text-3xl sm:text-5xl md:text-6xl lg:text-[70px] text-white leading-[1.18] tracking-tight max-w-5xl drop-shadow-[0_4px_35px_rgba(0,0,0,0.85)] px-4">
-            When Journeys Disrupt, <br className="hidden sm:inline" />
+          {/* Top Pill matching media_1790415846481.jpg */}
+          <div className="mb-4 sm:mb-6 px-5 py-1.5 rounded-full bg-white/95 text-[#14183E] font-googleSans font-semibold text-xs sm:text-sm tracking-wide shadow-xl border border-white/50">
+            {t?.worryLessPill || "Travel More. Worry Less"}
+          </div>
+
+          <h1 className="font-googleSans font-bold text-3xl sm:text-5xl md:text-6xl lg:text-[72px] text-white leading-[1.15] tracking-tight max-w-5xl drop-shadow-[0_4px_35px_rgba(0,0,0,0.85)] px-4">
+            {t?.landingTagline1 || "When Journeys Disrupt,"} <br className="hidden sm:inline" />
             <span className="relative inline-block text-white">
-              Voyage Finds a Way Forward.
-              <svg className="absolute -bottom-2 sm:-bottom-3 left-0 w-full h-3 sm:h-5 text-[#DF6951] opacity-90" viewBox="0 0 350 20" fill="none" preserveAspectRatio="none">
+              {t?.landingTagline2 || "Voyage Finds a Way Forward."}
+              {/* WHITE CURVED LINE as explicitly requested by user */}
+              <svg className="absolute -bottom-2 sm:-bottom-3 left-0 w-full h-3 sm:h-5 text-white opacity-95 drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]" viewBox="0 0 350 20" fill="none" preserveAspectRatio="none">
                 <path d="M3 15C80 3 240 3 347 13" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
               </svg>
             </span>
