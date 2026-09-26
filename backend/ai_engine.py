@@ -949,14 +949,21 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
 
         if is_train:
             carrier = "Indian Railways"
-            train_num = train_num_match.group(1) if train_num_match else "11026"
-            t_data = RailRadarTracker.get_live_train_status(train_num)
-            service_number = f"#{t_data.get('train_number', train_num)} {t_data.get('train_name', 'Express')}"
-            if not origin_loc and t_data.get("origin"):
-                origin_name = t_data.get("origin")
-            if not dest_loc and t_data.get("destination"):
-                dest_name = t_data.get("destination")
-            live_delay = t_data.get("delay_minutes", 0)
+            if train_num_match:
+                train_num = train_num_match.group(1)
+                # Fetch train name only — do NOT inherit live delay for uploaded tickets
+                try:
+                    t_data = RailRadarTracker.get_live_train_status(train_num)
+                    train_name = t_data.get("train_name", "Express")
+                    if not origin_loc and t_data.get("origin"):
+                        origin_name = t_data.get("origin")
+                    if not dest_loc and t_data.get("destination"):
+                        dest_name = t_data.get("destination")
+                except Exception:
+                    train_name = "Express"
+                service_number = f"#{train_num} {train_name}"
+            else:
+                service_number = "Indian Railways Express"
             mode = "train"
         else:
             mode = "flight"
@@ -975,15 +982,13 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
             else:
                 service_number = "6E 521" if "IndiGo" in carrier else ("BA 712" if "British" in carrier else "AI 882")
 
-            live_delay = 0
-
         # PNR extraction
         pnr_match = re.search(r'\bpnr[\s:=-]+([a-z0-9]{6,10})\b', lower)
         pnr = f"VY-{pnr_match.group(1).upper()}" if pnr_match else f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN"
 
-        # Delay extraction
+        # Delay extraction — ONLY from explicit text in the document. Default is always 0.
         is_cancellation = "cancel" in lower or "cancelled" in lower
-        delay_minutes = live_delay if live_delay > 0 else 0
+        delay_minutes = 0  # No delay unless explicitly stated in the ticket
         delay_match = re.search(r'(\d+)\s*(mins?|minutes?|hrs?|hours?)\s*(?:delay|late)', lower)
         if delay_match:
             val = int(delay_match.group(1))

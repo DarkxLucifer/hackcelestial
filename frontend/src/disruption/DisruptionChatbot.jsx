@@ -272,7 +272,16 @@ export default function DisruptionChatbot({
       let fallbackText = "";
       if (activeTicketContext) {
         const c = activeTicketContext;
-        fallbackText = `### ✈️ Trip Details & Resilience Status\n\nHere are the details for your journey on **${c.carrier} ${c.service_number}**:\n• **Route Corridor**: **${c.origin} ➔ ${c.destination}**\n• **PNR / Booking Reference**: \`${c.pnr}\`\n• **Current Status**: **+${c.delay_minutes} mins delay** ${c.is_cancellation ? "(Service Cancelled)" : ""}\n• **Disruption Reason**: ${c.disruption_reason || "Operational schedule delay"}\n• **Total Ticket Fare**: ₹${c.ticket_cost || 6450} ${c.currency || 'INR'}\n\n#### 🛡️ Statutory Passenger Rights & Protection:\n• **Governing Framework**: DGCA CAR Section 3 & EU261 active\n• **Full Fare Refund**: Eligible (100% refund without cancellation deductions)\n• **Duty of Care**: Mandatory refreshments and meals at departure terminal.\n\nChoose an action below to upload another ticket, ask questions, or proceed to the travel map:`;
+        const delayMins = c.delay_minutes || 0;
+        const isPast = c.is_past_journey === true;
+        const statusText = isPast
+          ? '**Travel Status**: ✅ Historical Journey — Service Already Completed'
+          : c.is_cancellation
+            ? '**Travel Status**: ❌ Service Cancelled'
+            : delayMins > 0
+              ? `**Reported Disruption**: ⚠️ +${delayMins} mins delay`
+              : '**Travel Status**: ✅ On Schedule (Running Right Time)';
+        fallbackText = `### ✈️ Trip Details & Resilience Status\n\nHere are the details for your journey on **${c.carrier} ${c.service_number}**:\n• **Route Corridor**: **${c.origin} ➔ ${c.destination}**\n• **PNR / Booking Reference**: \`${c.pnr}\`\n• ${statusText}${!isPast && delayMins === 0 && !c.is_cancellation ? ' (+0m delay)' : ''}\n• **Disruption Reason**: ${c.disruption_reason || 'Nominal on-schedule operation'}\n• **Total Ticket Fare**: ₹${c.ticket_cost || 6450} ${c.currency || 'INR'}\n\n#### 🛡️ Statutory Passenger Rights & Protection:\n• **Governing Framework**: ${isPast ? 'IRCTC TDR Policy (historical journey)' : 'DGCA CAR Section 3 & EU261 active'}\n• **Full Fare Refund**: ${isPast ? 'File TDR on IRCTC portal if missed train' : delayMins >= 180 ? 'Eligible (100% refund)' : 'Standard policy applies'}\n• **Duty of Care**: Mandatory refreshments and meals at departure terminal.\n\nChoose an action below to upload another ticket, ask questions, or proceed to the travel map:`;
       } else {
         fallbackText = "I have recorded your disruption query and evaluated your statutory passenger rights under DGCA CAR Section 3 and IRCTC guidelines. Please upload your ticket or share your PNR to see your exact connection map.";
       }
@@ -354,18 +363,19 @@ export default function DisruptionChatbot({
         parsedRecord = {
           id: Math.floor(1000 + Math.random() * 9000),
           pnr: `VY-${Math.floor(10000 + Math.random() * 90000)}-IN`,
-          passenger_name: "Elena Vance",
+          passenger_name: "Passenger",
           booking_source: `Parsed Ticket (${fileName})`,
           carrier: isTrain ? "Indian Railways" : "IndiGo",
-          service_number: isTrain ? "20978 Vande Bharat" : "6E 412",
-          origin: "Bangalore (BLR)",
-          destination: "Delhi (DEL)",
-          origin_coords: { lat: 12.9716, lng: 77.5946 },
-          dest_coords: { lat: 28.5562, lng: 77.1000 },
-          delay_minutes: 75,
+          service_number: isTrain ? "Express Service" : "6E 412",
+          origin: "Origin",
+          destination: "Destination",
+          origin_coords: { lat: 20.9374, lng: 77.7796 },
+          dest_coords: { lat: 18.9401, lng: 72.8351 },
+          delay_minutes: 0,
           is_cancellation: false,
-          disruption_reason: `Schedule delay detected on ${fileName}`,
-          ticket_cost: 6450,
+          is_past_journey: false,
+          disruption_reason: "Nominal on-schedule operation",
+          ticket_cost: null,
           currency: "INR"
         };
       }
@@ -392,11 +402,20 @@ export default function DisruptionChatbot({
         const service = parsedRecord?.service_number || 'Transit';
         const origin = parsedRecord?.origin || 'Origin';
         const destination = parsedRecord?.destination || 'Destination';
-        const delay = parsedRecord?.delay_minutes || 45;
+        const delay = typeof parsedRecord?.delay_minutes === 'number' ? parsedRecord.delay_minutes : 0;
+        const isPast = parsedRecord?.is_past_journey === true;
         const pnr = parsedRecord?.pnr || 'N/A';
         const fare = parsedRecord?.ticket_cost ? `${parsedRecord?.currency || 'INR'} ${parsedRecord?.ticket_cost}` : '₹6,450 INR';
 
-        const extractedSummaryText = `📄 **Document Successfully Processed & Analyzed!**\n\nHere are the travel details extracted from **${files[0].name}**:\n• **Carrier & Service**: ${carrier} ${service}\n• **Route Corridor**: ${origin} ➔ ${destination}\n• **Reported Disruption**: +${delay} mins delay ${parsedRecord?.is_cancellation ? "(Cancelled)" : ""}\n• **PNR / Booking Ref**: ${pnr}\n• **Ticket Fare**: ${fare}\n• **Statutory Protection**: DGCA CAR Section 3 & EU261 active\n\n**What would you like to do next?**\nChoose one of the 3 actions below to upload another document, chat about your trip, or proceed to the travel map:`;
+        const statusLine = isPast
+          ? '**Travel Status**: ✅ Historical Journey — Service Already Completed'
+          : parsedRecord?.is_cancellation
+            ? '**Travel Status**: ❌ Service Cancelled'
+            : delay > 0
+              ? `**Reported Disruption**: ⚠️ +${delay} mins delay`
+              : '**Travel Status**: ✅ On Schedule — Running Right Time (+0m delay)';
+
+        const extractedSummaryText = `📄 **Document Successfully Processed & Analyzed!**\n\nHere are the travel details extracted from **${files[0].name}**:\n• **Carrier & Service**: ${carrier} ${service}\n• **Route Corridor**: ${origin} ➔ ${destination}\n• ${statusLine}\n• **PNR / Booking Ref**: ${pnr}\n• **Ticket Fare**: ${fare}\n• **Statutory Protection**: ${isPast ? 'IRCTC TDR Policy — File TDR on IRCTC portal if journey was missed' : 'DGCA CAR Section 3 & EU261 active'}\n\n**What would you like to do next?**\nChoose one of the 3 actions below to upload another document, chat about your trip, or proceed to the travel map:`;
 
         setMessages(prev => [
           ...prev,
