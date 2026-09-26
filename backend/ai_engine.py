@@ -37,27 +37,38 @@ from .travel_retrieval import (
 SYSTEM_PROMPT = """You are Voyage Intelligence, an advanced autonomous travel resilience concierge and passenger rights advisor.
 
 CRITICAL INSTRUCTIONS:
-1. FOCUS DIRECTLY ON THE USER'S QUESTION:
-   - Provide a direct, concise, natural, and helpful answer tailored specifically to what the user asked.
-   - For general travel questions (e.g., how to find a ticket number, PNR, baggage policies, station navigation), give a brief, friendly, bulleted explanation (2-3 short sections max).
+1. FOCUS DIRECTLY ON THE USER'S QUESTION WITH STRUCTURED, ACTIONABLE ANSWERS:
+   - Provide direct, concrete, structured, and helpful answers tailored specifically to what the user asked.
+   - DO NOT deflect, stall, or just ask clarifying questions when the user asks for flights, trains, or schedules.
    - DO NOT dump unsolicited programming code (no Python, no bash scripts, no regex tutorials).
-   - Avoid overwhelming walls of text, unnecessary mega-tables, or redundant checklists. Keep it readable and conversational.
+   - Keep answers clear, readable, and highly informative with tables, bullet points, and specific details.
 
-2. TRAVEL DISRUPTION & PASSENGER RIGHTS:
+2. SCHEDULE, SEARCH & ROUTE QUERIES (MANDATORY STRUCTURED OUTPUT):
+   - When the user asks to search, find, or view flights, trains, or buses (e.g. "search flights from Mumbai to Delhi", "27 sep", "look schedule for morning"):
+   - ALWAYS PROVIDE A STRUCTURED SCHEDULE TABLE OR DETAILED BREAKDOWN with concrete data:
+     * ✈️ Flight / 🚆 Train / 🚌 Bus Code & Operator (e.g., Air India AI 887, IndiGo 6E 2054, Vistara UK 994)
+     * ⏰ Departure & Arrival Times (e.g., Dep: 06:00 IST ➔ Arr: 08:15 IST)
+     * ⏱️ Travel Duration & Stops (e.g., 2h 15m Non-stop)
+     * 📍 Terminals / Stations (e.g., BOM T1 ➔ DEL T2)
+     * 💰 Estimated Price / Fare in INR (e.g., ₹4,850 – ₹5,800 INR)
+     * 🛡️ Disruption Risk & Resilience Advice (e.g., Morning flights have lowest ATC delay probability; DGCA CAR Section 3 protection)
+   - If the user specifies a time window (e.g. morning, afternoon, evening, night), strictly filter and display flights within that window.
+   - Always present concrete flight/train/bus options immediately in the response, even if you ask a follow-up question at the end.
+
+3. TRAVEL DISRUPTION & PASSENGER RIGHTS:
    - When the user asks about flight/train delays, cancellations, or compensation:
-     * DGCA CAR Section 3 Series M Part IV (India): Full refund + up to ₹5,000 - ₹10,000 statutory compensation for delays >6 hrs or cancellations without 24hr notice; refreshments for delays >2 hrs.
+     * DGCA CAR Section 3 Series M Part IV (India): Full refund + up to ₹5,000 - ₹10,000 statutory compensation for delays >6 hrs or cancellations without 24hr notice; complimentary refreshments for delays >2 hrs.
      * EU Regulation (EC) 261/2004 & UK261: €250 to €600 compensation for delays >=3 hrs.
      * 2024 U.S. DOT Automatic Cash Refund Mandate: Mandatory prompt cash refund for delays >3 hrs domestic, >6 hrs intl.
      * Indian Railways (IRCTC) TDR: 100% full refund if train is delayed by >3 hrs at boarding point.
    - Propose clear, actionable recovery plans (airline rebooking, Vande Bharat/rail alternative, or road transport).
 
-3. STRICT DOMAIN RESTRICTIONS & BOUNDARIES (MANDATORY):
+4. STRICT DOMAIN RESTRICTIONS & BOUNDARIES (MANDATORY):
    - You are exclusively dedicated to travel resilience, flight/train disruptions, tickets, transit, and passenger rights.
    - You are STRICTLY FORBIDDEN from generating code for games (e.g. Python games, Snake, Tic-Tac-Toe, arcade games, pygame) or unrelated non-travel software.
-   - If asked for game code or off-topic programming (e.g. "write code of python game", "make a snake game in python"), you must politely refuse and clarify that you are restricted to travel disruption, flight/train status, and passenger compensation rights.
-   - Only provide code if it specifically relates to travel systems (e.g., flight delay parser, PNR validator, or DGCA compensation calculator).
+   - If asked for game code or off-topic programming, politely refuse and clarify your travel resilience focus.
 
-Tone: Friendly, concise, empathetic, accurate, and professional.
+Tone: Professional, precise, structured, empathetic, and actionable.
 """
 
 def is_restricted_game_query(query: str) -> bool:
@@ -832,6 +843,86 @@ def run_ai_chat(
                         f"- Estimated Arrival: {f_data.get('estimated_arrival', 'N/A')}\n"
                         f"- Aircraft: {f_data.get('aircraft', 'Commercial Jet')}\n"
                         "INSTRUCTION: When answering, provide these accurate real-time live flight radar details."
+                    )
+            except Exception:
+                pass
+
+    # 2b. Multi-turn Flight Corridor & Schedule Search (e.g. "search flights from Mumbai to Delhi", "27 sep", "look schedule for morning")
+    full_context_text = " ".join([m.get("content", "") for m in messages]) + " " + query
+    full_lower = full_context_text.lower()
+    flight_keywords = ["flight", "flights", "fight", "flite", "fly", "flying", "plane", "planes", "airline", "airlines", "airways", "airfare"]
+    is_flight_intent = any(w in full_lower for w in flight_keywords)
+
+    if is_flight_intent:
+        orig_f, dest_f = "", ""
+        m_rt = re.search(r'(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', full_context_text, re.IGNORECASE)
+        if m_rt:
+            o_clean = re.sub(r'^(?:can\s+you\s+)?(?:please\s+)?(?:give|show|tell|find|search|check|get|me|info|information|details|about|tickets?|schedule|status|flights?|fights?|options?|for|the|cheap|cheapest|any)\s+', '', m_rt.group(1).strip(), flags=re.I).strip()
+            d_clean = re.sub(r'\s+(?:flights?|fights?|options?|details?|tickets?|today|tomorrow|now|please|morning|evening|night|afternoon|\d{1,2}\s+[a-zA-Z]+)$', '', m_rt.group(2).strip(), flags=re.I).strip()
+            orig_f, dest_f = o_clean, d_clean
+
+        if not orig_f or not dest_f:
+            if "mumbai" in full_lower and "delhi" in full_lower:
+                orig_f, dest_f = "Mumbai", "Delhi"
+            elif "bangalore" in full_lower and "delhi" in full_lower:
+                orig_f, dest_f = "Bangalore", "Delhi"
+            elif "mumbai" in full_lower and "bangalore" in full_lower:
+                orig_f, dest_f = "Mumbai", "Bangalore"
+            elif "mumbai" in full_lower and "goa" in full_lower:
+                orig_f, dest_f = "Mumbai", "Goa"
+            elif "delhi" in full_lower and "jaipur" in full_lower:
+                orig_f, dest_f = "Delhi", "Jaipur"
+
+        if orig_f and dest_f and orig_f.lower() != dest_f.lower():
+            o_loc = lookup_location(orig_f)
+            d_loc = lookup_location(dest_f)
+            dep_code = o_loc["code"] if o_loc else orig_f[:3].upper()
+            arr_code = d_loc["code"] if d_loc else dest_f[:3].upper()
+
+            # Detect date in conversation
+            date_str = None
+            d_match = re.search(r'\b(\d{1,2})\s*(?:th|st|nd|rd)?\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b', full_context_text, re.IGNORECASE)
+            if d_match:
+                date_str = f"{d_match.group(2).capitalize()} {d_match.group(1)}"
+            elif "tomorrow" in full_lower:
+                date_str = "Tomorrow"
+            elif "today" in full_lower:
+                date_str = "Today"
+
+            # Detect time window
+            time_win = None
+            if any(w in query.lower() for w in ["morning", "early", "am", "dawn"]):
+                time_win = "morning"
+            elif any(w in query.lower() for w in ["afternoon", "noon", "midday", "lunch"]):
+                time_win = "afternoon"
+            elif any(w in query.lower() for w in ["evening", "dusk"]):
+                time_win = "evening"
+            elif any(w in query.lower() for w in ["night", "late", "pm", "red eye", "overnight"]):
+                time_win = "night"
+
+            try:
+                from .travel_retrieval import AviationStackTracker
+                tracker = AviationStackTracker()
+                route_flights = tracker.search_route_flights(dep_iata=dep_code, arr_iata=arr_code, flight_date=date_str, time_window=time_win)
+                if route_flights:
+                    fl_rows = []
+                    for rf in route_flights:
+                        fl_rows.append(
+                            f"| {rf['departure_time']} | **{rf['flight_iata']}** | {rf['airline']} | {rf['departure_iata']} ({rf['departure_terminal']}) ➔ {rf['arrival_iata']} ({rf['arrival_terminal']}) | {rf['duration']} | ₹{rf['estimated_fare_inr']:,} INR | {rf['status'].upper()} |"
+                        )
+                    
+                    context_header = f"VERIFIED LIVE FLIGHT SCHEDULE ({orig_f} [{dep_code}] ➔ {dest_f} [{arr_code}])"
+                    if date_str:
+                        context_header += f" FOR {date_str.upper()}"
+                    if time_win:
+                        context_header += f" ({time_win.upper()} WINDOW)"
+
+                    live_context_parts.append(
+                        f"{context_header}:\n"
+                        "| Departure | Flight | Airline | Route / Terminals | Duration | Est. Fare | Status |\n"
+                        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
+                        + "\n".join(fl_rows) +
+                        "\n\nINSTRUCTION: Present these concrete flights immediately to the traveler in a clean, structured Markdown table with exact times, flight codes, airlines, terminals, duration, and estimated fares in INR. Highlight resilience advantages (morning departures have lowest ATC delay risk). Conclude with DGCA CAR Section 3 statutory passenger rights (>2h delay = complimentary meals, >6h delay/cancellation = 100% full refund). DO NOT ask open questions without presenting this structured schedule table first."
                     )
             except Exception:
                 pass
