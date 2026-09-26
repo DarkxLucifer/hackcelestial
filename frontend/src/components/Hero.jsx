@@ -26,22 +26,22 @@ export default function Hero({ onSimulateAlpine, onOpenSaga, itinerary, activeDi
             
             {/* Tagline */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-voyare-coral/10 border border-voyare-coral/20">
-              <Sparkles className="w-4 h-4 text-voyare-coral" />
+              <span className="w-2 h-2 rounded-full bg-[#DF6951]" />
               <span className="text-xs md:text-sm font-bold tracking-wider uppercase text-voyare-coral font-poppins">
-                Intelligent Travel Resilience Platform
+                Autonomous Travel Resilience
               </span>
             </div>
 
             {/* Main Title in Volkhov font as per Figma specs */}
-            <h1 className="font-volkhov text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold text-voyare-navy leading-[1.08] tracking-tight">
-              Travel Without Fear. <br />
+            <h1 className="font-volkhov text-4xl sm:text-5xl md:text-6xl lg:text-[66px] font-bold text-voyare-navy leading-[1.08] tracking-tight">
+              When Journeys Disrupt, <br />
               <span className="relative inline-block text-voyare-darkNavy">
-                Self-Healing
+                Voyage Finds a Way Forward.
                 {/* Decorative underline curve from Figma Vector Decore */}
                 <svg className="absolute -bottom-2 left-0 w-full h-4 text-voyare-coral opacity-80" viewBox="0 0 350 20" fill="none" preserveAspectRatio="none">
                   <path d="M3 15C80 3 240 3 347 13" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
                 </svg>
-              </span> Multi-Modal Journeys.
+              </span>
             </h1>
 
             {/* Description in Poppins font as per Figma specs */}

@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Menu, X, ShieldAlert, AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
+import { Menu, X, ChevronDown, Lock, UserPlus } from 'lucide-react';
 
 export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authModal, setAuthModal] = useState(null); // 'login' | 'signup' | null
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authSubmitted, setAuthSubmitted] = useState(false);
 
   const scrollTo = (id) => {
     setMobileMenuOpen(false);
@@ -16,12 +20,12 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
     }
   };
 
-  const navLinks = [
-    { label: 'About Us', target: '#hero' },
+  // Nav Items matching the exact reference Figma code
+  const navItems = [
     { label: 'Destinations', target: '#destinations' },
-    { label: 'Travel Packages', target: '#recovery' },
-    { label: 'Offers', target: '#services' },
-    { label: 'Contact', target: '#footer' },
+    { label: 'Hotels', target: '#easy-steps' },
+    { label: 'Flights', target: '#itinerary' },
+    { label: 'Bookings', target: '#recovery' },
   ];
 
   const handleDisruptionSolving = () => {
@@ -38,126 +42,302 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
     scrollTo('#easy-steps');
   };
 
+  const handleAuthSubmit = (e) => {
+    e.preventDefault();
+    setAuthSubmitted(true);
+    setTimeout(() => {
+      setAuthModal(null);
+      setAuthSubmitted(false);
+      setAuthEmail('');
+      setAuthPassword('');
+    }, 1200);
+  };
+
   return (
-    <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
-      <nav className="pointer-events-auto w-full max-w-5xl rounded-full px-5 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between bg-[#0b272c]/80 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.38)] transition-all duration-300">
-        
-        {/* Left: Uploaded Voyage Logo (Clean, no sticker/badge) */}
-        <a 
-          href="#hero" 
-          onClick={(e) => { e.preventDefault(); scrollTo('#hero'); }}
-          className="flex items-center group py-0.5"
-          aria-label="Voyage Home"
-        >
-          <img 
-            src="/voyage_logo_crop.png" 
-            alt="Voyage" 
-            className="h-6 sm:h-7 md:h-8 w-auto object-contain brightness-105 transition-transform duration-200 group-hover:scale-[1.02]" 
-          />
-        </a>
-
-        {/* Center: Clean Text Navigation Links (Matching Reference Image) */}
-        <div className="hidden md:flex items-center gap-7 lg:gap-9 text-[13px] lg:text-sm font-medium text-white/90">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.target}
-              onClick={(e) => {
-                e.preventDefault();
-                scrollTo(link.target);
-              }}
-              className="hover:text-white transition-colors duration-200 tracking-wide hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-
-        {/* Right Action Group: Disruption Solving (MAIN) + Book Now (SECONDARY) */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+    <>
+      <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
+        <nav className="pointer-events-auto w-full max-w-6xl rounded-full px-6 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between bg-[#0b272c]/85 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.38)] transition-all duration-300">
           
-          {/* SECONDARY ACTION: Book Now (Sleek Frosted Ghost Button) */}
-          <button
-            onClick={handleBookNow}
-            className="hidden sm:inline-flex px-4 py-1.5 sm:py-2 rounded-full border border-white/35 bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap"
-            title="Book Itinerary & Ghost Holds"
-          >
-            Book Now
-          </button>
-
-          {/* MAIN PRIMARY ACTION: Disruption Solver (Prominent Solid Pill Button) */}
-          <button
-            onClick={handleDisruptionSolving}
-            className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 shadow-lg active:scale-95 whitespace-nowrap flex items-center gap-2 ring-2 ring-white/30 ${
-              activeDisruption 
-                ? 'bg-gradient-to-r from-[#DF6951] to-[#FF7D68] text-white shadow-[#DF6951]/50 animate-pulse'
-                : 'bg-white text-[#0b272c] hover:bg-slate-100 hover:shadow-xl'
-            }`}
-            title="Launch Spatio-Temporal Disruption Recovery Engine"
-          >
-            {activeDisruption ? (
-              <>
-                <AlertTriangle className="w-4 h-4 text-white" />
-                <span>Resolve Disruption</span>
-              </>
-            ) : (
-              <>
-                <ShieldAlert className="w-4 h-4 text-[#DF6951]" />
-                <span>Disruption Solver</span>
-              </>
-            )}
-          </button>
-
-          {/* Mobile Menu Toggle Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors ml-1"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile Dropdown Menu */}
-      {mobileMenuOpen && (
-        <div className="pointer-events-auto absolute top-16 left-4 right-4 rounded-2xl bg-[#0b272c]/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl flex flex-col gap-3 md:hidden animate-in fade-in slide-in-from-top-3 duration-200">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.target}
-              onClick={(e) => {
-                e.preventDefault();
-                scrollTo(link.target);
-              }}
-              className="text-white/90 hover:text-white font-medium text-sm py-2 px-3 rounded-lg hover:bg-white/10 transition-colors"
+          {/* ========================================================================= */}
+          {/* LEFT: VOYAGE LOGO (Neatly separated with border & margin)                 */}
+          {/* ========================================================================= */}
+          <div className="flex items-center shrink-0 mr-6 lg:mr-10 pr-6 lg:pr-8 border-r border-white/15">
+            <a 
+              href="#hero" 
+              onClick={(e) => { e.preventDefault(); scrollTo('#hero'); }}
+              className="flex items-center group py-0.5"
+              aria-label="Voyage Home"
             >
-              {link.label}
+              <img 
+                src="/voyage_logo_crop.png" 
+                alt="Voyage" 
+                className="h-6 sm:h-7 md:h-8 w-auto object-contain brightness-105 transition-transform duration-200 group-hover:scale-[1.02]" 
+              />
             </a>
-          ))}
-          <div className="pt-3 border-t border-white/15 flex flex-col gap-2">
+          </div>
+
+          {/* ========================================================================= */}
+          {/* CENTER: NAV ITEMS (From Figma: Destinations, Hotels, Flights, Bookings)   */}
+          {/* Font: Google Sans / Poppins 400 17px, line-height 22px, whitespace-nowrap */}
+          {/* ========================================================================= */}
+          <div className="hidden lg:flex items-center gap-7 xl:gap-9">
+            {navItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.target}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollTo(item.target);
+                }}
+                className="font-googleSans font-normal text-[16px] xl:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors duration-200 whitespace-nowrap"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+
+          {/* ========================================================================= */}
+          {/* RIGHT: ACTIONS & AUTH (Disruption Solver, Book Now, Login, Sign up, EN)   */}
+          {/* NO STICKERS, NO ICONS in button - Clean typography!                       */}
+          {/* ========================================================================= */}
+          <div className="flex items-center gap-3 xl:gap-5">
+            
+            {/* 1. DISRUPTION SOLVER (MAIN PRIMARY ACTION - Solid Pill, NO STICKER) */}
             <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                handleDisruptionSolving();
-              }}
-              className="w-full py-2.5 rounded-full bg-white text-[#0b272c] font-bold text-xs flex items-center justify-center gap-2 shadow-md"
+              onClick={handleDisruptionSolving}
+              className={`px-4 sm:px-5 py-2 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 shadow-md active:scale-95 whitespace-nowrap ${
+                activeDisruption
+                  ? 'bg-gradient-to-r from-[#DF6951] to-[#FF7D68] text-white shadow-[#DF6951]/50 animate-pulse'
+                  : 'bg-white text-[#0b272c] hover:bg-slate-100 hover:shadow-xl'
+              }`}
+              title="Launch Disruption Resilience Engine"
             >
-              <ShieldAlert className="w-4 h-4 text-[#DF6951]" />
-              <span>{activeDisruption ? "Resolve Disruption" : "Disruption Solver"}</span>
+              {activeDisruption ? "Resolve Disruption" : "Disruption Solver"}
             </button>
+
+            {/* 2. BOOK NOW (SECONDARY ACTION - Subtle Frosted Pill) */}
             <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                handleBookNow();
-              }}
-              className="w-full py-2 rounded-full border border-white/30 text-white font-medium text-xs text-center"
+              onClick={handleBookNow}
+              className="hidden sm:inline-flex px-3.5 py-1.5 rounded-full border border-white/30 bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap"
+              title="Book Itinerary & Ghost-Holds"
             >
               Book Now
             </button>
+
+            {/* Vertical divider */}
+            <div className="hidden md:block w-px h-5 bg-white/20" />
+
+            {/* 3. LOGIN (Figma: Google Sans 500, 17px, line-height 22px) */}
+            <button
+              onClick={() => setAuthModal('login')}
+              className="hidden md:inline-block font-googleSans font-medium text-[15px] xl:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Login
+            </button>
+
+            {/* 4. SIGN UP (Figma: Rectangle 4 - border 1px solid, radius 5px, 102px x 40px) */}
+            <button
+              onClick={() => setAuthModal('signup')}
+              className="hidden md:inline-flex items-center justify-center font-googleSans font-medium text-[14px] xl:text-[16px] leading-[22px] text-white px-4 py-1.5 rounded-[5px] border border-white/60 hover:border-white hover:bg-white/10 transition-all duration-200 whitespace-nowrap cursor-pointer"
+            >
+              Sign up
+            </button>
+
+            {/* 5. EN DROPDOWN (Figma: Dropdown 38.5px x 22px, Vector 1 arrow) */}
+            <div className="hidden xl:flex items-center gap-1 font-googleSans font-medium text-[15px] xl:text-[17px] leading-[22px] text-white/80 hover:text-white cursor-pointer transition-colors">
+              <span>EN</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+
+            {/* Mobile Menu Toggle Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors ml-1"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+
+        </nav>
+
+        {/* ========================================================================= */}
+        {/* MOBILE NAVIGATION DRAWER                                                  */}
+        {/* ========================================================================= */}
+        {mobileMenuOpen && (
+          <div className="pointer-events-auto absolute top-16 left-4 right-4 rounded-2xl bg-[#0b272c]/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl flex flex-col gap-3 lg:hidden animate-in fade-in slide-in-from-top-3 duration-200">
+            {navItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.target}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollTo(item.target);
+                }}
+                className="font-googleSans text-white/90 hover:text-white font-medium text-base py-2 px-3 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                {item.label}
+              </a>
+            ))}
+
+            <div className="pt-3 border-t border-white/15 flex flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleDisruptionSolving();
+                }}
+                className="w-full py-2.5 rounded-full bg-white text-[#0b272c] font-bold text-sm shadow-md"
+              >
+                {activeDisruption ? "Resolve Disruption" : "Disruption Solver"}
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleBookNow();
+                }}
+                className="w-full py-2 rounded-full border border-white/30 text-white font-medium text-sm text-center"
+              >
+                Book Now
+              </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setAuthModal('login');
+                  }}
+                  className="py-2 text-center text-white/90 hover:text-white font-googleSans text-sm font-medium border border-white/20 rounded-[5px]"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setAuthModal('signup');
+                  }}
+                  className="py-2 text-center text-white font-googleSans text-sm font-medium border border-white/60 bg-white/10 rounded-[5px]"
+                >
+                  Sign up
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* ========================================================================= */}
+      {/* INTERACTIVE AUTH MODAL (Login & Sign Up)                                  */}
+      {/* ========================================================================= */}
+      {authModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 space-y-6">
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setAuthModal(null)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="text-center space-y-1">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#FFF1DA] text-[#DF6951] mb-2">
+                {authModal === 'login' ? <Lock className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
+              </div>
+              <h3 className="font-volkhov font-bold text-2xl text-[#181E4B]">
+                {authModal === 'login' ? 'Sign In to Voyage' : 'Create Voyage Account'}
+              </h3>
+              <p className="font-poppins text-xs text-[#5E6282]">
+                {authModal === 'login' 
+                  ? 'Access your autonomous disruption recovery dashboard' 
+                  : 'Join Voyage for self-healing travel & EU261 liquidity'}
+              </p>
+            </div>
+
+            {/* Toggle Tabs */}
+            <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-sm font-googleSans font-medium">
+              <button
+                onClick={() => setAuthModal('login')}
+                className={`py-2 rounded-lg transition-all ${
+                  authModal === 'login' ? 'bg-white text-[#181E4B] shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Login
+              </button>
+              <button
+                onClick={() => setAuthModal('signup')}
+                className={`py-2 rounded-lg transition-all ${
+                  authModal === 'signup' ? 'bg-white text-[#181E4B] shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            {authSubmitted ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                  ✓
+                </div>
+                <h4 className="font-poppins font-bold text-lg text-[#181E4B]">Welcome Aboard!</h4>
+                <p className="text-xs text-[#5E6282]">Redirecting to your flight resilience portal...</p>
+              </div>
+            ) : (
+              <form onSubmit={handleAuthSubmit} className="space-y-4 font-poppins">
+                {authModal === 'signup' && (
+                  <div>
+                    <label className="text-xs font-semibold text-[#5E6282] block mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Elena Vance"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#DF6951]"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-[#5E6282] block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="elena.vance@corporate.com"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#DF6951]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[#5E6282] block mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#DF6951]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-xl bg-[#DF6951] text-white font-semibold text-sm shadow-md hover:bg-[#c8563e] active:scale-95 transition-all mt-2"
+                >
+                  {authModal === 'login' ? 'Sign In' : 'Create Free Account'}
+                </button>
+              </form>
+            )}
+
+            <div className="pt-2 text-center text-xs text-[#84829A] font-poppins">
+              Protected by Voyage 256-bit GDS Encryption &amp; EU261 Liquidity Bridge
+            </div>
+
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }

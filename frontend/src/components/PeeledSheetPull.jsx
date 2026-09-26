@@ -127,7 +127,7 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
       {/* ========================================================================= */}
       {/* 2. CENTER HERO TAGLINE & HEADING (z-10)                                   */}
       {/* Centered right in the middle of the landing page view as requested:       */}
-      {/* "add this tagline in middle in landing page any tag lin e"                */}
+      {/* "replcae tagline with When Journeys Disrupt, Voyage Finds a Way Forward"   */}
       {/* Fades out smoothly as the plane ascends and hoists up content.            */}
       {/* ========================================================================= */}
       {progress < 0.6 && (
@@ -139,28 +139,28 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
             willChange: 'opacity, transform'
           }}
         >
-          {/* Tagline from Figma: Poppins 700 20px uppercase #DF6951 */}
-          <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-[#0b272c]/45 backdrop-blur-md border border-white/20 shadow-lg mb-4 sm:mb-5">
+          {/* Tagline from User Request */}
+          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#0b272c]/55 backdrop-blur-md border border-white/20 shadow-xl mb-4 sm:mb-6">
             <span className="w-2 h-2 rounded-full bg-[#DF6951] animate-ping" />
-            <span className="font-poppins font-bold text-xs sm:text-sm tracking-[0.22em] uppercase text-[#FF8A65] drop-shadow-sm">
-              BEST DESTINATIONS &amp; AUTONOMOUS RESILIENCE
+            <span className="font-poppins font-bold text-xs sm:text-sm tracking-[0.2em] uppercase text-[#FF8A65] drop-shadow-sm">
+              AUTONOMOUS DISRUPTION RESILIENCE
             </span>
           </div>
 
-          {/* Heading from Figma: Volkhov 700 84px with coral underline swoop */}
-          <h1 className="font-volkhov font-bold text-4xl sm:text-5xl md:text-6xl lg:text-[70px] text-white leading-[1.1] tracking-tight max-w-4xl drop-shadow-[0_4px_30px_rgba(0,0,0,0.7)]">
-            Travel, enjoy and live a <br className="hidden sm:inline" />
+          {/* Heading: When Journeys Disrupt, Voyage Finds a Way Forward */}
+          <h1 className="font-volkhov font-bold text-3xl sm:text-5xl md:text-6xl lg:text-[66px] text-white leading-[1.15] tracking-tight max-w-5xl drop-shadow-[0_4px_30px_rgba(0,0,0,0.75)] px-4">
+            When Journeys Disrupt, <br className="hidden sm:inline" />
             <span className="relative inline-block text-white">
-              new and full life.
+              Voyage Finds a Way Forward.
               <svg className="absolute -bottom-2 left-0 w-full h-3.5 sm:h-5 text-[#DF6951] opacity-90" viewBox="0 0 350 20" fill="none" preserveAspectRatio="none">
                 <path d="M3 15C80 3 240 3 347 13" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
               </svg>
             </span>
           </h1>
 
-          {/* Subtitle from Figma */}
+          {/* Subtitle */}
           <p className="font-poppins font-normal text-white/95 text-sm sm:text-base md:text-lg max-w-2xl mt-5 sm:mt-6 leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
-            Built for fearless explorers. Autonomous spatio-temporal AI that detects disruptions hours early, holds backup rail seats, and recovers your journey in 1 click.
+            World’s first self-healing spatio-temporal travel intelligence. When flights delay and connections break, Voyage automatically reroutes, holds backup rail seats, and recovers your journey in 1 click.
           </p>
 
           {/* Scroll hint indicator */}
