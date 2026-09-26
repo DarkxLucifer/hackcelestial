@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, ArrowRight, Sparkles } from 'lucide-react';
+import { Menu, X, ShieldAlert, AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -18,23 +18,29 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
 
   const navLinks = [
     { label: 'About Us', target: '#hero' },
-    { label: 'Destinations', target: '#itinerary' },
+    { label: 'Destinations', target: '#destinations' },
     { label: 'Travel Packages', target: '#recovery' },
-    { label: 'Offers', target: '#simulator' },
-    { label: 'Contact', target: '#rights' },
+    { label: 'Offers', target: '#services' },
+    { label: 'Contact', target: '#footer' },
   ];
 
-  const handleBookNow = () => {
+  const handleDisruptionSolving = () => {
     if (activeDisruption && onOpenSaga) {
       onOpenSaga();
-    } else {
-      scrollTo('#recovery');
+    } else if (onQuickSimulate) {
+      onQuickSimulate();
+      const el = document.querySelector('#simulator');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const handleBookNow = () => {
+    scrollTo('#easy-steps');
   };
 
   return (
     <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
-      <nav className="pointer-events-auto w-full max-w-5xl rounded-full px-5 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between bg-[#0b272c]/75 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300">
+      <nav className="pointer-events-auto w-full max-w-5xl rounded-full px-5 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between bg-[#0b272c]/80 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.38)] transition-all duration-300">
         
         {/* Left: Uploaded Voyage Logo (Clean, no sticker/badge) */}
         <a 
@@ -67,22 +73,45 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
           ))}
         </div>
 
-        {/* Right: Solid White Pill "Book Now" Button */}
-        <div className="flex items-center gap-3">
+        {/* Right Action Group: Disruption Solving (MAIN) + Book Now (SECONDARY) */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          
+          {/* SECONDARY ACTION: Book Now (Sleek Frosted Ghost Button) */}
           <button
             onClick={handleBookNow}
-            className="px-5 sm:px-6 py-1.5 sm:py-2 rounded-full bg-white text-[#0b272c] font-bold text-xs sm:text-sm hover:bg-slate-100 hover:shadow-lg active:scale-95 transition-all duration-200 shadow-md whitespace-nowrap flex items-center gap-1.5"
+            className="hidden sm:inline-flex px-4 py-1.5 sm:py-2 rounded-full border border-white/35 bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap"
+            title="Book Itinerary & Ghost Holds"
           >
-            <span>Book Now</span>
-            {activeDisruption && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
+            Book Now
+          </button>
+
+          {/* MAIN PRIMARY ACTION: Disruption Solver (Prominent Solid Pill Button) */}
+          <button
+            onClick={handleDisruptionSolving}
+            className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 shadow-lg active:scale-95 whitespace-nowrap flex items-center gap-2 ring-2 ring-white/30 ${
+              activeDisruption 
+                ? 'bg-gradient-to-r from-[#DF6951] to-[#FF7D68] text-white shadow-[#DF6951]/50 animate-pulse'
+                : 'bg-white text-[#0b272c] hover:bg-slate-100 hover:shadow-xl'
+            }`}
+            title="Launch Spatio-Temporal Disruption Recovery Engine"
+          >
+            {activeDisruption ? (
+              <>
+                <AlertTriangle className="w-4 h-4 text-white" />
+                <span>Resolve Disruption</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-4 h-4 text-[#DF6951]" />
+                <span>Disruption Solver</span>
+              </>
             )}
           </button>
 
           {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+            className="md:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors ml-1"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -106,6 +135,27 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
               {link.label}
             </a>
           ))}
+          <div className="pt-3 border-t border-white/15 flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleDisruptionSolving();
+              }}
+              className="w-full py-2.5 rounded-full bg-white text-[#0b272c] font-bold text-xs flex items-center justify-center gap-2 shadow-md"
+            >
+              <ShieldAlert className="w-4 h-4 text-[#DF6951]" />
+              <span>{activeDisruption ? "Resolve Disruption" : "Disruption Solver"}</span>
+            </button>
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleBookNow();
+              }}
+              className="w-full py-2 rounded-full border border-white/30 text-white font-medium text-xs text-center"
+            >
+              Book Now
+            </button>
+          </div>
         </div>
       )}
     </header>

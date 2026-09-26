@@ -11,6 +11,7 @@ import PersonaWeightSliders from './components/PersonaWeightSliders';
 import RecoveryComparison from './components/RecoveryComparison';
 import PassengerRightsBridge from './components/PassengerRightsBridge';
 import AgenticSagaModal from './components/AgenticSagaModal';
+import TravelAgencySections from './components/TravelAgencySections';
 import Footer from './components/Footer';
 
 import {
@@ -292,6 +293,18 @@ export default function App() {
           isOpen={isSagaOpen}
           onClose={() => setIsSagaOpen(false)}
           onCommitSuccess={handleCommitSuccess}
+        />
+
+        {/* Travel Agency Figma UI Sections (Services, Top Destinations, Easy Steps, Testimonials, Partner Logos) */}
+        <TravelAgencySections
+          onSimulateAlpine={() => handleSimulateDisruption({
+            node_id: "node_flight_1",
+            delay_minutes: 65,
+            is_cancellation: false,
+            reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
+          })}
+          onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
+          activeDisruption={activeDisruption}
         />
 
         {/* Footer (matching user's specification) */}
