@@ -3,7 +3,7 @@ import {
   Send, Mic, MicOff, Paperclip, Sparkles, CheckCircle2, 
   AlertTriangle, ArrowRight, X, Minimize2, Maximize2, 
   FileText, ShieldCheck, Clock, RefreshCw, Volume2, Copy, Check,
-  Settings, Key, Bot, Code, HelpCircle
+  Settings, Key, Bot, Code, HelpCircle, Trash2
 } from 'lucide-react';
 
 export default function DisruptionChatbot({
@@ -47,6 +47,21 @@ export default function DisruptionChatbot({
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, isRecording, isLoading]);
+
+  // Clear chat conversation
+  const handleClearChat = () => {
+    setMessages([
+      {
+        id: Date.now(),
+        sender: 'bot',
+        provider: 'Voyage AI Engine',
+        text: "Chat cleared. I am your Voyage AI Travel Assistant.\n\nHow can I help you with your journey or travel disruption today?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+    setInputText('');
+    setCurrentDisruption(null);
+  };
 
   // Save API keys to local storage
   const handleSaveKeys = (e) => {
@@ -403,6 +418,16 @@ export default function DisruptionChatbot({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Clear Chat Button in Corner */}
+          <button
+            onClick={handleClearChat}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/90 hover:border-rose-200 rounded-xl transition-all cursor-pointer font-medium shadow-2xs"
+            title="Clear chat messages and start fresh"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+            <span className="hidden sm:inline">Clear Chat</span>
+          </button>
+
           {/* Settings / API Keys Modal Toggle */}
           <button
             onClick={() => setShowSettings(!showSettings)}
