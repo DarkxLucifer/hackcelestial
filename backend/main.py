@@ -79,6 +79,17 @@ def serve_island():
         return FileResponse(island_path)
     raise HTTPException(status_code=404, detail="island.jpg not found")
 
+@app.get("/voyage_logo.png")
+@app.get("/voyage_logo_crop.png")
+@app.get("/voyage_logo_transparent.png")
+def serve_voyage_logo():
+    logo_path = os.path.join(DIST_DIR, "voyage_logo_crop.png")
+    if not os.path.exists(logo_path):
+        logo_path = os.path.join(DIST_DIR, "voyage_logo.png")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path)
+    raise HTTPException(status_code=404, detail="voyage logo not found")
+
 @app.get("/navbar_ref.png")
 def serve_navbar_ref():
     nav_path = os.path.join(DIST_DIR, "navbar_ref.png")

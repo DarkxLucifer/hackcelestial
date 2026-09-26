@@ -105,14 +105,7 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
           style={{ backgroundImage: `url('/island.jpg')` }}
         >
           {/* Subtle natural atmospheric vignette */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/35" />
-        </div>
-
-        {/* Top-Left Brand Logo: "YATAR" */}
-        <div className="absolute top-8 left-10 z-10 flex items-center gap-3">
-          <span className="font-poppins font-black text-2xl sm:text-3xl tracking-[0.18em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)]">
-            YATAR
-          </span>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/25" />
         </div>
 
         {/* Atmospheric Cloud Framing on Left and Right */}
@@ -146,15 +139,6 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
               willChange: 'top, transform, opacity'
             }}
           >
-            {/* Volumetric Shadow on Island Canopy */}
-            <div 
-              className="absolute top-14 w-72 h-72 rounded-full bg-black/45 blur-2xl -z-10"
-              style={{ 
-                opacity: entryRatio,
-                transform: `scale(${0.6 + entryRatio * 0.6}) translate3d(0, ${10 + entryRatio * 20}px, 0)` 
-              }}
-            />
-
             {/* Jet Engine Contrails */}
             {entryRatio > 0.4 && (
               <>
@@ -169,11 +153,11 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
               </>
             )}
 
-            {/* High-Resolution Airliner */}
+            {/* High-Resolution Airliner - Clean, no black shadow/shade */}
             <img 
               src="/plane.png" 
-              alt="YATAR Airplane"
-              className="w-[280px] sm:w-[340px] md:w-[410px] lg:w-[460px] h-auto drop-shadow-[0_25px_35px_rgba(0,0,0,0.6)] select-none"
+              alt="Voyage Airplane"
+              className="w-[280px] sm:w-[340px] md:w-[410px] lg:w-[460px] h-auto select-none"
             />
 
             {/* Wingtip Position Strobe Lights */}

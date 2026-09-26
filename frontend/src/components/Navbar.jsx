@@ -1,80 +1,113 @@
-import React, { useState, useEffect } from 'react';
-import { Plane, Compass, ShieldAlert, Sparkles, Activity, FileCheck2, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Menu, X, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }) {
-  const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      // Navbar only becomes visible / active once the flight entry finishes and content begins pulling
-      setScrolled(window.scrollY > 850);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const scrollTo = (id) => {
+    setMobileMenuOpen(false);
+    if (id === '#hero') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const el = document.querySelector(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const navLinks = [
+    { label: 'About Us', target: '#hero' },
+    { label: 'Destinations', target: '#itinerary' },
+    { label: 'Travel Packages', target: '#recovery' },
+    { label: 'Offers', target: '#simulator' },
+    { label: 'Contact', target: '#rights' },
+  ];
+
+  const handleBookNow = () => {
+    if (activeDisruption && onOpenSaga) {
+      onOpenSaga();
+    } else {
+      scrollTo('#recovery');
+    }
+  };
 
   return (
-    <header 
-      className={`fixed top-5 left-0 right-0 z-50 flex justify-center px-4 transition-all duration-700 pointer-events-none ${
-        scrolled ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'
-      }`}
-    >
-      <nav className="pointer-events-auto w-full max-w-5xl rounded-full px-6 py-2.5 flex items-center justify-between voyare-pill-nav bg-[#0c1f24]/85 backdrop-blur-xl border border-white/20 shadow-2xl">
+    <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
+      <nav className="pointer-events-auto w-full max-w-5xl rounded-full px-5 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between bg-[#0b272c]/75 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300">
         
-        {/* Brand Logo - YATAR */}
-        <a href="#hero" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-voyare-coral via-[#FF8A65] to-voyare-gold flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-            <Plane className="w-4 h-4 text-white transform -rotate-45" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-black tracking-[0.2em] text-white font-poppins">YATAR</span>
-            <span className="text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/15 hidden sm:inline-block">
-              Resilience
-            </span>
-          </div>
+        {/* Left: Uploaded Voyage Logo (Clean, no sticker/badge) */}
+        <a 
+          href="#hero" 
+          onClick={(e) => { e.preventDefault(); scrollTo('#hero'); }}
+          className="flex items-center group py-0.5"
+          aria-label="Voyage Home"
+        >
+          <img 
+            src="/voyage_logo_crop.png" 
+            alt="Voyage" 
+            className="h-6 sm:h-7 md:h-8 w-auto object-contain brightness-105 transition-transform duration-200 group-hover:scale-[1.02]" 
+          />
         </a>
 
-        {/* Center Nav Links */}
-        <div className="hidden md:flex items-center gap-6 text-xs font-medium text-white/80">
-          <a href="#itinerary" className="hover:text-white transition-colors flex items-center gap-1.5">
-            <Compass className="w-3.5 h-3.5 text-voyare-gold" />
-            <span>Itinerary Graph</span>
-          </a>
-          <a href="#simulator" className="hover:text-white transition-colors flex items-center gap-1.5">
-            <Activity className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Radar Simulator</span>
-          </a>
-          <a href="#blast-radius" className="hover:text-white transition-colors flex items-center gap-1.5">
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-            <span>CPM Ripple</span>
-          </a>
-          <a href="#recovery" className="hover:text-white transition-colors flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-voyare-coral" />
-            <span>Recovery Plans</span>
-          </a>
+        {/* Center: Clean Text Navigation Links (Matching Reference Image) */}
+        <div className="hidden md:flex items-center gap-7 lg:gap-9 text-[13px] lg:text-sm font-medium text-white/90">
+          {navLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.target}
+              onClick={(e) => {
+                e.preventDefault();
+                scrollTo(link.target);
+              }}
+              className="hover:text-white transition-colors duration-200 tracking-wide hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
 
-        {/* Right CTA */}
+        {/* Right: Solid White Pill "Book Now" Button */}
         <div className="flex items-center gap-3">
-          {activeDisruption ? (
-            <button
-              onClick={onOpenSaga}
-              className="px-4 py-1.5 rounded-full bg-voyare-coral text-white font-bold text-xs shadow-md hover:bg-[#c5533c] transition-all flex items-center gap-1.5"
-            >
-              <span>1-Click Recover</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={onQuickSimulate}
-              className="px-4 py-1.5 rounded-full bg-white text-[#0c1f24] font-bold text-xs hover:bg-slate-100 transition-all flex items-center gap-1.5"
-            >
-              <span>Simulate Breach</span>
-              <ArrowRight className="w-3.5 h-3.5 text-voyare-coral" />
-            </button>
-          )}
+          <button
+            onClick={handleBookNow}
+            className="px-5 sm:px-6 py-1.5 sm:py-2 rounded-full bg-white text-[#0b272c] font-bold text-xs sm:text-sm hover:bg-slate-100 hover:shadow-lg active:scale-95 transition-all duration-200 shadow-md whitespace-nowrap flex items-center gap-1.5"
+          >
+            <span>Book Now</span>
+            {activeDisruption && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
+            )}
+          </button>
+
+          {/* Mobile Menu Toggle Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile Dropdown Menu */}
+      {mobileMenuOpen && (
+        <div className="pointer-events-auto absolute top-16 left-4 right-4 rounded-2xl bg-[#0b272c]/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl flex flex-col gap-3 md:hidden animate-in fade-in slide-in-from-top-3 duration-200">
+          {navLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.target}
+              onClick={(e) => {
+                e.preventDefault();
+                scrollTo(link.target);
+              }}
+              className="text-white/90 hover:text-white font-medium text-sm py-2 px-3 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      )}
     </header>
   );
 }
