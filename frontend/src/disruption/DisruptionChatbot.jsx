@@ -29,7 +29,7 @@ export default function DisruptionChatbot({
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeProvider, setActiveProvider] = useState('Groq / Gemini');
+  const [activeProvider, setActiveProvider] = useState('Voyage AI Engine');
   const [showSettings, setShowSettings] = useState(false);
   const [groqKey, setGroqKey] = useState(localStorage.getItem('voyage_groq_key') || '');
   const [geminiKey, setGeminiKey] = useState(localStorage.getItem('voyage_gemini_key') || '');
@@ -152,7 +152,7 @@ export default function DisruptionChatbot({
 
       const data = await res.json();
       const replyText = data.reply || "I have received your request and evaluated the disruption.";
-      const provider = data.provider || "Groq / Gemini Fallback";
+      const provider = data.provider || "Voyage AI Engine";
       setActiveProvider(provider);
 
       // Check if disruption was detected in query and extract structured record

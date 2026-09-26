@@ -40,7 +40,7 @@ CRITICAL INSTRUCTIONS:
 1. FOCUS DIRECTLY ON THE USER'S QUESTION:
    - Provide a direct, concise, natural, and helpful answer tailored specifically to what the user asked.
    - For general travel questions (e.g., how to find a ticket number, PNR, baggage policies, station navigation), give a brief, friendly, bulleted explanation (2-3 short sections max).
-   - DO NOT dump unsolicited programming code (no Python, no bash scripts, no regex tutorials) UNLESS the user explicitly asks you to write code or build software.
+   - DO NOT dump unsolicited programming code (no Python, no bash scripts, no regex tutorials).
    - Avoid overwhelming walls of text, unnecessary mega-tables, or redundant checklists. Keep it readable and conversational.
 
 2. TRAVEL DISRUPTION & PASSENGER RIGHTS:
@@ -51,11 +51,49 @@ CRITICAL INSTRUCTIONS:
      * Indian Railways (IRCTC) TDR: 100% full refund if train is delayed by >3 hrs at boarding point.
    - Propose clear, actionable recovery plans (airline rebooking, Vande Bharat/rail alternative, or road transport).
 
-3. CODE GENERATION (ONLY WHEN EXPLICITLY REQUESTED):
-   - Only if the user asks "write code", "code for...", or software development questions, provide clean, modern, production-grade code formatted in markdown code blocks.
+3. STRICT DOMAIN RESTRICTIONS & BOUNDARIES (MANDATORY):
+   - You are exclusively dedicated to travel resilience, flight/train disruptions, tickets, transit, and passenger rights.
+   - You are STRICTLY FORBIDDEN from generating code for games (e.g. Python games, Snake, Tic-Tac-Toe, arcade games, pygame) or unrelated non-travel software.
+   - If asked for game code or off-topic programming (e.g. "write code of python game", "make a snake game in python"), you must politely refuse and clarify that you are restricted to travel disruption, flight/train status, and passenger compensation rights.
+   - Only provide code if it specifically relates to travel systems (e.g., flight delay parser, PNR validator, or DGCA compensation calculator).
 
 Tone: Friendly, concise, empathetic, accurate, and professional.
 """
+
+def is_restricted_game_query(query: str) -> bool:
+    """
+    Detects requests to generate game code or non-travel game scripts.
+    Voyage AI is restricted to travel resilience, flight/train disruptions, and passenger rights.
+    """
+    if not query:
+        return False
+    q = query.lower()
+    
+    # Direct game code phrases
+    game_code_phrases = [
+        "python game", "code of python game", "code for python game",
+        "game in python", "game code", "code a game", "write a game",
+        "make a game", "create a game", "build a game", "develop a game",
+        "snake game", "tic tac toe", "tictactoe", "flappy bird",
+        "pong game", "tetris", "pygame", "arcade game", "chess game",
+        "hangman game", "rock paper scissors"
+    ]
+    if any(p in q for p in game_code_phrases):
+        return True
+
+    # General check: game keyword + code/programming action
+    game_words = ["game", "games", "gaming"]
+    code_words = ["code", "script", "program", "write", "develop", "create", "make", "implement", "build"]
+    has_game = any(re.search(rf"\b{re.escape(w)}\b", q) for w in game_words)
+    has_code = any(re.search(rf"\b{re.escape(w)}\b", q) for w in code_words)
+
+    if has_game and has_code:
+        # Exclude legitimate travel contexts
+        travel_exceptions = ["connection game", "game theory", "travel simulation", "gamified"]
+        if not any(ex in q for ex in travel_exceptions):
+            return True
+
+    return False
 
 try:
     from dotenv import load_dotenv
@@ -109,7 +147,7 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
                 reply = completion.choices[0].message.content
                 if reply and reply.strip():
                     state["response"] = reply
-                    state["provider"] = f"groq ({model_name})"
+                    state["provider"] = "Voyage AI Engine"
                     return state
             except Exception as me:
                 last_err = me
@@ -154,7 +192,7 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
                     response = model.generate_content(query)
                 if response and response.text and response.text.strip():
                     state["response"] = response.text
-                    state["provider"] = f"gemini ({model_name})"
+                    state["provider"] = "Voyage AI Engine"
                     return state
             except Exception as me:
                 last_err = me
@@ -170,6 +208,20 @@ def call_expert_engine(state: AgentState) -> AgentState:
     """High-intelligence local fallback that understands travel laws, writes code, and extracts disruptions."""
     query = state["user_query"].strip()
     lower = query.lower()
+
+    if is_restricted_game_query(query):
+        state["response"] = (
+            "### 🛡️ Voyage AI Domain Restriction Notice\n\n"
+            "I am **Voyage AI**, an intelligent assistant dedicated exclusively to **travel disruption resilience, flight & train telemetry, and passenger rights** under DGCA CAR Section 3, EU261, US DOT, and IRCTC.\n\n"
+            "I have a **domain restriction** and cannot generate code for games (such as Python games, arcade games, or entertainment software).\n\n"
+            "#### How I can assist you:\n"
+            "- **Flight & Train Delay Analysis**: Track real-time status and downstream connection risk.\n"
+            "- **Passenger Rights & Compensation**: Calculate statutory cash refunds and meal entitlements.\n"
+            "- **Multi-Modal Recovery**: Recommend fastest or lowest-cost alternatives across air, rail, metro, and road transit.\n\n"
+            "Please let me know if you would like help with an upcoming flight, train, or travel disruption!"
+        )
+        state["provider"] = "Voyage AI Engine"
+        return state
 
     # Case 1: User asks to write code
     if any(k in lower for k in ["write code", "code for", "create a website", "react component", "html", "javascript", "python", "fastapi"]):
@@ -426,12 +478,31 @@ def run_ai_chat(
     gemini_api_key: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Executes LangGraph agent with fallback:
-    Groq -> Gemini -> Voyage Expert Engine
+    Executes Voyage AI Agent with domain restrictions and multi-provider failover:
+    Gemini -> Groq -> Local Expert Engine
     """
+    query = (user_query or (messages[-1]["content"] if messages else "")).strip()
+
+    # Domain restriction check: block game code generation
+    if is_restricted_game_query(query):
+        return {
+            "reply": (
+                "### 🛡️ Voyage AI Domain Restriction Notice\n\n"
+                "I am **Voyage AI**, an intelligent assistant dedicated exclusively to **travel disruption resilience, flight & train telemetry, and passenger rights** under DGCA CAR Section 3, EU261, US DOT, and IRCTC.\n\n"
+                "I have a **domain restriction** and cannot generate code for games (such as Python games, arcade games, or entertainment software).\n\n"
+                "#### How I can assist you:\n"
+                "- **Flight & Train Delay Analysis**: Track real-time status and downstream connection risk.\n"
+                "- **Passenger Rights & Compensation**: Calculate statutory cash refunds and meal entitlements.\n"
+                "- **Multi-Modal Recovery**: Recommend fastest or lowest-cost alternatives across air, rail, metro, and road transit.\n\n"
+                "Please let me know if you would like help with an upcoming flight, train, or travel disruption!"
+            ),
+            "provider": "Voyage AI Engine",
+            "success": True
+        }
+
     state: AgentState = {
         "messages": messages,
-        "user_query": user_query or (messages[-1]["content"] if messages else ""),
+        "user_query": query,
         "response": None,
         "provider": None,
         "structured_ticket": None,
@@ -447,7 +518,7 @@ def run_ai_chat(
         if state.get("response"):
             return {
                 "reply": state["response"],
-                "provider": state["provider"],
+                "provider": "Voyage AI Engine",
                 "success": True
             }
 
@@ -457,7 +528,7 @@ def run_ai_chat(
         if state.get("response"):
             return {
                 "reply": state["response"],
-                "provider": state["provider"],
+                "provider": "Voyage AI Engine",
                 "success": True
             }
 
@@ -465,7 +536,7 @@ def run_ai_chat(
     state = call_expert_engine(state)
     return {
         "reply": state["response"],
-        "provider": state["provider"],
+        "provider": "Voyage AI Engine",
         "success": True
     }
 
