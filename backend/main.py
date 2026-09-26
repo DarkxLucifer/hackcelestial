@@ -516,6 +516,12 @@ def get_gtfs_metro_endpoint():
     """Returns GTFS 2.0 specification schedule for Delhi Airport Express Metro."""
     return GTFSAndBusRetriever.get_gtfs_airport_metro()
 
+@app.get("/api/tools/web-scrape")
+def web_scrape_endpoint(url: str = "https://gtfs.org"):
+    """Scrapes and extracts content from any random web domain using AgentWebScraper."""
+    from .scraper_tool import AgentWebScraper
+    return AgentWebScraper.scrape_url(url)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
