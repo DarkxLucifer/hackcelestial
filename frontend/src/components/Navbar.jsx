@@ -20,7 +20,6 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
     }
   };
 
-  // Nav Items matching the exact reference Figma code
   const navItems = [
     { label: 'Destinations', target: '#destinations' },
     { label: 'Hotels', target: '#easy-steps' },
@@ -55,13 +54,49 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
 
   return (
     <>
-      <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
-        <nav className="pointer-events-auto w-full max-w-6xl rounded-full px-6 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between bg-[#0b272c]/85 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.38)] transition-all duration-300">
+      {/* ========================================================================= */}
+      {/* 1. TOP UTILITY NAVBAR (DIFFERENT NAVBAR FOR LOGIN & SIGN UP)              */}
+      {/* Exact Figma reference font structure: Google Sans 500, Rectangle 4 border */}
+      {/* ========================================================================= */}
+      <div className="fixed top-2.5 sm:top-3 right-4 sm:right-10 z-50 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-4 sm:gap-6 px-4 py-1.5 rounded-full bg-[#0b272c]/40 backdrop-blur-md border border-white/15 shadow-sm text-white/90">
           
-          {/* ========================================================================= */}
-          {/* LEFT: VOYAGE LOGO (Neatly separated with border & margin)                 */}
-          {/* ========================================================================= */}
-          <div className="flex items-center shrink-0 mr-6 lg:mr-10 pr-6 lg:pr-8 border-r border-white/15">
+          {/* EN Dropdown (Figma Vector arrow, 17px) */}
+          <div className="flex items-center gap-1 font-googleSans font-medium text-[14px] sm:text-[16px] leading-[22px] text-white/80 hover:text-white cursor-pointer transition-colors">
+            <span>EN</span>
+            <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+          </div>
+
+          <div className="w-px h-3.5 bg-white/25" />
+
+          {/* Login (Figma Google Sans 500 17px) */}
+          <button
+            onClick={() => setAuthModal('login')}
+            className="font-googleSans font-medium text-[14px] sm:text-[16px] leading-[22px] text-white/90 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Login
+          </button>
+
+          {/* Sign up (Figma Rectangle 4: border 1px solid, radius 5px) */}
+          <button
+            onClick={() => setAuthModal('signup')}
+            className="font-googleSans font-medium text-[13px] sm:text-[15px] leading-[20px] text-white px-3.5 py-1 rounded-[5px] border border-white/60 hover:border-white hover:bg-white/10 transition-all cursor-pointer whitespace-nowrap"
+          >
+            Sign up
+          </button>
+        </div>
+      </div>
+
+
+      {/* ========================================================================= */}
+      {/* 2. MAIN FLOATING CAPSULE NAVBAR                                           */}
+      {/* Spacious, uncrowded, neat separation. NO STICKERS, NO ICONS in button!    */}
+      {/* ========================================================================= */}
+      <header className="fixed top-12 sm:top-14 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
+        <nav className="pointer-events-auto w-full max-w-4xl lg:max-w-5xl rounded-full px-6 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between bg-[#0b272c]/85 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.38)] transition-all duration-300">
+          
+          {/* LEFT: VOYAGE LOGO (Isolated with clean right spacing) */}
+          <div className="flex items-center shrink-0 pr-6 mr-2 sm:mr-4">
             <a 
               href="#hero" 
               onClick={(e) => { e.preventDefault(); scrollTo('#hero'); }}
@@ -76,11 +111,9 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
             </a>
           </div>
 
-          {/* ========================================================================= */}
-          {/* CENTER: NAV ITEMS (From Figma: Destinations, Hotels, Flights, Bookings)   */}
-          {/* Font: Google Sans / Poppins 400 17px, line-height 22px, whitespace-nowrap */}
-          {/* ========================================================================= */}
-          <div className="hidden lg:flex items-center gap-7 xl:gap-9">
+          {/* CENTER: NAV ITEMS (Destinations, Hotels, Flights, Bookings) */}
+          {/* Ample room, will NEVER collide with buttons! */}
+          <div className="hidden md:flex items-center gap-7 lg:gap-10">
             {navItems.map((item) => (
               <a
                 key={item.label}
@@ -89,70 +122,41 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
                   e.preventDefault();
                   scrollTo(item.target);
                 }}
-                className="font-googleSans font-normal text-[16px] xl:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors duration-200 whitespace-nowrap"
+                className="font-googleSans font-normal text-[15px] lg:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors duration-200 whitespace-nowrap hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
               >
                 {item.label}
               </a>
             ))}
           </div>
 
-          {/* ========================================================================= */}
-          {/* RIGHT: ACTIONS & AUTH (Disruption Solver, Book Now, Login, Sign up, EN)   */}
-          {/* NO STICKERS, NO ICONS in button - Clean typography!                       */}
-          {/* ========================================================================= */}
-          <div className="flex items-center gap-3 xl:gap-5">
+          {/* RIGHT: ACTION BUTTONS (Book Now secondary, Disruption Solver main) */}
+          {/* NO STICKERS / NO ICONS - Pure clean typography! */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0 pl-4 sm:pl-6">
             
-            {/* 1. DISRUPTION SOLVER (MAIN PRIMARY ACTION - Solid Pill, NO STICKER) */}
-            <button
-              onClick={handleDisruptionSolving}
-              className={`px-4 sm:px-5 py-2 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 shadow-md active:scale-95 whitespace-nowrap ${
-                activeDisruption
-                  ? 'bg-gradient-to-r from-[#DF6951] to-[#FF7D68] text-white shadow-[#DF6951]/50 animate-pulse'
-                  : 'bg-white text-[#0b272c] hover:bg-slate-100 hover:shadow-xl'
-              }`}
-              title="Launch Disruption Resilience Engine"
-            >
-              {activeDisruption ? "Resolve Disruption" : "Disruption Solver"}
-            </button>
-
-            {/* 2. BOOK NOW (SECONDARY ACTION - Subtle Frosted Pill) */}
+            {/* SECONDARY ACTION: Book Now */}
             <button
               onClick={handleBookNow}
-              className="hidden sm:inline-flex px-3.5 py-1.5 rounded-full border border-white/30 bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap"
-              title="Book Itinerary & Ghost-Holds"
+              className="hidden sm:inline-flex px-4 py-1.5 sm:py-2 rounded-full border border-white/35 bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm active:scale-95 transition-all duration-200 whitespace-nowrap"
             >
               Book Now
             </button>
 
-            {/* Vertical divider */}
-            <div className="hidden md:block w-px h-5 bg-white/20" />
-
-            {/* 3. LOGIN (Figma: Google Sans 500, 17px, line-height 22px) */}
+            {/* MAIN PRIMARY ACTION: Disruption Solver */}
             <button
-              onClick={() => setAuthModal('login')}
-              className="hidden md:inline-block font-googleSans font-medium text-[15px] xl:text-[17px] leading-[22px] text-white/90 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+              onClick={handleDisruptionSolving}
+              className={`px-5 sm:px-6 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 shadow-lg active:scale-95 whitespace-nowrap ${
+                activeDisruption
+                  ? 'bg-gradient-to-r from-[#DF6951] to-[#FF7D68] text-white shadow-[#DF6951]/50 animate-pulse'
+                  : 'bg-white text-[#0b272c] hover:bg-slate-100 hover:shadow-xl'
+              }`}
             >
-              Login
+              {activeDisruption ? "Resolve Disruption" : "Disruption Solver"}
             </button>
-
-            {/* 4. SIGN UP (Figma: Rectangle 4 - border 1px solid, radius 5px, 102px x 40px) */}
-            <button
-              onClick={() => setAuthModal('signup')}
-              className="hidden md:inline-flex items-center justify-center font-googleSans font-medium text-[14px] xl:text-[16px] leading-[22px] text-white px-4 py-1.5 rounded-[5px] border border-white/60 hover:border-white hover:bg-white/10 transition-all duration-200 whitespace-nowrap cursor-pointer"
-            >
-              Sign up
-            </button>
-
-            {/* 5. EN DROPDOWN (Figma: Dropdown 38.5px x 22px, Vector 1 arrow) */}
-            <div className="hidden xl:flex items-center gap-1 font-googleSans font-medium text-[15px] xl:text-[17px] leading-[22px] text-white/80 hover:text-white cursor-pointer transition-colors">
-              <span>EN</span>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </div>
 
             {/* Mobile Menu Toggle Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors ml-1"
+              className="md:hidden text-white/90 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors ml-1"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -165,7 +169,7 @@ export default function Navbar({ activeDisruption, onOpenSaga, onQuickSimulate }
         {/* MOBILE NAVIGATION DRAWER                                                  */}
         {/* ========================================================================= */}
         {mobileMenuOpen && (
-          <div className="pointer-events-auto absolute top-16 left-4 right-4 rounded-2xl bg-[#0b272c]/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl flex flex-col gap-3 lg:hidden animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="pointer-events-auto absolute top-16 left-4 right-4 rounded-2xl bg-[#0b272c]/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl flex flex-col gap-3 md:hidden animate-in fade-in slide-in-from-top-3 duration-200">
             {navItems.map((item) => (
               <a
                 key={item.label}

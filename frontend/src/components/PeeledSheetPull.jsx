@@ -125,49 +125,29 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
 
 
       {/* ========================================================================= */}
-      {/* 2. CENTER HERO TAGLINE & HEADING (z-10)                                   */}
-      {/* Centered right in the middle of the landing page view as requested:       */}
-      {/* "replcae tagline with When Journeys Disrupt, Voyage Finds a Way Forward"   */}
-      {/* Fades out smoothly as the plane ascends and hoists up content.            */}
+      {/* 2. CENTER HERO TAGLINE (z-10)                                             */}
+      {/* ONLY THIS TAGLINE, ALL OTHER REMOVED per user instruction:                */}
+      {/* "in landing page keep only this tag line remove all other                */}
+      {/*  When Journeys Disrupt, Voyage Finds a Way Forward"                       */}
       {/* ========================================================================= */}
-      {progress < 0.6 && (
+      {progress < 0.65 && (
         <div 
           className="fixed inset-0 z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 pointer-events-none select-none"
           style={{
-            opacity: Math.max(0, 1 - progress * 2.3),
-            transform: `translate3d(0, ${-progress * 130}px, 0) scale(${1 - progress * 0.08})`,
+            opacity: Math.max(0, 1 - progress * 2.2),
+            transform: `translate3d(0, ${-progress * 130}px, 0) scale(${1 - progress * 0.06})`,
             willChange: 'opacity, transform'
           }}
         >
-          {/* Tagline from User Request */}
-          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#0b272c]/55 backdrop-blur-md border border-white/20 shadow-xl mb-4 sm:mb-6">
-            <span className="w-2 h-2 rounded-full bg-[#DF6951] animate-ping" />
-            <span className="font-poppins font-bold text-xs sm:text-sm tracking-[0.2em] uppercase text-[#FF8A65] drop-shadow-sm">
-              AUTONOMOUS DISRUPTION RESILIENCE
-            </span>
-          </div>
-
-          {/* Heading: When Journeys Disrupt, Voyage Finds a Way Forward */}
-          <h1 className="font-volkhov font-bold text-3xl sm:text-5xl md:text-6xl lg:text-[66px] text-white leading-[1.15] tracking-tight max-w-5xl drop-shadow-[0_4px_30px_rgba(0,0,0,0.75)] px-4">
+          <h1 className="font-volkhov font-bold text-3xl sm:text-5xl md:text-6xl lg:text-[70px] text-white leading-[1.18] tracking-tight max-w-5xl drop-shadow-[0_4px_35px_rgba(0,0,0,0.85)] px-4">
             When Journeys Disrupt, <br className="hidden sm:inline" />
             <span className="relative inline-block text-white">
               Voyage Finds a Way Forward.
-              <svg className="absolute -bottom-2 left-0 w-full h-3.5 sm:h-5 text-[#DF6951] opacity-90" viewBox="0 0 350 20" fill="none" preserveAspectRatio="none">
+              <svg className="absolute -bottom-2 sm:-bottom-3 left-0 w-full h-3 sm:h-5 text-[#DF6951] opacity-90" viewBox="0 0 350 20" fill="none" preserveAspectRatio="none">
                 <path d="M3 15C80 3 240 3 347 13" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
               </svg>
             </span>
           </h1>
-
-          {/* Subtitle */}
-          <p className="font-poppins font-normal text-white/95 text-sm sm:text-base md:text-lg max-w-2xl mt-5 sm:mt-6 leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
-            World’s first self-healing spatio-temporal travel intelligence. When flights delay and connections break, Voyage automatically reroutes, holds backup rail seats, and recovers your journey in 1 click.
-          </p>
-
-          {/* Scroll hint indicator */}
-          <div className="mt-8 flex items-center gap-2 text-xs sm:text-sm text-white/80 font-medium tracking-widest uppercase drop-shadow-md">
-            <span>Scroll down to hoist flight</span>
-            <span className="animate-bounce text-base">↓</span>
-          </div>
         </div>
       )}
 
