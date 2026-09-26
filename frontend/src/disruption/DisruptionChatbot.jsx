@@ -278,13 +278,23 @@ export default function DisruptionChatbot({
           setCurrentDisruption(parsedRecord);
         }
 
+        const carrier = parsedRecord?.carrier || 'Carrier';
+        const service = parsedRecord?.service_number || 'Transit';
+        const origin = parsedRecord?.origin || 'Origin';
+        const destination = parsedRecord?.destination || 'Destination';
+        const delay = parsedRecord?.delay_minutes || 45;
+        const pnr = parsedRecord?.pnr || 'N/A';
+        const fare = parsedRecord?.ticket_cost ? `${parsedRecord?.currency || 'INR'} ${parsedRecord?.ticket_cost}` : 'Not Specified';
+
+        const extractedSummaryText = `📄 **Document Successfully Processed & Analyzed!**\n\nHere are the travel details extracted from **${fileName}**:\n• **Carrier & Service**: ${carrier} ${service}\n• **Route**: ${origin} ➔ ${destination}\n• **Reported Disruption**: +${delay} mins delay ${parsedRecord?.is_cancellation ? "(Cancelled)" : ""}\n• **PNR / Booking Ref**: ${pnr}\n• **Ticket Fare**: ${fare}\n\n**What would you like to do next?**\n1️⃣ **Upload Another Document** (e.g. connecting train, return flight, bus, or hotel)\n2️⃣ **Chat about this Ticket** (ask about compensation, delay rights, or alternative connections)\n3️⃣ **Proceed to Connection Map & Recovery Plans**`;
+
         setMessages(prev => [
           ...prev,
           {
             id: Date.now() + i * 2 + 1,
             sender: 'bot',
             provider: 'Voyage AI Engine',
-            text: `Successfully parsed ticket "${fileName}". Extracted ${parsedRecord?.carrier || 'Carrier'} (${parsedRecord?.service_number || 'Transit'}) from ${parsedRecord?.origin || 'Origin'} to ${parsedRecord?.destination || 'Destination'} with delay +${parsedRecord?.delay_minutes || 45}m. Synchronized with your Connection Map.`,
+            text: extractedSummaryText,
             structuredCard: parsedRecord,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
@@ -594,9 +604,9 @@ export default function DisruptionChatbot({
 
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-googleSans text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-googleSans text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
-                      <UploadCloud className="w-3.5 h-3.5 text-purple-600" />
+                      <UploadCloud className="w-4 h-4" />
                       <span>Upload Another Document</span>
                     </button>
 
@@ -605,18 +615,18 @@ export default function DisruptionChatbot({
                         textInputRef.current?.focus();
                         setInputText(`What is the cascade impact of ${msg.structuredCard.carrier} ${msg.structuredCard.service_number} delay?`);
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-googleSans text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      className="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-googleSans text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                      <MessageSquare className="w-4 h-4 text-blue-600" />
                       <span>Chat about Ticket</span>
                     </button>
 
                     <button
                       onClick={() => onEndChat && onEndChat(msg.structuredCard)}
-                      className="px-3 py-1.5 rounded-xl bg-[#181E4B] text-white hover:bg-[#232a68] font-googleSans text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      className="px-3.5 py-2 rounded-xl bg-[#181E4B] text-white hover:bg-[#232a68] font-googleSans text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
-                      <span>View Connection Map</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>Proceed to Connection Map</span>
+                      <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
 

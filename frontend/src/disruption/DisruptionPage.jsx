@@ -73,14 +73,7 @@ export default function DisruptionPage({
 
   const handleTicketProcessed = (record) => {
     setDisruptedTicket(record);
-    // Smoothly minimize chatbot into "Contact Us" pill and directly scroll to connection map
-    setIsChatMinimized(true);
-    setTimeout(() => {
-      const mapElement = document.getElementById('connection-map-section');
-      if (mapElement) {
-        mapElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 150);
+    // Keep chatbot open so user can review extracted details, upload additional documents, or chat!
   };
 
   const handlePageMultiFileUpload = async (e) => {
@@ -120,6 +113,12 @@ export default function DisruptionPage({
     }
     setHasEndedChat(true);
     setIsChatMinimized(true);
+    setTimeout(() => {
+      const mapElement = document.getElementById('connection-map-section');
+      if (mapElement) {
+        mapElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
   };
 
   const handleExecutePlan = (planKey) => {
