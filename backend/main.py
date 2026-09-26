@@ -26,6 +26,12 @@ from .database import (
     evaluate_disruption_rights
 )
 from .ai_engine import run_ai_chat, parse_document_file
+from .travel_retrieval import (
+    AviationStackTracker,
+    RailRadarTracker,
+    GTFSAndBusRetriever,
+    get_live_connection_graph_telemetry
+)
 
 # Initialize SQLite database for external disruptions and claims
 init_db()
@@ -479,6 +485,36 @@ async def ai_transcribe_voice(
         "transcript": transcript,
         "ai_response": ai_response
     }
+
+@app.get("/api/travel/live-telemetry")
+def get_travel_telemetry():
+    """Returns real-time multi-modal telemetry across Flight, GTFS Metro, RailRadar, and Buses."""
+    return get_live_connection_graph_telemetry()
+
+@app.get("/api/travel/flight-status")
+def get_flight_status_endpoint(flight: str = "AI 882"):
+    """Fetches real-time flight status and radar telemetry via AviationStack API."""
+    tracker = AviationStackTracker()
+    return tracker.get_flight_status(flight)
+
+@app.get("/api/travel/train-status")
+def get_train_status_endpoint(train: str = "20978"):
+    """Fetches live train running status and platform allocations via RailRadar API."""
+    return RailRadarTracker.get_live_train_status(train)
+
+@app.get("/api/travel/bus-options")
+def get_bus_options_endpoint(origin: str = "Delhi", destination: str = "Jaipur"):
+    """Scrapes and aggregates live bus departures from redBus & AbhiBus."""
+    return {
+        "origin": origin,
+        "destination": destination,
+        "buses": GTFSAndBusRetriever.search_intercity_buses(origin, destination)
+    }
+
+@app.get("/api/travel/gtfs-metro")
+def get_gtfs_metro_endpoint():
+    """Returns GTFS 2.0 specification schedule for Delhi Airport Express Metro."""
+    return GTFSAndBusRetriever.get_gtfs_airport_metro()
 
 if __name__ == "__main__":
     import uvicorn

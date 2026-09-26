@@ -4,11 +4,12 @@ import {
   RotateCcw, CheckCircle2, Clock, Train, Plane, Building2, 
   FileText, Shield, Sparkles, AlertCircle, Compass, HelpCircle,
   MessageSquare, UploadCloud, ChevronRight, DollarSign, RefreshCw,
-  Search, Link2, Check
+  Search, Link2, Check, Radio, Bus, Navigation
 } from 'lucide-react';
 import DemoJourneyGraph from '../components/DemoJourneyGraph';
 import DisruptionChatbot from './DisruptionChatbot';
 import RefundPolicyModal from './RefundPolicyModal';
+import MultiModalTravelTool from './MultiModalTravelTool';
 
 export default function DisruptionPage({
   user,
@@ -20,8 +21,7 @@ export default function DisruptionPage({
   onOpenSaga,
   t
 }) {
-  // Whether the user has a confirmed active booking on Voyage
-  // Real website behavior: Default is false unless synced or created in /booking
+  // Booking connection state (Real website: default false unless synced)
   const [hasVoyageBooking, setHasVoyageBooking] = useState(false);
   const [voyagePnrInput, setVoyagePnrInput] = useState('');
   const [isLinkingBooking, setIsLinkingBooking] = useState(false);
@@ -30,9 +30,12 @@ export default function DisruptionPage({
   const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [hasEndedChat, setHasEndedChat] = useState(false);
   
-  // Structured Disruption Record (extracted from real document upload, voice, or chat)
+  // Structured Disruption Record
   const [disruptedTicket, setDisruptedTicket] = useState(null);
   const [selectedPlanId, setSelectedPlanId] = useState('plan_b');
+
+  // Multi-Modal Travel Radar expand/collapse
+  const [showTravelRadar, setShowTravelRadar] = useState(true);
 
   // Refund policy modal state
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
@@ -72,7 +75,6 @@ export default function DisruptionPage({
     const carrier = disruptedTicket?.carrier || "Air India";
     const origin = disruptedTicket?.origin || "Mumbai (BOM)";
     const dest = disruptedTicket?.destination || "Delhi (DEL)";
-    const delay = disruptedTicket?.delay_minutes || 210;
 
     return [
       {
@@ -168,35 +170,35 @@ export default function DisruptionPage({
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#181E4B] font-poppins pt-28 pb-24 px-4 sm:px-8 max-w-7xl mx-auto">
       
-      {/* Top Header / Breadcrumbs */}
-      <div className="flex flex-wrap items-center justify-between pb-6 border-b border-slate-200 gap-4">
-        <div className="flex items-center gap-3">
+      {/* Top Header / Minimal Breadcrumbs */}
+      <div className="flex flex-wrap items-center justify-between pb-5 border-b border-slate-200/60 gap-4">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => onNavigate('/')}
             className="flex items-center gap-1.5 text-xs font-semibold text-[#5E6282] hover:text-[#181E4B] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Voyage Home</span>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Home</span>
           </button>
           <span className="text-slate-300">/</span>
           <button
             onClick={() => onNavigate('/booking')}
             className="text-xs font-semibold text-[#5E6282] hover:text-[#181E4B] transition-colors cursor-pointer"
           >
-            My Bookings
+            Bookings
           </button>
           <span className="text-slate-300">/</span>
-          <span className="text-xs font-bold text-[#A35645]">Disruption &amp; Dispute Resolver</span>
+          <span className="text-xs font-bold text-[#A35645]">Disruption Resolver</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Statutory Refund Rights Evaluation Button */}
           <button
             onClick={() => handleOpenRefundModal()}
-            className="text-xs font-mono text-[#A35645] bg-[#A35645]/10 hover:bg-[#A35645]/20 px-3.5 py-1.5 rounded-full border border-[#A35645]/30 flex items-center gap-1.5 font-bold transition-all cursor-pointer shadow-2xs"
+            className="text-xs font-mono text-[#A35645] bg-[#A35645]/10 hover:bg-[#A35645]/20 px-3.5 py-1.5 rounded-full border border-[#A35645]/20 flex items-center gap-1.5 font-bold transition-all cursor-pointer shadow-2xs"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-[#A35645]" />
-            <span>DGCA / EU261 REFUND POLICY CHECK</span>
+            <span>DGCA &amp; EU261 REFUND RIGHTS</span>
           </button>
         </div>
       </div>
@@ -204,28 +206,28 @@ export default function DisruptionPage({
       {/* Main Page Title */}
       <div className="mt-8 mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 text-[#F1A501]" />
-            <span>Autonomous Travel Resilience &amp; Dispute Management</span>
+            <span>Autonomous Travel Resilience &amp; Multi-Modal Rerouting</span>
           </div>
           <h1 className="font-volkhov font-bold text-3xl sm:text-4xl text-[#181E4B]">
-            Travel Disruption &amp; Dispute Resolver
+            Disruption &amp; Dispute Resolver
           </h1>
-          <p className="text-sm text-[#5E6282] mt-1 max-w-2xl">
-            Autonomous multi-modal rerouting, topological slack analysis, and statutory passenger rights enforcement (DGCA CAR Section 3, EU261, US DOT, IRCTC).
+          <p className="text-xs sm:text-sm text-[#5E6282] mt-1 max-w-2xl leading-relaxed">
+            Multi-modal topological slack analysis, real-time telemetry (AviationStack, RailRadar, GTFS, redBus), and automated statutory passenger refunds.
           </p>
         </div>
 
-        {/* Sync Voyage Booking Option */}
+        {/* Sync Existing Voyage PNR */}
         <div className="flex items-center gap-2">
           {!hasVoyageBooking ? (
-            <form onSubmit={handleLinkVoyageBooking} className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
+            <form onSubmit={handleLinkVoyageBooking} className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
               <input
                 type="text"
                 value={voyagePnrInput}
                 onChange={(e) => setVoyagePnrInput(e.target.value)}
-                placeholder="Enter Voyage PNR (e.g. VY-9904)..."
-                className="text-xs px-3 py-2 bg-transparent focus:outline-none w-48 font-mono"
+                placeholder="Sync PNR (e.g. VY-9904)..."
+                className="text-xs px-3 py-2 bg-transparent focus:outline-none w-44 font-mono text-[#181E4B]"
               />
               <button
                 type="submit"
@@ -233,16 +235,16 @@ export default function DisruptionPage({
                 className="px-3 py-2 rounded-xl text-xs font-googleSans font-bold text-white bg-[#181E4B] hover:bg-[#232a68] disabled:opacity-50 transition-all flex items-center gap-1 cursor-pointer"
               >
                 <Link2 className="w-3.5 h-3.5" />
-                <span>{isLinkingBooking ? "Syncing..." : "Sync Booking"}</span>
+                <span>{isLinkingBooking ? "Syncing..." : "Sync"}</span>
               </button>
             </form>
           ) : (
-            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3.5 py-2 rounded-2xl text-xs font-mono font-bold">
+            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-2xl text-xs font-mono font-bold">
               <Check className="w-4 h-4 text-emerald-600" />
-              <span>VOYAGE BOOKING LINKED (VY-9904-IN)</span>
+              <span>LINKED: VY-9904-IN</span>
               <button
                 onClick={() => setHasVoyageBooking(false)}
-                className="text-slate-400 hover:text-slate-600 ml-2 underline cursor-pointer text-[10px]"
+                className="text-slate-400 hover:text-slate-600 ml-1.5 underline cursor-pointer text-[10px]"
               >
                 Unlink
               </button>
@@ -252,43 +254,36 @@ export default function DisruptionPage({
       </div>
 
       {/* ========================================================================= */}
-      {/* CASE 1: USER HAS NOT SYNCED / LINKED A VOYAGE BOOKING YET                 */}
-      {/* Real Website Behavior: No dummy booking data shown. Directly chat with AI */}
+      {/* 1. FRESH VISITOR VIEW (No Booking Synced Yet)                            */}
+      {/* Pure Minimal Design: AI Travel Concierge with Voice, Document Upload, & Tools */}
       {/* ========================================================================= */}
       {!hasVoyageBooking && !hasEndedChat && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           
-          {/* Welcome & Ingestion Guidance Banner */}
-          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#A35645] bg-[#A35645]/10 px-2.5 py-0.5 rounded-full">
-                  AI Disruption Concierge
-                </span>
-                <span className="text-xs text-[#5E6282]">
-                  Powered by Groq Llama 3.3 70B &amp; Google Gemini 2.0 Flash
-                </span>
+          {/* Minimal Guidance Strip */}
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/70 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-mono text-[#A35645] font-bold">
+                <Radio className="w-3.5 h-3.5 animate-pulse" />
+                <span>AI DISRUPTION CONCIERGE &bull; DUAL-PROVIDER (GROQ + GEMINI)</span>
               </div>
-              <h3 className="font-volkhov font-bold text-xl text-[#181E4B]">
-                Experiencing a flight delay, rail connection breach, or cancellation?
-              </h3>
-              <p className="text-xs text-[#5E6282] max-w-2xl leading-relaxed">
-                Chat with our AI assistant below, speak using voice chat, or upload your ticket PDF/boarding pass. Voyage will extract the itinerary, evaluate your statutory refund rights, and build your recovery plan.
+              <p className="text-xs text-[#5E6282] mt-1 max-w-2xl leading-relaxed">
+                Describe your flight delay, speak using the microphone, or upload your ticket file (PDF / Image). The agent automatically evaluates downstream connection risks and calculates your refund under DGCA &amp; EU261.
               </p>
             </div>
 
             {disruptedTicket && (
               <button
                 onClick={() => handleEndChat(disruptedTicket)}
-                className="shrink-0 px-5 py-3 rounded-2xl font-googleSans font-bold text-xs text-white bg-[#181E4B] hover:bg-[#232a68] shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                className="shrink-0 px-4 py-2.5 rounded-2xl font-googleSans font-bold text-xs text-white bg-[#181E4B] hover:bg-[#232a68] shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <span>View Dispute Management ({disruptedTicket.carrier})</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>View Dispute Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          {/* AI Disruption Chatbot (Active) */}
+          {/* AI Disruption Chatbot */}
           <DisruptionChatbot
             isOpen={true}
             isMinimized={isChatMinimized}
@@ -300,34 +295,37 @@ export default function DisruptionPage({
             t={t}
           />
 
+          {/* Real-time Multi-Modal Travel Radar Tool */}
+          <MultiModalTravelTool />
+
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* CASE 2: DISPUTE MANAGEMENT DASHBOARD                                      */}
-      {/* Displays when Voyage Booking is Linked OR after Ticket Ingestion/End Chat */}
+      {/* 2. DISPUTE MANAGEMENT DASHBOARD                                          */}
+      {/* Renders when PNR is linked OR after Ticket Ingestion / Ending Chat        */}
       {/* ========================================================================= */}
       {(hasVoyageBooking || hasEndedChat || (disruptedTicket && isChatMinimized)) && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           
-          {/* HIGH-PRIORITY DISRUPTION ALERT BANNER */}
-          <div className="p-5 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-950 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* High-Priority Disruption Alert Bar */}
+          <div className="p-5 rounded-3xl bg-amber-50/80 border border-amber-200/80 text-amber-950 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-3.5">
-              <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 shrink-0">
-                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              <div className="p-2 rounded-2xl bg-amber-100 text-amber-700 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-base text-amber-900">
+                  <span className="font-bold text-sm sm:text-base text-amber-900">
                     Disruption Detected: {disruptedTicket?.carrier || "IndiGo"} ({disruptedTicket?.service_number || "6E 521"})
                   </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-200 text-amber-800">
-                    STORED IN DATABASE
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-200/80 text-amber-900">
+                    STRUCTURED IN DB
                   </span>
                 </div>
                 <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                  Operational schedule delay of <strong className="font-bold">+{disruptedTicket?.delay_minutes || 210} minutes</strong> on {disruptedTicket?.origin || "Mumbai (BOM)"} → {disruptedTicket?.destination || "Delhi (DEL)"}.
-                  Downstream connection slack depleted. DGCA CAR Section 3 &amp; EU261 statutory rights unlocked.
+                  Operational delay of <strong className="font-semibold">+{disruptedTicket?.delay_minutes || 210} mins</strong> on {disruptedTicket?.origin || "Mumbai (BOM)"} ➔ {disruptedTicket?.destination || "Delhi (DEL)"}.
+                  Downstream transfer margin breached. Evaluated under DGCA CAR Section 3 &amp; EU261.
                 </p>
               </div>
             </div>
@@ -335,35 +333,35 @@ export default function DisruptionPage({
             <div className="shrink-0 flex items-center gap-2">
               <button
                 onClick={() => handleOpenRefundModal(disruptedTicket)}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-2xs"
+                className="px-3.5 py-2 rounded-xl font-bold text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300/80 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-2xs"
               >
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Check Refund Policy &amp; Payout</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Check Refund Policy</span>
               </button>
               <button
                 onClick={handleExecuteSelectedPlan}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-[#181E4B] hover:bg-[#232a68] shadow-md transition-all cursor-pointer whitespace-nowrap"
+                className="px-4 py-2 rounded-xl font-bold text-xs text-white bg-[#181E4B] hover:bg-[#232a68] shadow-sm transition-all cursor-pointer whitespace-nowrap"
               >
-                Execute Recommended Plan
+                Execute Recovery Plan
               </button>
             </div>
           </div>
 
-          {/* Grid: Journey Visualizer / Map (Left) + Pareto Recovery Plans (Right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Grid: Google Maps / TDAG Visualizer (Left) + Recovery Plans (Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
-            {/* Left: Journey Visualizer & Manifest */}
-            <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            {/* Left: Journey Visualizer */}
+            <div className="lg:col-span-7 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/70 shadow-2xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-volkhov font-bold text-xl text-[#181E4B]">
+                  <h3 className="font-volkhov font-bold text-lg text-[#181E4B]">
                     Interactive Journey Visualizer
                   </h3>
                   <p className="text-xs text-[#5E6282]">
                     Google Maps Basemap &amp; Topological Graph showing connection slacks and rerouting paths.
                   </p>
                 </div>
-                <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
                   CARTO / TDAG ENGINE
                 </span>
               </div>
@@ -381,32 +379,32 @@ export default function DisruptionPage({
                 t={t}
               />
 
-              {/* Ingested Ticket Manifest */}
+              {/* Ingested Ticket Record Pill */}
               {disruptedTicket && (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono space-y-2">
-                  <div className="flex items-center justify-between font-bold text-[#181E4B] pb-2 border-b border-slate-200">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/60 text-xs font-mono space-y-1.5">
+                  <div className="flex items-center justify-between font-bold text-[#181E4B] pb-1.5 border-b border-slate-200/70">
                     <span className="flex items-center gap-1.5 font-poppins">
-                      <FileText className="w-4 h-4 text-[#A35645]" />
+                      <FileText className="w-3.5 h-3.5 text-[#A35645]" />
                       <span>Ingested Ticket Record (SQLite)</span>
                     </span>
-                    <span className="text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded text-[10px]">
+                    <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
                       RECORD #{disruptedTicket.id || 1}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-slate-600">
-                    <div>Carrier: <strong className="text-slate-900">{disruptedTicket.carrier}</strong></div>
-                    <div>Service: <strong className="text-slate-900">{disruptedTicket.service_number}</strong></div>
-                    <div>Route: <strong className="text-slate-900">{disruptedTicket.origin} → {disruptedTicket.destination}</strong></div>
-                    <div>Fare: <strong className="text-slate-900">₹{disruptedTicket.ticket_cost || 6450} INR</strong></div>
+                  <div className="grid grid-cols-2 gap-2 text-slate-600 text-[11px]">
+                    <div>Carrier: <strong className="text-slate-900">{disruptedTicket.carrier} ({disruptedTicket.service_number})</strong></div>
+                    <div>Route: <strong className="text-slate-900">{disruptedTicket.origin} ➔ {disruptedTicket.destination}</strong></div>
+                    <div>Recorded Fare: <strong className="text-slate-900">₹{disruptedTicket.ticket_cost || 6450} INR</strong></div>
+                    <div>Delay: <strong className="text-amber-800">+{disruptedTicket.delay_minutes || 210} mins</strong></div>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Right: Recovery Plans */}
-            <div className="lg:col-span-5 space-y-6">
+            <div className="lg:col-span-5 space-y-5">
               
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/70 shadow-2xs">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-volkhov font-bold text-lg text-[#181E4B]">
@@ -416,12 +414,12 @@ export default function DisruptionPage({
                       Optimal trade-offs between recovery speed, cost, and comfort.
                     </p>
                   </div>
-                  <span className="text-xs font-bold text-[#A35645] bg-[#A35645]/10 px-2.5 py-1 rounded-full shrink-0">
+                  <span className="text-xs font-bold text-[#A35645] bg-[#A35645]/10 px-2.5 py-0.5 rounded-full shrink-0">
                     {currentPlans.length} Validated Plans
                   </span>
                 </div>
 
-                <div className="space-y-3.5">
+                <div className="space-y-3">
                   {currentPlans.map((p) => {
                     const isSelected = selectedPlanId === p.id;
                     const isRecommended = p.id === 'plan_b';
@@ -431,18 +429,18 @@ export default function DisruptionPage({
                         onClick={() => setSelectedPlanId(p.id)}
                         className={`p-4 rounded-2xl border transition-all cursor-pointer relative ${
                           isSelected
-                            ? 'border-[#181E4B] bg-slate-50/90 shadow-sm ring-1 ring-[#181E4B]/20'
+                            ? 'border-[#181E4B] bg-slate-50/90 shadow-2xs ring-1 ring-[#181E4B]/20'
                             : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                       >
                         {isRecommended && (
-                          <div className="absolute -top-2.5 right-4 bg-[#A35645] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+                          <div className="absolute -top-2.5 right-4 bg-[#A35645] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-2xs">
                             BEST RECOMMENDED PLAN
                           </div>
                         )}
 
-                        <div className="flex items-center justify-between mb-1.5 pt-0.5">
-                          <span className="font-bold text-sm text-[#181E4B]">
+                        <div className="flex items-center justify-between mb-1 pt-0.5">
+                          <span className="font-bold text-xs sm:text-sm text-[#181E4B]">
                             {p.title}
                           </span>
                           <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${p.badgeColor}`}>
@@ -450,7 +448,7 @@ export default function DisruptionPage({
                           </span>
                         </div>
 
-                        <p className="text-xs text-[#5E6282] leading-relaxed mb-3">
+                        <p className="text-xs text-[#5E6282] leading-relaxed mb-2.5">
                           {p.description}
                         </p>
 
@@ -476,7 +474,7 @@ export default function DisruptionPage({
                 {/* Execute Plan Button */}
                 <button
                   onClick={handleExecuteSelectedPlan}
-                  className="mt-5 w-full py-3.5 rounded-2xl font-googleSans font-bold text-sm text-white bg-[#181E4B] hover:bg-[#232a68] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  className="mt-4 w-full py-3 rounded-2xl font-googleSans font-bold text-xs sm:text-sm text-white bg-[#181E4B] hover:bg-[#232a68] shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <span>Execute Selected Recovery with Agentic Saga</span>
                   <ArrowRight className="w-4 h-4" />
@@ -484,12 +482,12 @@ export default function DisruptionPage({
               </div>
 
               {/* Direct Refund Card */}
-              <div className="bg-gradient-to-r from-emerald-950 to-[#072422] text-white p-6 rounded-3xl shadow-md space-y-3">
-                <div className="flex items-center gap-2 text-xs font-mono text-emerald-300">
-                  <ShieldCheck className="w-4 h-4" />
+              <div className="bg-gradient-to-r from-emerald-950 to-[#072422] text-white p-5 rounded-3xl shadow-2xs space-y-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-300">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                   <span>DGCA &amp; AIRLINE REFUND GUARANTEE</span>
                 </div>
-                <h4 className="font-volkhov font-bold text-xl text-white">
+                <h4 className="font-volkhov font-bold text-base sm:text-lg text-white">
                   Eligible for Full Refund &amp; Statutory Compensation?
                 </h4>
                 <p className="text-xs text-white/80 leading-relaxed">
@@ -497,7 +495,7 @@ export default function DisruptionPage({
                 </p>
                 <button
                   onClick={() => handleOpenRefundModal(disruptedTicket)}
-                  className="w-full py-2.5 rounded-xl font-googleSans font-bold text-xs text-emerald-950 bg-emerald-300 hover:bg-emerald-200 transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                  className="w-full py-2 rounded-xl font-googleSans font-bold text-xs text-emerald-950 bg-emerald-300 hover:bg-emerald-200 transition-colors shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer mt-1"
                 >
                   <span>Evaluate Statutory Claim Packet</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -507,6 +505,10 @@ export default function DisruptionPage({
             </div>
 
           </div>
+
+          {/* Real-time Multi-Modal Travel Radar Tool */}
+          <MultiModalTravelTool />
+
         </div>
       )}
 
