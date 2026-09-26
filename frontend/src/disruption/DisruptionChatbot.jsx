@@ -395,10 +395,6 @@ export default function DisruptionChatbot({
               <h3 className="font-volkhov font-bold text-base text-[#181E4B]">
                 Voyage AI Travel Assistant
               </h3>
-              <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>ONLINE</span>
-              </span>
             </div>
             <p className="text-[11px] text-[#5E6282] flex items-center gap-1.5">
               <span>Dual-Provider: Groq (Llama 3.3 70B) &amp; Gemini 2.0 Flash</span>
