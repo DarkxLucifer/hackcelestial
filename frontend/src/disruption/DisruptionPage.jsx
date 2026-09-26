@@ -168,7 +168,7 @@ export default function DisruptionPage({
             Disruption &amp; Dispute Resolver
           </h1>
           <p className="text-xs sm:text-sm text-[#5E6282] mt-1 max-w-2xl leading-relaxed">
-            Multi-modal topological slack analysis, real-time telemetry (AviationStack, RailRadar, GTFS, redBus), and automated statutory passenger refunds.
+            Multi-modal connection analysis, live radar telemetry across flights, trains, metro and buses, and automated travel recovery.
           </p>
         </div>
 
@@ -251,8 +251,7 @@ export default function DisruptionPage({
                   </span>
                 </div>
                 <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                  Operational delay of <strong className="font-semibold">+{disruptedTicket?.delay_minutes || (activeDisruption ? 45 : 210)} mins</strong> on {disruptedTicket?.origin || "Mumbai (BOM)"} ➔ {disruptedTicket?.destination || "Delhi (DEL)"}.
-                  Downstream transfer margin breached. Evaluated under DGCA CAR Section 3 &amp; EU261.
+                  Operational delay of <strong className="font-semibold">+{disruptedTicket?.delay_minutes || (activeDisruption ? 45 : 210)} mins</strong> on {disruptedTicket?.origin || "Mumbai (BOM)"} ➔ {disruptedTicket?.destination || "Delhi (DEL)"}. Downstream connection window impacted.
                 </p>
               </div>
             </div>

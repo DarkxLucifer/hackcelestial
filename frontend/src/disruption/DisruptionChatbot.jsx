@@ -20,8 +20,8 @@ export default function DisruptionChatbot({
     {
       id: 1,
       sender: 'bot',
-      provider: 'Voyage AI Engine (Groq / Gemini LangGraph)',
-      text: "Hello! I am your Voyage Disruption & Travel Resilience Assistant, powered by Groq and Google Gemini with LangGraph fallback.\n\nI can analyze your delayed or cancelled travel, calculate statutory passenger refunds (under DGCA CAR Section 3, EU261, US DOT, IRCTC), parse uploaded ticket files, answer questions, and write code for travel websites.\n\nHow can I help your journey today?",
+      provider: 'Voyage AI Engine',
+      text: "Hello! I am your Voyage AI Travel Assistant, powered by Groq and Google Gemini with LangGraph fallback.\n\nI can analyze travel delays, assess downstream connections, evaluate passenger rights, parse tickets, and assist with your journey.\n\nHow can I help you today?",
       timestamp: "Just now"
     }
   ]);
