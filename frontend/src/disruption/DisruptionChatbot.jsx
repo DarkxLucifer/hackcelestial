@@ -226,32 +226,24 @@ export default function DisruptionChatbot({
       const provider = data.provider || "Voyage AI Engine";
       setActiveProvider(provider);
 
-      // Check if disruption was detected in query and extract structured record
+      // If the backend returned a real structured ticket (e.g. from RailRadar live lookup for 12134)
       const lower = query.toLowerCase();
-      let extractedTicket = null;
-      if (lower.includes("delay") || lower.includes("cancel") || lower.includes("flight") || lower.includes("train") || lower.includes("pnr")) {
-        try {
-          const extRes = await fetch('/api/disruptions/external', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              carrier: lower.includes("indigo") ? "IndiGo" : (lower.includes("air india") ? "Air India" : (lower.includes("train") || lower.includes("rail") ? "Indian Railways" : "Air India")),
-              service_number: lower.includes("indigo") ? "6E 521" : "AI 882",
-              origin: "Mumbai (BOM)",
-              destination: "Delhi (DEL)",
-              delay_minutes: lower.includes("45") ? 45 : 210,
-              is_cancellation: lower.includes("cancel"),
-              ticket_cost: 6450,
-              disruption_reason: query
-            })
-          });
-          const extData = await extRes.json();
-          extractedTicket = extData.record;
-          setCurrentDisruption(extractedTicket);
-          if (onTicketProcessed) onTicketProcessed(extractedTicket);
-        } catch (e) {
-          console.warn("Could not save structured ticket:", e);
-        }
+      let cardToShow = null;
+      if (data.structured_ticket) {
+        cardToShow = data.structured_ticket;
+        setCurrentDisruption(cardToShow);
+        if (onTicketProcessed) onTicketProcessed(cardToShow);
+      } else if (activeTicketContext && (
+        lower.includes("my trip") || 
+        lower.includes("my ticket") || 
+        lower.includes("my train") || 
+        lower.includes("my flight") || 
+        lower.includes("trip detail") || 
+        lower.includes("trip summary") || 
+        lower.includes("pnr")
+      )) {
+        // Only show active ticket card if user explicitly asked about their own trip
+        cardToShow = activeTicketContext;
       }
 
       setMessages(prev => [
@@ -261,7 +253,7 @@ export default function DisruptionChatbot({
           sender: 'bot',
           provider: provider,
           text: replyText,
-          structuredCard: extractedTicket || activeTicketContext,
+          structuredCard: cardToShow,
           allTickets: uploadedTickets,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }

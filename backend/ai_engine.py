@@ -109,6 +109,7 @@ class AgentState(TypedDict):
     response: Optional[str]
     provider: Optional[str]
     structured_ticket: Optional[Dict[str, Any]]
+    live_context: Optional[str]
     error: Optional[str]
 
 def get_groq_key(custom_key: Optional[str] = None) -> Optional[str]:
@@ -119,6 +120,8 @@ def get_gemini_key(custom_key: Optional[str] = None) -> Optional[str]:
 
 def get_system_prompt_with_ticket(state: AgentState) -> str:
     prompt = SYSTEM_PROMPT
+    if state.get("live_context"):
+        prompt += f"\n\n{state['live_context']}"
     if state.get("structured_ticket"):
         st = state["structured_ticket"]
         is_past = bool(st.get("is_past_journey", False))
@@ -449,49 +452,68 @@ print(json.dumps(claim, indent=2))
         return state
 
     # Case 3: Train Running Status / RailRadar Tool
-    if any(k in lower for k in ["railradar", "track train", "train status", "20978", "vande bharat", "rajdhani", "12951"]) or ("train" in lower and any(x in lower for x in ["running", "platform", "live", "schedule"])):
-        train_num = "20978" if ("20978" in lower or "vande" in lower) else ("12951" if "rajdhani" in lower else "20978")
+    train_match = re.search(r'\b([012]\d{4})\b', query)
+    if train_match or any(k in lower for k in ["railradar", "track train", "train status", "vande bharat", "rajdhani", "12134", "12810"]):
+        train_num = train_match.group(1) if train_match else ("20978" if ("20978" in lower or "vande" in lower) else ("12134" if "12134" in lower else ("12951" if "rajdhani" in lower else "12810")))
         t_data = RailRadarTracker.get_live_train_status(train_num)
+        delay_val = t_data.get('delay_minutes', 0)
+        delay_str = f"+{delay_val} mins delay" if delay_val > 0 else "Running Right Time (On-Time)"
         
-        reply = f"""### 🚆 RailRadar Live Train Tracker :: {t_data['train_name']}
+        reply = f"""### 🚆 RailRadar Live Train Tracker :: {t_data.get('train_name', f'Train #{train_num}')}
 
-- **Service**: #{t_data['train_number']} {t_data['train_name']}
-- **Route**: {t_data['origin']} ➔ {t_data['destination']}
-- **Live Location**: Currently approaching **{t_data['current_location']}** (Speed: {t_data['speed_kmh']} km/h)
-- **Next Station**: {t_data['upcoming_station']}
-- **Departure Platform**: **{t_data['platform_number']}**
-- **Delay**: **{"+ " + str(t_data['delay_minutes']) + " mins" if t_data['delay_minutes'] > 0 else "Running Right Time (On-Time)"}**
-- **Scheduled Departure / Arrival**: {t_data['scheduled_departure']} / {t_data['scheduled_arrival']}
-- **IRCTC TDR Status**: {"100% Fare Refund Eligible (Delay > 3 Hrs)" if t_data['tdr_refund_eligible'] else "Nominal Operation (Zero Cancellation Penalty)"}
-- **Data Engine**: *RailRadar Indian Railways Telemetry (railradar.in)*
+• **Service**: #{t_data.get('train_number', train_num)} {t_data.get('train_name', 'Express')}
+• **Route Corridor**: **{t_data.get('origin', 'Origin')} ➔ {t_data.get('destination', 'Destination')}**
+• **Status**: **{t_data.get('status', 'running').upper()}** ({delay_str})
+• **Live Current Location**: Currently approaching/at **{t_data.get('current_location', 'In transit')}**
+• **Next Station / Halt**: **{t_data.get('upcoming_station', 'In transit')}**
+• **Previous Station**: {t_data.get('prev_station', 'N/A')}
+• **Live GPS Telemetry**: Distance Remaining: {t_data.get('distance_remaining_km', 0)} km | Avg Speed: {t_data.get('avg_speed_kmh', 0)} km/h
+• **IRCTC TDR Status**: {"100% Full Fare Refund Eligible (Delay exceeds 3 hours)" if t_data.get('tdr_refund_eligible') else "Nominal Schedule (Zero Cancellation Penalty under Normal Rules)"}
+• **Data Engine**: *RailRadar Live Indian Railways API v1 (api.railradar.in)*
 """
         state["response"] = reply
         state["provider"] = "railradar_train_tracker"
         return state
 
-    # Case 4: Bus & Urban Transit / redBus, AbhiBus & GTFS Tool
-    if any(k in lower for k in ["redbus", "abhibus", "bus", "buses", "gtfs", "metro", "airport express", "zingbus", "nuego"]):
-        buses = GTFSAndBusRetriever.search_intercity_buses("Delhi", "Jaipur")
-        metro = GTFSAndBusRetriever.get_gtfs_airport_metro()
+    # Case 4: Bus & Urban Transit / MSRTC, redBus, AbhiBus & GTFS Tool
+    bus_query_pattern = re.search(r'(?:travels?|buses?|bus|ride|taxi|cab|road)\s+(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', query, re.IGNORECASE)
+    if not bus_query_pattern:
+        bus_query_pattern = re.search(r'(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:travels?|buses?|bus|route))?$', query, re.IGNORECASE)
+
+    if bus_query_pattern or any(k in lower for k in ["redbus", "abhibus", "bus", "buses", "travels", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma"]):
+        orig_city = "Kolhapur"
+        dest_city = "Latur"
+        if bus_query_pattern:
+            o_cand = re.sub(r'^(search|give|show|find|list|for|the)\s+', '', bus_query_pattern.group(1), flags=re.I).strip().title()
+            d_cand = re.sub(r'\s+(travels?|buses?|bus|options|details)$', '', bus_query_pattern.group(2), flags=re.I).strip().title()
+            if len(o_cand) >= 3 and len(d_cand) >= 3:
+                orig_city = o_cand
+                dest_city = d_cand
+        elif "pune" in lower and "mumbai" in lower:
+            orig_city, dest_city = "Mumbai", "Pune"
+        elif "delhi" in lower and "jaipur" in lower:
+            orig_city, dest_city = "Delhi", "Jaipur"
+            
+        buses = GTFSAndBusRetriever.search_intercity_buses(orig_city, dest_city)
         
         bus_rows = ""
-        for b in buses:
-            bus_rows += f"- **{b['operator']}** ({b['bus_type']})\n  - Dep: {b['departure_time']} | Arr: {b['arrival_time']} ({b['duration']})\n  - Fare: **₹{b['fare_inr']} INR** | Rating: ⭐ {b['rating']} | Seats: {b['available_seats']} left\n  - Boarding: {b['origin_point']}\n  - Verified via: *{b['provider']}*\n\n"
+        for idx, b in enumerate(buses, 1):
+            bus_rows += f"**{idx}. {b.get('operator')}** ({b.get('bus_type')})\n"
+            bus_rows += f"• **Departure**: {b.get('departure_time')} from **{b.get('origin_point')}**\n"
+            bus_rows += f"• **Arrival**: {b.get('arrival_time')} at **{b.get('drop_point')}**\n"
+            bus_rows += f"• **Duration**: {b.get('duration')} | **Fare**: **₹{b.get('fare_inr')} INR**\n"
+            if b.get('route'):
+                bus_rows += f"• **Corridor / Route**: {b.get('route')}\n"
+            bus_rows += f"• **Booking**: [{b.get('provider')}]({b.get('booking_link')})\n\n"
 
-        reply = f"""### 🚌 Multi-Modal Transit Finder (GTFS + redBus / AbhiBus)
+        reply = f"""### 🚌 Intercity Travel & Bus Departures ({orig_city} ➔ {dest_city})
 
-#### 🚇 1. GTFS Urban Airport Transit (DMRC Orange Express)
-- **Line**: {metro['route']['route_long_name']}
-- **Transit Duration**: **{metro['transit_metrics']['journey_duration_minutes']} minutes** (direct link from IGI T3 to NDLS)
-- **Frequency**: Every {metro['transit_metrics']['frequency_headway_minutes']} minutes | Speed: {metro['transit_metrics']['operating_speed_kmh']} km/h
-- **Fare**: ₹{metro['transit_metrics']['fare_inr']} INR
-- **Standard**: *GTFS 2.0 Transit Specification (gtfs.org)*
-
-#### 🛣️ 2. Verified Intercity Bus Alternatives (Delhi ➔ Jaipur Recovery)
-Scraped and aggregated via **redBus** & **AbhiBus**:
+Here are verified daily services across **Maharashtra State Road Transport Corporation (MSRTC)** and premier private operators:
 
 {bus_rows}
-*Recommendation for Flight Delay Recovery*: If your Vande Bharat connection is breached, **Zingbus Plus at 19:00** or **NueGo Electric at 19:30** picks up directly near the IGI Airport bypass and guarantees hotel arrival before midnight.
+#### 💡 Travel Tips:
+• **MSRTC State Fleet**: Reliable, frequent state-guaranteed services departing from Central Bus Stands (CBS). Book online at [msrtcors.com](https://npublic.msrtcors.com).
+• **Private AC Sleepers**: Recommended for overnight travel; equipped with charging ports and blankets. Book via [redBus](https://www.redbus.in) or [AbhiBus](https://www.abhibus.com).
 """
         state["response"] = reply
         state["provider"] = "gtfs_redbus_aggregator"
@@ -582,45 +604,144 @@ def run_ai_chat(
             "success": True
         }
 
+    live_context_parts = []
+    extracted_train_card = None
+    buses_result = None
+
+    # 1. Detect train query (5-digit Indian Railways train number)
+    train_match = re.search(r'\b([012]\d{4})\b', query)
+    if train_match:
+        train_num = train_match.group(1)
+        try:
+            from .travel_retrieval import RailRadarTracker
+            t_data = RailRadarTracker.get_live_train_status(train_num)
+            if t_data and t_data.get("train_name"):
+                delay_val = t_data.get('delay_minutes', 0)
+                delay_str = f"+{delay_val} mins delay" if delay_val > 0 else "Running Right Time (On-Time)"
+                live_context_parts.append(
+                    f"REAL-TIME RAILRADAR TELEMETRY FOR TRAIN #{t_data['train_number']}:\n"
+                    f"- Service: #{t_data['train_number']} {t_data['train_name']}\n"
+                    f"- Route Corridor: {t_data.get('origin', '')} ({t_data.get('origin_code', '')}) ➔ {t_data.get('destination', '')} ({t_data.get('destination_code', '')})\n"
+                    f"- Status: {t_data.get('status', 'running')} (Live GPS Tracking: {t_data.get('is_live', True)})\n"
+                    f"- Current Location: Approaching/at {t_data.get('current_location', 'In transit')}\n"
+                    f"- Next Station / Halt: {t_data.get('upcoming_station', 'En route')}\n"
+                    f"- Previous Station: {t_data.get('prev_station', 'N/A')}\n"
+                    f"- Current Delay: {delay_str}\n"
+                    f"- Distance Remaining: {t_data.get('distance_remaining_km', 0)} km\n"
+                    f"- Average Speed: {t_data.get('avg_speed_kmh', 0)} km/h\n"
+                    f"- IRCTC TDR Refund: {'Eligible (100% refund, delay >= 3 hrs)' if t_data.get('tdr_refund_eligible') else 'Nominal (delay < 3 hrs)'}\n"
+                    "INSTRUCTION: When answering, provide these accurate real-time live telemetry details for this train."
+                )
+                extracted_train_card = {
+                    "carrier": "Indian Railways",
+                    "service_number": f"#{t_data['train_number']} {t_data['train_name']}",
+                    "origin": t_data.get("origin", "Origin"),
+                    "destination": t_data.get("destination", "Destination"),
+                    "delay_minutes": delay_val,
+                    "is_cancellation": False,
+                    "is_past_journey": False,
+                    "disruption_reason": f"Live location: {t_data.get('current_location', 'In transit')} • {delay_str}",
+                    "pnr": f"VY-LIVE-{t_data['train_number']}",
+                    "current_location": t_data.get("current_location"),
+                    "upcoming_station": t_data.get("upcoming_station"),
+                    "status": t_data.get("status"),
+                    "source": "RailRadar Live API v1"
+                }
+        except Exception as e:
+            pass
+
+    # 2. Detect bus / travels query between two cities
+    bus_query_pattern = re.search(r'(?:travels?|buses?|bus|ride|taxi|cab|road)\s+(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', query, re.IGNORECASE)
+    if not bus_query_pattern:
+        bus_query_pattern = re.search(r'(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:travels?|buses?|bus|route))?$', query, re.IGNORECASE)
+    
+    if bus_query_pattern and any(w in query.lower() for w in ["travel", "travels", "bus", "buses", "road"]):
+        orig_candidate = bus_query_pattern.group(1).strip()
+        dest_candidate = bus_query_pattern.group(2).strip()
+        orig_clean = re.sub(r'^(search|give|show|find|list|for|the)\s+', '', orig_candidate, flags=re.I).strip().title()
+        dest_clean = re.sub(r'\s+(travels?|buses?|bus|options|details)$', '', dest_candidate, flags=re.I).strip().title()
+        if len(orig_clean) >= 3 and len(dest_clean) >= 3 and orig_clean.lower() != dest_clean.lower():
+            try:
+                from .travel_retrieval import GTFSAndBusRetriever
+                buses = GTFSAndBusRetriever.search_intercity_buses(orig_clean, dest_clean)
+                if buses:
+                    buses_result = buses
+                    bus_lines = []
+                    for idx, b in enumerate(buses, 1):
+                        bus_lines.append(
+                            f"{idx}. {b.get('operator')} ({b.get('bus_type')}):\n"
+                            f"   • Departs: {b.get('departure_time')} from {b.get('origin_point')}\n"
+                            f"   • Arrives: {b.get('arrival_time')} at {b.get('drop_point')}\n"
+                            f"   • Duration: {b.get('duration')} | Fare: ₹{b.get('fare_inr')} INR\n"
+                            f"   • Route / Highlights: {b.get('route', ', '.join(b.get('amenities', [])))}\n"
+                            f"   • Booking: {b.get('provider')} ({b.get('booking_link')})"
+                        )
+                    live_context_parts.append(
+                        f"VERIFIED INTERCITY BUS & TRAVEL OPERATOR SCHEDULE ({orig_clean} ➔ {dest_clean}):\n"
+                        + "\n".join(bus_lines) +
+                        f"\n\nINSTRUCTION: The user is specifically asking for travel/bus options between {orig_clean} and {dest_clean}. "
+                        "Give a comprehensive, well-structured breakdown featuring these exact departures with specific operators, departure times, boarding stands, drop points, exact fares in INR, and booking guidance. Do NOT output generic high-level text."
+                    )
+            except Exception as e:
+                pass
+
+    live_context_str = "\n\n".join(live_context_parts) if live_context_parts else None
+
     state: AgentState = {
         "messages": messages,
         "user_query": query,
         "response": None,
         "provider": None,
-        "structured_ticket": active_ticket,
+        "structured_ticket": extracted_train_card or active_ticket,
+        "live_context": live_context_str,
         "error": None
     }
 
     g_key = get_groq_key(groq_api_key)
     gem_key = get_gemini_key(gemini_api_key)
 
-    # 1. Attempt Google Gemini (Gemini 2.5 Flash with native reasoning and conversational conciseness)
+    # 1. Attempt Google Gemini
     if gem_key and genai is not None:
         state = call_gemini(state, gem_key)
         if state.get("response"):
-            return {
+            res = {
                 "reply": state["response"],
                 "provider": "Voyage AI Engine",
                 "success": True
             }
+            if extracted_train_card:
+                res["structured_ticket"] = extracted_train_card
+            if buses_result:
+                res["buses"] = buses_result
+            return res
 
-    # 2. Attempt Groq (Qwen 3.8 27B / GPT-OSS 120B)
+    # 2. Attempt Groq
     if g_key and Groq is not None:
         state = call_groq(state, g_key)
         if state.get("response"):
-            return {
+            res = {
                 "reply": state["response"],
                 "provider": "Voyage AI Engine",
                 "success": True
             }
+            if extracted_train_card:
+                res["structured_ticket"] = extracted_train_card
+            if buses_result:
+                res["buses"] = buses_result
+            return res
 
     # 3. Fallback to Local Voyage Expert Engine
     state = call_expert_engine(state)
-    return {
+    res = {
         "reply": state["response"],
         "provider": "Voyage AI Engine",
         "success": True
     }
+    if extracted_train_card:
+        res["structured_ticket"] = extracted_train_card
+    if buses_result:
+        res["buses"] = buses_result
+    return res
 
 KNOWN_LOCATIONS = {
     # Major Indian Aviation & Rail Hubs (including Maharashtra & Central Railway corridors)
