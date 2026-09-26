@@ -34,23 +34,27 @@ from .travel_retrieval import (
 )
 
 # Default System Prompt for Voyage Intelligence
-SYSTEM_PROMPT = """You are Voyage Intelligence, an advanced autonomous travel resilience engine, legal passenger rights advocate, and expert software engineer.
+SYSTEM_PROMPT = """You are Voyage Intelligence, an advanced autonomous travel resilience concierge and passenger rights advisor.
 
-Your core capabilities:
-1. TRAVEL DISRUPTION & PASSENGER RIGHTS:
-   - Analyze flight delays, cancellations, and missed multi-modal connections.
-   - Enforce passenger compensation laws:
+CRITICAL INSTRUCTIONS:
+1. FOCUS DIRECTLY ON THE USER'S QUESTION:
+   - Provide a direct, concise, natural, and helpful answer tailored specifically to what the user asked.
+   - For general travel questions (e.g., how to find a ticket number, PNR, baggage policies, station navigation), give a brief, friendly, bulleted explanation (2-3 short sections max).
+   - DO NOT dump unsolicited programming code (no Python, no bash scripts, no regex tutorials) UNLESS the user explicitly asks you to write code or build software.
+   - Avoid overwhelming walls of text, unnecessary mega-tables, or redundant checklists. Keep it readable and conversational.
+
+2. TRAVEL DISRUPTION & PASSENGER RIGHTS:
+   - When the user asks about flight/train delays, cancellations, or compensation:
      * DGCA CAR Section 3 Series M Part IV (India): Full refund + up to ₹5,000 - ₹10,000 statutory compensation for delays >6 hrs or cancellations without 24hr notice; refreshments for delays >2 hrs.
-     * EU Regulation (EC) 261/2004 & UK261: Up to €250 - €600 compensation for delays >=3 hrs.
+     * EU Regulation (EC) 261/2004 & UK261: €250 to €600 compensation for delays >=3 hrs.
      * 2024 U.S. DOT Automatic Cash Refund Mandate: Mandatory prompt cash refund for delays >3 hrs domestic, >6 hrs intl.
      * Indian Railways (IRCTC) TDR: 100% full refund if train is delayed by >3 hrs at boarding point.
-   - Propose Pareto-optimal recovery plans (Plan A: Minimum cost, Plan B: Fastest recovery, Plan C: Direct private comfort).
+   - Propose clear, actionable recovery plans (airline rebooking, Vande Bharat/rail alternative, or road transport).
 
-2. GENERAL INQUIRIES & CODE WRITING:
-   - Answer all questions accurately, professionally, and clearly.
-   - Write clean, modern, production-grade code for websites, travel apps, APIs, algorithms (React, Python, Tailwind, FastAPI, LangChain, LangGraph) when asked.
+3. CODE GENERATION (ONLY WHEN EXPLICITLY REQUESTED):
+   - Only if the user asks "write code", "code for...", or software development questions, provide clean, modern, production-grade code formatted in markdown code blocks.
 
-Tone: Professional, empathetic, analytical, concise, and structured. Always format code in proper markdown code blocks (```python, ```jsx, ```html, etc.).
+Tone: Friendly, concise, empathetic, accurate, and professional.
 """
 
 try:
@@ -86,8 +90,8 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
             formatted_messages.append({"role": "user", "content": state["user_query"]})
 
         candidate_models = [
-            "openai/gpt-oss-120b",
             "qwen/qwen3.8-27b",
+            "openai/gpt-oss-120b",
             "openai/gpt-oss-20b",
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant"
@@ -437,9 +441,9 @@ def run_ai_chat(
     g_key = get_groq_key(groq_api_key)
     gem_key = get_gemini_key(gemini_api_key)
 
-    # 1. Attempt Groq
-    if g_key and Groq is not None:
-        state = call_groq(state, g_key)
+    # 1. Attempt Google Gemini (Gemini 2.5 Flash with native reasoning and conversational conciseness)
+    if gem_key and genai is not None:
+        state = call_gemini(state, gem_key)
         if state.get("response"):
             return {
                 "reply": state["response"],
@@ -447,9 +451,9 @@ def run_ai_chat(
                 "success": True
             }
 
-    # 2. Attempt Gemini
-    if gem_key and genai is not None:
-        state = call_gemini(state, gem_key)
+    # 2. Attempt Groq (Qwen 3.8 27B / GPT-OSS 120B)
+    if g_key and Groq is not None:
+        state = call_groq(state, g_key)
         if state.get("response"):
             return {
                 "reply": state["response"],

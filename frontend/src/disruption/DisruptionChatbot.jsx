@@ -21,7 +21,7 @@ export default function DisruptionChatbot({
       id: 1,
       sender: 'bot',
       provider: 'Voyage AI Engine',
-      text: "Hello! I am your Voyage AI Travel Assistant, powered by Groq and Google Gemini with LangGraph fallback.\n\nI can analyze travel delays, assess downstream connections, evaluate passenger rights, parse tickets, and assist with your journey.\n\nHow can I help you today?",
+      text: "Hello! I am your Voyage AI Travel Assistant.\n\nI can analyze travel delays, assess downstream connections, evaluate passenger rights, parse tickets, and assist with your journey.\n\nHow can I help you today?",
       timestamp: "Just now"
     }
   ]);
@@ -579,7 +579,7 @@ export default function DisruptionChatbot({
               <span className="w-2 h-2 rounded-full bg-[#181E4B] animate-bounce" style={{ animationDelay: '0ms' }} />
               <span className="w-2 h-2 rounded-full bg-[#181E4B] animate-bounce" style={{ animationDelay: '150ms' }} />
               <span className="w-2 h-2 rounded-full bg-[#181E4B] animate-bounce" style={{ animationDelay: '300ms' }} />
-              <span className="text-[11px] font-mono text-slate-500 ml-1">Analyzing with LangGraph Agent...</span>
+              <span className="text-[11px] font-mono text-slate-500 ml-1">Thinking...</span>
             </div>
           </div>
         )}
