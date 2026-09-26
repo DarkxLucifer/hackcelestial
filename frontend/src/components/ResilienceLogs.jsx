@@ -199,16 +199,8 @@ export default function ResilienceLogs({ activeDisruption, itinerary, t }) {
                   {evt.time}
                 </div>
 
-                {/* Badge Tag */}
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono tracking-wide shrink-0 ${
-                  evt.status === 'delay'
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                    : evt.status === 'risk' || evt.status === 'alert'
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : evt.status === 'protected' || evt.status === 'success'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-blue-50 text-blue-700 border border-blue-200'
-                }`}>
+                {/* Event Type: Clean text without colored pill shape or border */}
+                <span className="text-[11px] font-mono font-bold text-slate-700 tracking-wider shrink-0 uppercase sm:w-40">
                   {evt.type}
                 </span>
 

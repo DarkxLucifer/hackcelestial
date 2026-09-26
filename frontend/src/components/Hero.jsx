@@ -7,23 +7,11 @@ export default function Hero({ onSimulateAlpine, onOpenSaga, itinerary, activeDi
       id="hero" 
       className="relative min-h-[85vh] pt-10 sm:pt-14 pb-16 flex flex-col justify-center overflow-hidden bg-white"
     >
-      {/* Background Decore SVG from Figma (Yellow blob right, purple blur left) */}
-      <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden -z-0">
-        <div 
-          className="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full filter blur-[85px] pointer-events-none opacity-40"
-          style={{ backgroundColor: '#D5AEE4' }}
-        />
-        <div 
-          className="absolute top-0 right-0 w-[550px] lg:w-[720px] h-[550px] lg:h-[680px] rounded-bl-[160px] filter blur-[70px] pointer-events-none opacity-50"
-          style={{ backgroundColor: '#FFF1DA' }}
-        />
-      </div>
-
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
           
           {/* ===================================================================== */}
-          {/* DIV[1]: REAL MATHEMATICAL TDAG GRAPH VIEW                             */}
+          {/* DIV[1]: REAL MATHEMATICAL TDAG GRAPH / GOOGLE MAP VIEW                */}
           {/* XPath: /html/body/div/div/div[2]/div[3]/div[2]/div[2]/section[1]/div[2]/div/div[1] */}
           {/* ===================================================================== */}
           <div className="lg:col-span-8 w-full">
@@ -40,9 +28,6 @@ export default function Hero({ onSimulateAlpine, onOpenSaga, itinerary, activeDi
           {/* DIV[2]: TRAVELER VISUAL COMPOSITION MATCHING FIGMA REFERENCE          */}
           {/* ===================================================================== */}
           <div className="lg:col-span-4 relative flex flex-col items-center justify-center">
-            {/* Ambient background glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 h-72 sm:h-80 bg-[#FFF1DA] rounded-full filter blur-[50px] -z-10 opacity-80" />
-            
             <img 
               src="/hero_traveller_full.png" 
               alt="Voyage Traveler" 

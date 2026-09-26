@@ -171,7 +171,7 @@ export default function DemoJourneyGraph({
               }`}
             >
               <Map className="w-3.5 h-3.5" />
-              <span>Carto Basemap</span>
+              <span>Google Map</span>
             </button>
           </div>
 

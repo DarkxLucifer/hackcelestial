@@ -76,18 +76,18 @@ export default function Navbar({
       <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
         <nav className="pointer-events-auto w-full max-w-6xl rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between bg-[#072422]/90 backdrop-blur-xl border border-white/20 shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
           
-          {/* LEFT: PURE VECTOR VOYAGE LOGO (No sticker borders!) */}
+          {/* LEFT: EXACT UPLOADED VOYAGE LOGO */}
           <div className="flex items-center shrink-0 pr-4 sm:pr-6">
             <button
               onClick={() => onNavigate('/')}
-              className="flex items-center gap-1.5 text-white font-googleSans font-bold text-xl sm:text-2xl tracking-widest hover:opacity-90 transition-opacity cursor-pointer select-none"
+              className="flex items-center hover:opacity-90 transition-opacity cursor-pointer"
               aria-label="Voyage Home"
             >
-              <span>V</span>
-              <span className="relative inline-flex items-center justify-center w-5 h-5 rounded-full border-2 border-white">
-                <Compass className="w-3.5 h-3.5 text-white -rotate-45" />
-              </span>
-              <span>YAGE</span>
+              <img 
+                src="/voyage_logo.png" 
+                alt="VOYAGE" 
+                className="h-6 sm:h-7.5 w-auto object-contain"
+              />
             </button>
           </div>
 
@@ -227,7 +227,11 @@ export default function Navbar({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-[#072422]/98 backdrop-blur-2xl flex flex-col items-center justify-center p-6 space-y-5 md:hidden">
           <div className="w-full flex justify-between items-center pb-4 border-b border-white/10">
-            <span className="font-googleSans font-bold text-xl text-white tracking-widest">VOYAGE</span>
+            <img 
+              src="/voyage_logo.png" 
+              alt="VOYAGE" 
+              className="h-6 w-auto object-contain"
+            />
             <button onClick={() => setMobileMenuOpen(false)} className="text-white p-2">
               <X className="w-6 h-6" />
             </button>
