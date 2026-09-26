@@ -64,10 +64,20 @@ class GraphEngine:
         Computes ES, EF, LS, LF, and Slack for each node.
         """
         if not nx.is_directed_acyclic_graph(self.graph):
-            # In case of cycles, resolve gracefully
-            pass
+            # In case of cycles, break back edges to allow topological sort
+            try:
+                cycles = list(nx.simple_cycles(self.graph))
+                for cycle in cycles:
+                    if len(cycle) >= 2:
+                        if self.graph.has_edge(cycle[-1], cycle[0]):
+                            self.graph.remove_edge(cycle[-1], cycle[0])
+            except Exception:
+                pass
 
-        topo_order = list(nx.topological_sort(self.graph))
+        try:
+            topo_order = list(nx.topological_sort(self.graph))
+        except Exception:
+            topo_order = list(self.graph.nodes())
         if not topo_order:
             return {}
 
@@ -169,11 +179,27 @@ class GraphEngine:
                 summary="Disrupted node not found."
             )
 
+        node_map = {n.id: n for n in self.itinerary.nodes}
+
         # Baseline CPM
         self.calculate_cpm_and_slacks()
 
         # Mark disrupted node
-        disrupted_node = next(n for n in self.itinerary.nodes if n.id == disrupted_id)
+        disrupted_node = node_map.get(disrupted_id)
+        if not disrupted_node:
+            return DownstreamImpact(
+                disrupted_node_id=disrupted_id,
+                delay_minutes=delay,
+                blast_radius_node_ids=[],
+                missed_connection_node_ids=[],
+                at_risk_reservation_ids=[],
+                total_downstream_delay=0,
+                estimated_financial_loss=0.0,
+                domino_risk_index_before=self.itinerary.domino_risk_index,
+                domino_risk_index_after=self.itinerary.domino_risk_index,
+                summary="Disrupted node not found."
+            )
+
         if disruption.is_cancellation:
             disrupted_node.status = NodeStatus.CANCELLED
         else:
@@ -187,21 +213,26 @@ class GraphEngine:
         descendants = list(nx.descendants(self.graph, disrupted_id))
         # Sort descendants topologically
         subgraph = self.graph.subgraph([disrupted_id] + descendants)
-        ordered_desc = [n for n in nx.topological_sort(subgraph) if n != disrupted_id]
+        try:
+            ordered_desc = [n for n in nx.topological_sort(subgraph) if n != disrupted_id]
+        except Exception:
+            ordered_desc = [n for n in descendants if n != disrupted_id]
 
         node_arrival_times = {disrupted_id: current_arrival}
 
         for desc_id in ordered_desc:
-            desc_node = next(n for n in self.itinerary.nodes if n.id == desc_id)
+            desc_node = node_map.get(desc_id)
+            if not desc_node:
+                continue
             blast_radius.append(desc_id)
 
             # Find the predecessor with maximum arrival + transfer
             max_inbound_time = 0
             breached = False
             for pred_id in self.graph.predecessors(desc_id):
-                pred_arrival = node_arrival_times.get(pred_id, time_to_minutes(
-                    next(n for n in self.itinerary.nodes if n.id == pred_id).end_time
-                ))
+                pred_node = node_map.get(pred_id)
+                pred_fallback = time_to_minutes(pred_node.end_time) if pred_node else 0
+                pred_arrival = node_arrival_times.get(pred_id, pred_fallback)
                 edge_data = self.graph[pred_id][desc_id]
                 mct = edge_data.get('mct', 45)
                 transfer = edge_data.get('transfer', 20)
@@ -240,18 +271,19 @@ class GraphEngine:
 
         # Calculate final arrival delay
         last_node_id = ordered_desc[-1] if ordered_desc else disrupted_id
-        original_final_time = time_to_minutes(next(n for n in self.itinerary.nodes if n.id == last_node_id).end_time)
-        revised_final_time = node_arrival_times[last_node_id]
+        last_node = node_map.get(last_node_id)
+        original_final_time = time_to_minutes(last_node.end_time) if last_node else 0
+        revised_final_time = node_arrival_times.get(last_node_id, original_final_time)
         total_delay = max(0, revised_final_time - original_final_time)
 
         # Update edges slack
         for edge in self.itinerary.edges:
             if edge.source_id in node_arrival_times or edge.target_id in node_arrival_times:
-                src_end = node_arrival_times.get(
-                    edge.source_id,
-                    time_to_minutes(next(n for n in self.itinerary.nodes if n.id == edge.source_id).end_time)
-                )
-                tgt_start = time_to_minutes(next(n for n in self.itinerary.nodes if n.id == edge.target_id).start_time)
+                s_node = node_map.get(edge.source_id)
+                s_fallback = time_to_minutes(s_node.end_time) if s_node else 0
+                src_end = node_arrival_times.get(edge.source_id, s_fallback)
+                t_node = node_map.get(edge.target_id)
+                tgt_start = time_to_minutes(t_node.start_time) if t_node else 0
                 edge.slack = tgt_start - (src_end + edge.min_connection_time + edge.transfer_duration)
                 edge.is_breached = edge.slack < 0
 

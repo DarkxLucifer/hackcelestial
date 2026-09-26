@@ -292,6 +292,12 @@ def get_all_external_disruptions() -> List[Dict[str, Any]]:
                 d["recommended_plan"] = json.loads(d["recommended_plan"])
             except Exception:
                 pass
+        for coord_field in ["origin_coords", "dest_coords"]:
+            if d.get(coord_field) and isinstance(d[coord_field], str):
+                try:
+                    d[coord_field] = json.loads(d[coord_field])
+                except Exception:
+                    pass
         result.append(d)
         
     conn.close()

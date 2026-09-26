@@ -303,6 +303,20 @@ def list_external_disruptions():
         "disruptions": records
     }
 
+def _parse_coords(c_data, default_lat: float, default_lng: float) -> tuple[float, float]:
+    """Safely extracts (lat, lng) from dict, JSON string, or None."""
+    if isinstance(c_data, str):
+        try:
+            import json as _json
+            c_data = _json.loads(c_data)
+        except Exception:
+            c_data = {}
+    if not isinstance(c_data, dict):
+        c_data = {}
+    lat = float(c_data.get("lat") or default_lat)
+    lng = float(c_data.get("lng") or default_lng)
+    return lat, lng
+
 def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional[List[Dict[str, Any]]] = None):
     """
     Dynamically constructs an authentic Connection Graph (TDAG) reflecting the user's
@@ -334,8 +348,8 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
             if rec_delay > max_delay:
                 max_delay = rec_delay
 
-            orig_c = rec.get("origin_coords") or {"lat": 12.9716, "lng": 77.5946}
-            dest_c = rec.get("dest_coords") or {"lat": 17.2403, "lng": 78.4294}
+            orig_lat, orig_lng = _parse_coords(rec.get("origin_coords"), 12.9716, 77.5946)
+            dest_lat, dest_lng = _parse_coords(rec.get("dest_coords"), 17.2403, 78.4294)
 
             is_train = "rail" in rec_carrier.lower() or "train" in rec_carrier.lower() or "#" in rec_service
 
@@ -353,10 +367,10 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
                 service_number=rec_service,
                 origin=rec_origin,
                 destination=rec_dest,
-                origin_coords=Coordinates(lat=float(orig_c.get("lat", 12.9716)), lng=float(orig_c.get("lng", 77.5946))),
-                dest_coords=Coordinates(lat=float(dest_c.get("lat", 17.2403)), lng=float(dest_c.get("lng", 78.4294))),
-                start_time=f"{10 + idx*4:02d}:00",
-                end_time=f"{13 + idx*4:02d}:30",
+                origin_coords=Coordinates(lat=orig_lat, lng=orig_lng),
+                dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
+                start_time=f"{(10 + idx*4) % 24:02d}:00",
+                end_time=f"{(13 + idx*4) % 24:02d}:30",
                 duration_minutes=210,
                 cost=rec_cost,
                 currency="INR",
@@ -382,7 +396,7 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
         # Add final lodging / destination anchor
         last_rec = records_to_sync[-1]
         last_dest = last_rec.get("destination", "Final Destination")
-        last_dest_c = last_rec.get("dest_coords") or {"lat": 17.2403, "lng": 78.4294}
+        last_lat, last_lng = _parse_coords(last_rec.get("dest_coords"), 17.2403, 78.4294)
         anchor_node = ItineraryNode(
             id="node_final_anchor",
             name=f"{last_dest} Destination Anchor",
@@ -392,8 +406,8 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
             service_number="RES-ANCHOR",
             origin=last_dest,
             destination=last_dest,
-            origin_coords=Coordinates(lat=float(last_dest_c.get("lat", 17.2403)), lng=float(last_dest_c.get("lng", 78.4294))),
-            dest_coords=Coordinates(lat=float(last_dest_c.get("lat", 17.2403)), lng=float(last_dest_c.get("lng", 78.4294))),
+            origin_coords=Coordinates(lat=last_lat, lng=last_lng),
+            dest_coords=Coordinates(lat=last_lat, lng=last_lng),
             start_time="21:00",
             end_time="23:59",
             duration_minutes=179,
@@ -442,12 +456,13 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
         is_canc = bool(primary_record.get("is_cancellation", False))
         is_train = "rail" in carrier.lower() or "train" in carrier.lower() or "#" in service or "vande" in service.lower()
 
-        orig_coords_raw = primary_record.get("origin_coords") or {}
-        dest_coords_raw = primary_record.get("dest_coords") or {}
-        orig_lat = float(orig_coords_raw.get("lat") or (12.9716 if not is_train else 28.6139))
-        orig_lng = float(orig_coords_raw.get("lng") or (77.5946 if not is_train else 77.2090))
-        dest_lat = float(dest_coords_raw.get("lat") or (17.2403 if not is_train else 26.9124))
-        dest_lng = float(dest_coords_raw.get("lng") or (78.4294 if not is_train else 75.7873))
+        default_orig_lat = 28.6139 if is_train else 12.9716
+        default_orig_lng = 77.2090 if is_train else 77.5946
+        default_dest_lat = 26.9124 if is_train else 17.2403
+        default_dest_lng = 75.7873 if is_train else 78.4294
+
+        orig_lat, orig_lng = _parse_coords(primary_record.get("origin_coords"), default_orig_lat, default_orig_lng)
+        dest_lat, dest_lng = _parse_coords(primary_record.get("dest_coords"), default_dest_lat, default_dest_lng)
 
         node_main = ItineraryNode(
             id="node_main_1",
@@ -764,6 +779,8 @@ def get_ai_models_endpoint():
     """
     return {
         "groq_models": [
+            {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B Versatile", "type": "production", "speed": "Ultra-fast (~300 t/s)", "use_case": "Primary Groq model — reasoning, code generation, disruption analysis"},
+            {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B Instant", "type": "production", "speed": "Instant (~800 t/s)", "use_case": "Low-latency dialog, intent classification"},
             {"id": "qwen/qwen3.8-27b", "name": "Qwen 3.8 27B", "type": "production", "speed": "High-throughput", "use_case": "General reasoning, code generation, disruption analysis, multilingual"},
             {"id": "openai/gpt-oss-20b", "name": "GPT-OSS 20B", "type": "production", "speed": "Fast (~400 t/s)", "use_case": "Fallback reasoning and intent classification"},
             {"id": "whisper-large-v3", "name": "Whisper Large V3", "type": "audio", "speed": "Real-time speech-to-text", "use_case": "Voice input transcription for tickets & delays"},

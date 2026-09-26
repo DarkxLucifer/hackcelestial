@@ -297,7 +297,7 @@ class GTFSAndBusRetriever:
             "route": {
                 "route_id": "ORANGE_EXP",
                 "route_short_name": "Airport Express Line",
-                "route_long_name": "New Delhi Station ↔ IGI Airport T3 ↔ Dwarka Sector 21",
+                "route_long_name": "New Delhi Station <-> IGI Airport T3 <-> Dwarka Sector 21",
                 "route_type": 1,
                 "color": "#F37021"
             },
@@ -608,7 +608,7 @@ def get_live_connection_graph_telemetry(
 
     return {
         "timestamp": datetime.now().isoformat(),
-        "route_corridor": f"{origin} → {destination}" if origin and destination else "Unknown",
+        "route_corridor": f"{origin} -> {destination}" if origin and destination else "Unknown",
         "network_status": network_status,
         "transfer_slack_minutes": transfer_slack,
         "segments": {

@@ -204,11 +204,16 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
         if state["user_query"] and (not state["messages"] or state["messages"][-1].get("content") != state["user_query"]):
             formatted_messages.append({"role": "user", "content": state["user_query"]})
 
-        # Updated Sep 2026: llama-3.3-70b-versatile & llama-3.1-8b-instant retired Aug 16 2026.
-        # Current available Groq text models:
+        # Priority requested by user:
+        # 1. llama-3.3-70b-versatile
+        # 2. llama-3.1-8b-instant
+        # 3. other available models (qwen/qwen3.8-27b, openai/gpt-oss-20b, openai/gpt-oss-120b)
         candidate_models = [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
             "qwen/qwen3.8-27b",
             "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
         ]
 
         last_err = None

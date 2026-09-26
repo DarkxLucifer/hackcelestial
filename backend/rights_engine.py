@@ -40,7 +40,7 @@ class PassengerRightsEngine:
         if delay_minutes >= 120:
             duty_of_care.append("Complimentary meals & refreshment vouchers")
             duty_of_care.append("Two free telephone calls / internet access")
-        if delay_minutes >= 360 or (delay_minutes >= 180 and "evening" in node.start_time.lower()):
+        if delay_minutes >= 360 or (delay_minutes >= 180 and "evening" in (node.start_time or "").lower()):
             duty_of_care.append("Mandatory airline-provided overnight hotel accommodation & ground transfer")
 
         claim_packet = {
