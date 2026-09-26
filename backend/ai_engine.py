@@ -53,6 +53,14 @@ Your core capabilities:
 Tone: Professional, empathetic, analytical, concise, and structured. Always format code in proper markdown code blocks (```python, ```jsx, ```html, etc.).
 """
 
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+except ImportError:
+    pass
+
 class AgentState(TypedDict):
     messages: List[Dict[str, str]]
     user_query: str
@@ -68,7 +76,7 @@ def get_gemini_key(custom_key: Optional[str] = None) -> Optional[str]:
     return custom_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 def call_groq(state: AgentState, groq_key: str) -> AgentState:
-    """Attempts generation via Groq API (Llama 3.3 70B / Llama 3.1 8B)."""
+    """Attempts generation via Groq API with robust model fallback."""
     try:
         client = Groq(api_key=groq_key)
         formatted_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -77,55 +85,82 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
         if state["user_query"] and (not state["messages"] or state["messages"][-1].get("content") != state["user_query"]):
             formatted_messages.append({"role": "user", "content": state["user_query"]})
 
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=formatted_messages,
-            temperature=0.4,
-            max_tokens=2048
-        )
-        reply = completion.choices[0].message.content
-        state["response"] = reply
-        state["provider"] = "groq (llama-3.3-70b-versatile)"
+        candidate_models = [
+            "openai/gpt-oss-120b",
+            "qwen/qwen3.8-27b",
+            "openai/gpt-oss-20b",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant"
+        ]
+
+        last_err = None
+        for model_name in candidate_models:
+            try:
+                completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=formatted_messages,
+                    temperature=0.4,
+                    max_tokens=2048
+                )
+                reply = completion.choices[0].message.content
+                if reply and reply.strip():
+                    state["response"] = reply
+                    state["provider"] = f"groq ({model_name})"
+                    return state
+            except Exception as me:
+                last_err = me
+                continue
+
+        state["error"] = f"Groq all models failed: {str(last_err)}"
         return state
     except Exception as e:
         state["error"] = f"Groq error: {str(e)}"
         return state
 
 def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
-    """Attempts generation via Google Gemini API (Gemini 2.0 Flash / 1.5 Flash)."""
+    """Attempts generation via Google Gemini API with robust model fallback."""
     try:
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            system_instruction=SYSTEM_PROMPT
-        )
-        # Convert messages to Gemini format
+        candidate_models = [
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-2.5-pro"
+        ]
+
         chat_history = []
         for m in state["messages"][:-1]:
             role = "model" if m.get("role") in ["assistant", "model", "bot"] else "user"
             chat_history.append({"role": role, "parts": [m.get("content", "")]})
         
-        chat = model.start_chat(history=chat_history)
         query = state["user_query"] or (state["messages"][-1]["content"] if state["messages"] else "Hello")
-        response = chat.send_message(query)
-        state["response"] = response.text
-        state["provider"] = "gemini (gemini-2.0-flash)"
+
+        last_err = None
+        for model_name in candidate_models:
+            try:
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=SYSTEM_PROMPT
+                )
+                if chat_history:
+                    chat = model.start_chat(history=chat_history)
+                    response = chat.send_message(query)
+                else:
+                    response = model.generate_content(query)
+                if response and response.text and response.text.strip():
+                    state["response"] = response.text
+                    state["provider"] = f"gemini ({model_name})"
+                    return state
+            except Exception as me:
+                last_err = me
+                continue
+
+        state["error"] = f"Gemini all models failed: {str(last_err)}"
         return state
     except Exception as e:
-        # Try fallback model
-        try:
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=SYSTEM_PROMPT
-            )
-            query = state["user_query"] or (state["messages"][-1]["content"] if state["messages"] else "Hello")
-            response = model.generate_content(query)
-            state["response"] = response.text
-            state["provider"] = "gemini (gemini-1.5-flash)"
-            return state
-        except Exception as e2:
-            state["error"] = f"Gemini error: {str(e2)}"
-            return state
+        state["error"] = f"Gemini error: {str(e)}"
+        return state
 
 def call_expert_engine(state: AgentState) -> AgentState:
     """High-intelligence local fallback that understands travel laws, writes code, and extracts disruptions."""

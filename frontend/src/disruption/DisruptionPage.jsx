@@ -210,9 +210,6 @@ export default function DisruptionPage({
       {!isDisputeActive && (
         <div className="space-y-6">
           
-          {/* Multi-Modal Connection Radar (Shows all options clearly) */}
-          <MultiModalTravelTool />
-
           {/* AI Travel Assistant (Chat, Voice, Document Dropzone) */}
           <DisruptionChatbot
             isOpen={true}
@@ -224,6 +221,9 @@ export default function DisruptionPage({
             onCheckRefundPolicy={handleOpenRefundModal}
             t={t}
           />
+
+          {/* Multi-Modal Connection Radar (Shows all options clearly) */}
+          <MultiModalTravelTool />
 
         </div>
       )}

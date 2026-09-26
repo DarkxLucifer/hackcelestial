@@ -37,12 +37,15 @@ export default function DisruptionChatbot({
   const [copiedId, setCopiedId] = useState(null);
 
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Auto-scroll to latest message
+  // Auto-scroll inside chat container strictly without scrolling the browser window
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages, isRecording, isLoading]);
 
   // Save API keys to local storage
@@ -396,9 +399,6 @@ export default function DisruptionChatbot({
                 Voyage AI Travel Assistant
               </h3>
             </div>
-            <p className="text-[11px] text-[#5E6282] flex items-center gap-1.5">
-              <span>Dual-Provider: Groq (Llama 3.3 70B) &amp; Gemini 2.0 Flash</span>
-            </p>
           </div>
         </div>
 
@@ -490,7 +490,7 @@ export default function DisruptionChatbot({
       )}
 
       {/* Messages Thread */}
-      <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 font-poppins text-xs">
+      <div ref={chatContainerRef} className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 font-poppins text-xs">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -659,6 +659,12 @@ export default function DisruptionChatbot({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
             placeholder="Ask about disruption, refund rights, or write code..."
             className="flex-1 text-xs font-poppins px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#181E4B] bg-slate-50/50"
           />

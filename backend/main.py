@@ -7,6 +7,14 @@ import os
 import time
 import base64
 
+try:
+    from dotenv import load_dotenv
+    _env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(_env_path):
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 from .models import (
     Itinerary, DisruptionEvent, DownstreamImpact, RecoveryPlan,
     OptimizationWeights, ItineraryNode, ItineraryEdge,
