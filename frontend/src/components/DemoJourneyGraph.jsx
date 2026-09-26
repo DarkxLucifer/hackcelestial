@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
   Plane, Train, Building2, Footprints, AlertTriangle, 
-  CheckCircle2, ArrowRight, ShieldCheck, Zap, Network, Layers, Info
+  CheckCircle2, ArrowRight, ShieldCheck, Zap, Network, Layers, Info, Map
 } from 'lucide-react';
+import CartoJourneyMap from './CartoJourneyMap';
 
 export default function DemoJourneyGraph({ 
   itinerary, 
@@ -12,6 +13,7 @@ export default function DemoJourneyGraph({
   t 
 }) {
   const [selectedNodeId, setSelectedNodeId] = useState('node_flight_1');
+  const [activeView, setActiveView] = useState('graph'); // 'graph' | 'map'
 
   // Mathematical Graph Model (Vertices V and Directed Edges E)
   const nodes = [
@@ -131,9 +133,9 @@ export default function DemoJourneyGraph({
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || nodes[0];
 
   return (
-    <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-voyare-card p-6 sm:p-8 overflow-hidden select-none">
+    <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-voyare-card p-6 sm:p-8 overflow-hidden">
       
-      {/* Graph Header: Title, Real Graph Stats & Simulate Action */}
+      {/* Graph Header: Title, Real Graph Stats, View Switcher & Simulate Action */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
@@ -143,15 +145,36 @@ export default function DemoJourneyGraph({
             </span>
           </div>
           <h2 className="font-volkhov font-bold text-2xl sm:text-3xl text-[#181E4B] mt-1">
-            {t?.demoJourneyTitle || "The Alpine Expedition: London to Zermatt"}
+            Travel graph
           </h2>
           <p className="text-xs sm:text-sm text-[#5E6282] font-poppins mt-0.5">
             Topology: |V| = 5 Vertices • |E| = 4 Dependency Edges • Critical Path Length: 519m
           </p>
         </div>
 
-        {/* Real Graph Metrics & Action */}
-        <div className="flex items-center gap-3">
+        {/* View Mode Switcher + Graph Metrics & Action */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+            <button
+              onClick={() => setActiveView('graph')}
+              className={`px-3 py-1.5 rounded-lg font-googleSans font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeView === 'graph' ? 'bg-white text-[#181E4B] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>Graph View</span>
+            </button>
+            <button
+              onClick={() => setActiveView('map')}
+              className={`px-3 py-1.5 rounded-lg font-googleSans font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeView === 'map' ? 'bg-white text-[#181E4B] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Map className="w-3.5 h-3.5" />
+              <span>Carto Basemap</span>
+            </button>
+          </div>
+
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-mono text-[#181E4B]">
             <span className="text-slate-400">DRI:</span>
             <span className={`font-bold ${activeDisruption ? 'text-red-500' : 'text-emerald-600'}`}>
@@ -173,32 +196,38 @@ export default function DemoJourneyGraph({
         </div>
       </div>
 
-      {/* Legend bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 py-3 text-xs text-[#5E6282] font-poppins border-b border-slate-100">
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span>Positive Slack (&gt; 0m)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-            <span>Negative Slack (Breached Edge)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-            <span>Zero-Slack Hotel Anchor</span>
-          </div>
+      {activeView === 'map' ? (
+        <div className="mt-4">
+          <CartoJourneyMap activeDisruption={activeDisruption} />
         </div>
+      ) : (
+        <>
+          {/* Legend bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 py-3 text-xs text-[#5E6282] font-poppins border-b border-slate-100">
+            <div className="flex items-center gap-5">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>Positive Slack (&gt; 0m)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                <span>Negative Slack (Breached Edge)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span>Zero-Slack Hotel Anchor</span>
+              </div>
+            </div>
 
-        <div className="text-[11px] font-mono text-[#84829A]">
-          Click any vertex node to inspect CPM constraints
-        </div>
-      </div>
+            <div className="text-[11px] font-mono text-[#84829A]">
+              Click any vertex node to inspect CPM constraints
+            </div>
+          </div>
 
-      {/* ========================================================================= */}
-      {/* REAL GRAPH CANVAS: SVG DIRECTED GRAPH WITH VERTICES AND EDGES             */}
-      {/* ========================================================================= */}
-      <div className="relative w-full h-[320px] sm:h-[360px] bg-slate-50/80 rounded-2xl border border-slate-200 mt-4 overflow-hidden">
+          {/* ========================================================================= */}
+          {/* REAL GRAPH CANVAS: SVG DIRECTED GRAPH WITH VERTICES AND EDGES             */}
+          {/* ========================================================================= */}
+          <div className="relative w-full h-[320px] sm:h-[360px] bg-slate-50/80 rounded-2xl border border-slate-200 mt-4 overflow-hidden">
         
         {/* Subtle graph background grid */}
         <div 
@@ -422,6 +451,8 @@ export default function DemoJourneyGraph({
           </button>
         </div>
       </div>
+        </>
+      )}
 
     </div>
   );

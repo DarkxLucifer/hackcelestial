@@ -85,7 +85,7 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
   const entryRatio = Math.min(1.0, progress * 2.0);
 
   return (
-    <div className="relative w-full overflow-x-hidden select-none bg-[#091f2c]">
+    <div className="relative w-full overflow-x-hidden bg-[#091f2c]">
       
       {/* ========================================================================= */}
       {/* 1. FIXED FULLSCREEN ISLAND BACKGROUND (z-0)                               */}
@@ -130,7 +130,7 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
       {/* ========================================================================= */}
       {progress < 0.65 && (
         <div 
-          className="fixed inset-0 z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 pointer-events-none select-none"
+          className="fixed inset-0 z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 pointer-events-none"
           style={{
             opacity: Math.max(0, 1 - progress * 2.2),
             transform: `translate3d(0, ${-progress * 130}px, 0) scale(${1 - progress * 0.06})`,

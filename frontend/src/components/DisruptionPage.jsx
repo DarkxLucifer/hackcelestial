@@ -21,48 +21,48 @@ export default function DisruptionPage({
 
   const plans = [
     {
-      id: "plan_ghost_hold",
-      title: "Plan A: SBB Autonomous Ghost-Hold",
-      badge: "RECOMMENDED (OPTIMAL)",
+      id: "plan_a",
+      title: "PLAN A: MINIMUM COST",
+      badge: "₹0 EXTRA",
       badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      costDelta: "€0.00",
-      timeDelta: "+55m arrival",
-      riskScore: "12/100 (Safe)",
-      description: "Utilizes pre-reserved Just-in-Time inventory on SBB IC 8 #834 (Dep 19:02) from Zurich HB with auto-held late check-in at Matterhorn Lodge.",
+      costDelta: "₹0 out-of-pocket",
+      timeDelta: "Tomorrow 08:40",
+      riskScore: "2 bookings affected",
+      description: "Airline rebooking on next available flight (Mumbai → Delhi) with hotel retention and rescheduled transfer. Trade-off: Arrives next morning and misses tonight's check-in window.",
       steps: [
-        "Hold confirmed on SBB IC 8 #834 (Seat 42A, 19:02)",
-        "Matterhorn Lodge arrival window extended to 23:59",
-        "Zero cancellation penalties or extra re-booking fees"
+        "Airline rebooking on next available flight",
+        "Jaipur hotel reservation retained & late arrival notified",
+        "Existing Jaipur transfer rescheduled (₹0 additional travel payment)"
       ]
     },
     {
-      id: "plan_express_shuttle",
-      title: "Plan B: Alpine Express Sprinter",
-      badge: "FASTEST RECOVERY",
+      id: "plan_b",
+      title: "PLAN B: FASTEST RECOVERY",
+      badge: "RECOMMENDED RECOVERY (₹2,850 EXTRA)",
+      badgeColor: "bg-amber-50 text-amber-800 border-amber-200",
+      costDelta: "₹2,850 additional cost",
+      timeDelta: "Tonight 23:15 (~9h 25m saved)",
+      riskScore: "Protected Check-in",
+      description: "Flight + Rail Recovery: Earlier alternative flight secured + Delhi → Jaipur train connection found. Hotel check-in extended to 23:59.",
+      steps: [
+        "Earlier alternative flight secured (Mumbai → Delhi)",
+        "Delhi → Jaipur train connection found & booked",
+        "Hotel check-in extended to 23:59; Airport transfer adjusted"
+      ]
+    },
+    {
+      id: "plan_c",
+      title: "PLAN C: COMFORT RECOVERY",
+      badge: "MAXIMUM CONVENIENCE (₹6,900 EXTRA)",
       badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
-      costDelta: "+€45.00",
-      timeDelta: "+15m arrival",
-      riskScore: "8/100 (Ultra-Safe)",
-      description: "Direct private executive sprinter van dispatched from ZRH terminal to Visp station, bypassing the missed rail connection entirely.",
+      costDelta: "₹6,900 additional cost",
+      timeDelta: "Tonight 22:10 (~10h 30m saved)",
+      riskScore: "Zero Train Transfer",
+      description: "Private Road Recovery: Alternative flight + Private direct Delhi → Jaipur executive transfer with door-to-door luggage handling.",
       steps: [
-        "Driver assigned at Zurich Airport Terminal 1 curbside",
-        "Direct alpine highway transit avoiding rail schedule",
-        "Arrives Zermatt in time for standard 21:00 check-in"
-      ]
-    },
-    {
-      id: "plan_overnight_compensation",
-      title: "Plan C: Zurich Overnight + EU261 Credit",
-      badge: "MAXIMUM COMFORT & PAYOUT",
-      badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
-      costDelta: "-€250.00 (Net Gain)",
-      timeDelta: "Next Morning 08:30",
-      riskScore: "0/100 (Zero Risk)",
-      description: "Complimentary luxury stay at Radisson Blu Zurich Airport with automatic €250 EU261 passenger claim payout + panoramic Glacier Express train next morning.",
-      steps: [
-        "Free 5-star airport hotel voucher & dining voucher issued",
-        "Instant €250 statutory EU261 wire transfer queued",
-        "First-class morning connection via Glacier Express"
+        "Alternative Mumbai → Delhi flight secured",
+        "Private Delhi → Jaipur transfer (door-to-door)",
+        "Luggage handled throughout transfer; Hotel notified"
       ]
     }
   ];
@@ -293,38 +293,6 @@ export default function DisruptionPage({
             >
               <span>Execute Selected Recovery with Agentic Saga</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* EU261 & Passenger Rights Protection Card */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2.5 mb-3">
-              <Shield className="w-5 h-5 text-indigo-600" />
-              <h4 className="font-volkhov font-bold text-base text-[#181E4B]">
-                Statutory Compensation Rights
-              </h4>
-            </div>
-
-            <p className="text-xs text-[#5E6282] leading-relaxed">
-              Under EC Regulation 261/2004 and the Swiss Federal Office of Transport (FOT), delay pushbacks exceeding 3 hours entitle you to cash indemnity.
-            </p>
-
-            <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs font-mono">
-              <span>Eligible Claim:</span>
-              <span className="text-emerald-600 font-bold text-sm">€250.00 / Passenger</span>
-            </div>
-
-            <button
-              onClick={() => setClaimGenerated(true)}
-              disabled={claimGenerated}
-              className={`mt-4 w-full py-2.5 rounded-xl font-googleSans font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                claimGenerated
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>{claimGenerated ? "Claim Dossier Staged & Filed" : "Pre-fill EU261 Claim Dossier"}</span>
             </button>
           </div>
 

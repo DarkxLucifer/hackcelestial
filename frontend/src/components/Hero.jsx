@@ -46,13 +46,13 @@ export default function Hero({ onSimulateAlpine, onOpenSaga, itinerary, activeDi
             <img 
               src="/hero_traveller_full.png" 
               alt="Voyage Traveler" 
-              className="w-full max-w-[320px] sm:max-w-[380px] lg:max-w-[420px] h-auto object-contain select-none drop-shadow-md hover:scale-[1.02] transition-transform duration-500"
+              className="w-full max-w-[320px] sm:max-w-[380px] lg:max-w-[420px] h-auto object-contain drop-shadow-md hover:scale-[1.02] transition-transform duration-500"
             />
 
             {/* Micro Badge */}
             <div className="mt-3 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200/80 shadow-xs flex items-center gap-2 text-xs text-[#5E6282] font-poppins">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-semibold text-[#181E4B]">London → Zermatt</span>
+              <span className="font-semibold text-[#181E4B]">Mumbai → Delhi → Jaipur</span>
               <span>• Active Protection</span>
             </div>
           </div>

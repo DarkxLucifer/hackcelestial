@@ -292,6 +292,9 @@ export default function App() {
 
           {/* Section 3: Travel Dispute & Disruption Plans in ALL-WHITE Format */}
           <TravelDisputePlans
+            user={user}
+            onOpenAuth={handleOpenAuth}
+            onNavigate={handleNavigate}
             onSelectPlan={(planKey) => handleOpenSagaModal(recoveryPlans[0])}
             activeDisruption={activeDisruption}
             t={t}
