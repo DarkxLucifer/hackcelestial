@@ -826,9 +826,26 @@ def get_flight_status_endpoint(flight: str):
     return tracker.get_flight_status(flight)
 
 @app.get("/api/travel/train-status")
-def get_train_status_endpoint(train: str = "20978"):
-    """Fetches live train running status and platform allocations via RailRadar API."""
+def get_train_status_endpoint(train: str):
+    """Fetches live train running status via RailRadar API v1. Pass ?train=12810"""
+    if not train:
+        return {"error": "Provide ?train=TRAIN_NUMBER e.g. ?train=12810", "delay_minutes": 0}
     return RailRadarTracker.get_live_train_status(train)
+
+@app.get("/api/travel/train-schedule")
+def get_train_schedule_endpoint(train: str):
+    """Fetches static timetable & route for a train number. Pass ?train=12810"""
+    if not train:
+        return {"error": "Provide ?train=TRAIN_NUMBER e.g. ?train=12810"}
+    return RailRadarTracker.get_train_schedule(train)
+
+@app.get("/api/travel/pnr-status")
+def get_pnr_status_endpoint(pnr: str):
+    """Fetches 10-digit IRCTC PNR status via RailRadar API. Pass ?pnr=1234567890"""
+    if not pnr:
+        return {"error": "Provide ?pnr=10_DIGIT_PNR"}
+    return RailRadarTracker.get_pnr_status(pnr)
+
 
 @app.get("/api/travel/bus-options")
 def get_bus_options_endpoint(origin: str = "Delhi", destination: str = "Jaipur"):

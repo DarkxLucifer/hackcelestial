@@ -94,108 +94,150 @@ class AviationStackTracker:
 # ==============================================================================
 class RailRadarTracker:
     """
-    Indian train running status via:
-    1. RailRadar live API  (https://railradar.in/api/v1/trains/<num>/live)
-    2. erail.in train status scraping as fallback
-    
-    No synthetic/mock data. Returns "unavailable" if both fail.
+    Indian train running status via RailRadar API v1.
+    Base URL: https://api.railradar.in/v1
+    Auth: Authorization: Bearer <RAILRADAR_API_KEY>
+    Set RAILRADAR_API_KEY in .env to enable live data.
+
+    Endpoints used:
+      GET /v1/trains/{number}       - Timetable & schedule
+      GET /v1/trains/{number}/live  - Live running status & delay
+      GET /v1/pnr/{pnr}            - 10-digit PNR status
     """
-    RAILRADAR_ENDPOINT = "https://railradar.in/api/v1/trains"
-    ERAIL_ENDPOINT = "https://erail.in/ajax/getTrainRunningStatus.aspx"
+    BASE_URL = "https://api.railradar.in/v1"
+
+    @classmethod
+    def _get_headers(cls) -> dict:
+        key = os.getenv("RAILRADAR_API_KEY", "")
+        h = {"User-Agent": "VoyageTravel/1.0", "Accept": "application/json"}
+        if key:
+            h["Authorization"] = f"Bearer {key}"
+        return h
 
     @classmethod
     def get_live_train_status(cls, train_number: str) -> Dict[str, Any]:
         clean_num = re.sub(r"\D", "", train_number or "")
         if not clean_num:
-            return {
-                "train_number": train_number,
-                "error": "Invalid train number",
-                "delay_minutes": 0,
-                "source": "none"
-            }
+            return {"train_number": train_number, "error": "Invalid train number", "delay_minutes": 0, "source": "none"}
 
-        # --- 1. Try RailRadar live endpoint ---
+        headers = cls._get_headers()
+
+        # --- Live running status ---
         try:
-            url = f"{cls.RAILRADAR_ENDPOINT}/{clean_num}/live"
-            resp = requests.get(
-                url,
-                timeout=5,
-                headers={"User-Agent": "Mozilla/5.0 VoyageTravel/1.0 (travel disruption tool)"}
-            )
+            url = f"{cls.BASE_URL}/trains/{clean_num}/live"
+            resp = requests.get(url, headers=headers, timeout=8)
             if resp.status_code == 200:
-                data = resp.json()
-                # Validate response has real data
-                if data.get("train_name") or data.get("train_number"):
-                    delay_raw = data.get("delay_minutes") or data.get("delay") or 0
-                    try:
-                        delay_val = int(delay_raw)
-                    except (ValueError, TypeError):
-                        delay_val = 0
-                    return {
-                        "train_number": data.get("train_number", clean_num),
-                        "train_name": data.get("train_name", ""),
-                        "origin": data.get("source_station_name") or data.get("origin") or data.get("from") or "",
-                        "destination": data.get("destination_station_name") or data.get("destination") or data.get("to") or "",
-                        "current_location": data.get("current_station") or data.get("current_location") or "",
-                        "upcoming_station": data.get("next_station") or data.get("upcoming_station") or "",
-                        "scheduled_departure": data.get("scheduled_departure") or data.get("departure") or "",
-                        "scheduled_arrival": data.get("scheduled_arrival") or data.get("arrival") or "",
-                        "delay_minutes": delay_val,
-                        "platform_number": data.get("platform") or "",
-                        "speed_kmh": data.get("speed") or data.get("speed_kmh") or 0,
-                        "distance_remaining_km": data.get("distance_remaining_km") or 0,
-                        "tdr_refund_eligible": delay_val >= 180,
-                        "source": "RailRadar Live API"
-                    }
-        except Exception:
+                envelope = resp.json()
+                data = envelope.get("data", envelope)
+                # Real field names from RailRadar v1 response:
+                train_info = data.get("train", {})
+                source_stn = train_info.get("source", {})
+                dest_stn = train_info.get("destination", {})
+                cur_loc = data.get("currentLocation", {})
+                next_halt = data.get("nextHalt", {})
+                prev_halt = data.get("previousHalt", {})
+
+                delay_val = int(data.get("delayMinutes") or cur_loc.get("delayMinutes") or 0)
+                status_str = data.get("status", "unknown")   # "running", "completed", "yet_to_start"
+                is_live = data.get("isLive", False)
+
+                return {
+                    "train_number": data.get("trainNumber", clean_num),
+                    "train_name": data.get("trainName", train_info.get("name", "")),
+                    "status": status_str,
+                    "is_live": is_live,
+                    "origin": source_stn.get("name", ""),
+                    "origin_code": source_stn.get("code", ""),
+                    "destination": dest_stn.get("name", ""),
+                    "destination_code": dest_stn.get("code", ""),
+                    "current_location": cur_loc.get("stationName", ""),
+                    "current_station_code": cur_loc.get("stationCode", ""),
+                    "upcoming_station": next_halt.get("stationName", ""),
+                    "prev_station": prev_halt.get("stationName", ""),
+                    "delay_minutes": delay_val,
+                    "distance_from_origin_km": cur_loc.get("distanceFromOriginKm", 0),
+                    "distance_remaining_km": round(
+                        train_info.get("distance", 0) - cur_loc.get("distanceFromOriginKm", 0), 1
+                    ),
+                    "avg_speed_kmh": train_info.get("avgSpeed", 0),
+                    "tracking_mode": data.get("trackingMode", ""),
+                    "start_date": data.get("startDate", ""),
+                    "last_updated": data.get("lastUpdatedAt", ""),
+                    "tdr_refund_eligible": delay_val >= 180,
+                    "source": "RailRadar Live API v1"
+                }
+            elif resp.status_code == 401:
+                return {
+                    "train_number": clean_num, "delay_minutes": 0,
+                    "error": "RAILRADAR_API_KEY missing or invalid. Set it in .env",
+                    "source": "railradar_auth_error"
+                }
+            elif resp.status_code == 404:
+                # Train not running today — fetch schedule for name/route
+                return cls.get_train_schedule(clean_num)
+        except Exception as e:
             pass
 
-        # --- 2. Try erail.in as fallback ---
+        # --- Fallback: static schedule (timetable) ---
+        return cls.get_train_schedule(clean_num)
+
+    @classmethod
+    def get_train_schedule(cls, train_number: str) -> Dict[str, Any]:
+        """Fetch timetable/schedule for a train number."""
+        clean_num = re.sub(r"\D", "", train_number or "")
+        headers = cls._get_headers()
         try:
-            params = {
-                "sEcho": "1",
-                "iColumns": "12",
-                "iDisplayStart": "0",
-                "iDisplayLength": "1",
-                "sSearch": clean_num,
-                "TrainNo": clean_num,
-                "Date": datetime.now().strftime("%Y%m%d")
-            }
-            resp2 = requests.get(
-                cls.ERAIL_ENDPOINT,
-                params=params,
-                timeout=5,
-                headers={"User-Agent": "Mozilla/5.0 VoyageTravel/1.0"}
-            )
-            if resp2.status_code == 200:
-                raw = resp2.text.strip()
-                if raw and not raw.startswith("<"):
-                    data2 = resp2.json()
-                    rows = data2.get("aaData", [])
-                    if rows and len(rows[0]) >= 4:
-                        r = rows[0]
-                        return {
-                            "train_number": clean_num,
-                            "train_name": r[1] if len(r) > 1 else "",
-                            "origin": r[2] if len(r) > 2 else "",
-                            "destination": r[3] if len(r) > 3 else "",
-                            "delay_minutes": 0,
-                            "source": "erail.in"
-                        }
+            url = f"{cls.BASE_URL}/trains/{clean_num}"
+            resp = requests.get(url, headers=headers, timeout=8)
+            if resp.status_code == 200:
+                envelope = resp.json()
+                data = envelope.get("data", envelope)
+                train_info = data.get("train", data)
+                source_stn = train_info.get("source", {})
+                dest_stn = train_info.get("destination", {})
+                return {
+                    "train_number": train_info.get("number", clean_num),
+                    "train_name": train_info.get("name", ""),
+                    "status": "schedule_only",
+                    "is_live": False,
+                    "origin": source_stn.get("name", ""),
+                    "origin_code": source_stn.get("code", ""),
+                    "destination": dest_stn.get("name", ""),
+                    "destination_code": dest_stn.get("code", ""),
+                    "delay_minutes": 0,
+                    "avg_speed_kmh": train_info.get("avgSpeed", 0),
+                    "total_halts": train_info.get("totalHalts", 0),
+                    "distance_km": train_info.get("distance", 0),
+                    "tdr_refund_eligible": False,
+                    "source": "RailRadar Schedule API v1"
+                }
         except Exception:
             pass
-
-        # --- Both failed: return unavailable (no fake data) ---
         return {
-            "train_number": clean_num,
-            "train_name": "",
-            "origin": "",
-            "destination": "",
-            "current_location": "",
-            "delay_minutes": 0,
-            "note": f"Live status unavailable for train #{clean_num}. RailRadar and erail.in are unreachable.",
+            "train_number": clean_num, "delay_minutes": 0,
+            "note": f"Train #{clean_num} data unavailable from RailRadar.",
             "source": "unavailable"
         }
+
+    @classmethod
+    def get_pnr_status(cls, pnr: str) -> Dict[str, Any]:
+        """Fetch 10-digit PNR status from RailRadar API."""
+        clean_pnr = re.sub(r"\D", "", pnr or "")
+        if len(clean_pnr) != 10:
+            return {"error": f"PNR must be 10 digits. Got: {clean_pnr}", "source": "none"}
+        headers = cls._get_headers()
+        try:
+            url = f"{cls.BASE_URL}/pnr/{clean_pnr}"
+            resp = requests.get(url, headers=headers, timeout=8)
+            if resp.status_code == 200:
+                return resp.json().get("data", resp.json())
+            elif resp.status_code == 404:
+                return {"error": "PNR not found", "pnr": clean_pnr, "source": "railradar"}
+        except Exception as e:
+            pass
+        return {"error": "PNR lookup unavailable", "pnr": clean_pnr, "source": "unavailable"}
+
+
 
 
 # ==============================================================================
