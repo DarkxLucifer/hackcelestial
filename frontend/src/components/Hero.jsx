@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import DemoJourneyMap from './DemoJourneyMap';
+import DemoJourneyGraph from './DemoJourneyGraph';
 
 export default function Hero({ onSimulateAlpine, onOpenSaga, itinerary, activeDisruption, t }) {
   return (
@@ -23,11 +23,11 @@ export default function Hero({ onSimulateAlpine, onOpenSaga, itinerary, activeDi
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
           
           {/* ===================================================================== */}
-          {/* DIV[1]: DEMO JOURNEY IN FORMAT OF MAP (Replaced text as requested)    */}
+          {/* DIV[1]: REAL MATHEMATICAL TDAG GRAPH VIEW                             */}
           {/* XPath: /html/body/div/div/div[2]/div[3]/div[2]/div[2]/section[1]/div[2]/div/div[1] */}
           {/* ===================================================================== */}
           <div className="lg:col-span-8 w-full">
-            <DemoJourneyMap
+            <DemoJourneyGraph
               itinerary={itinerary}
               activeDisruption={activeDisruption}
               onSimulateAlpine={onSimulateAlpine}

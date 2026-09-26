@@ -54,6 +54,7 @@ if os.path.exists(DIST_DIR):
 @app.get("/")
 @app.get("/booking")
 @app.get("/profile")
+@app.get("/disruption")
 def serve_index():
     if os.path.exists(DIST_DIR):
         index_file = os.path.join(DIST_DIR, "index.html")
@@ -69,8 +70,8 @@ def serve_index():
 
 @app.get("/{file_name}")
 def serve_static_root(file_name: str):
-    """Serves static root files or SPA routes (booking, profile)."""
-    if file_name in ["booking", "profile"]:
+    """Serves static root files or SPA routes (booking, profile, disruption)."""
+    if file_name in ["booking", "profile", "disruption"]:
         if os.path.exists(DIST_DIR):
             index_file = os.path.join(DIST_DIR, "index.html")
             if os.path.exists(index_file):

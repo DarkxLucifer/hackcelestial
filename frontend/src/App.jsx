@@ -7,6 +7,7 @@ import TravelDisputePlans from './components/TravelDisputePlans';
 import TravelAgencySections from './components/TravelAgencySections';
 import BookingPage from './components/BookingPage';
 import ProfilePage from './components/ProfilePage';
+import DisruptionPage from './components/DisruptionPage';
 import AuthModal from './components/AuthModal';
 import AgenticSagaModal from './components/AgenticSagaModal';
 import Footer from './components/Footer';
@@ -166,6 +167,17 @@ export default function App() {
     }
   };
 
+  const handleResetItinerary = async () => {
+    try {
+      await resetItinerary();
+    } catch (e) {
+      console.error(e);
+    }
+    setActiveDisruption(null);
+    setActiveImpact(null);
+    loadInitialData();
+  };
+
   const handleOpenSagaModal = (plan) => {
     setSelectedPlanForSaga(plan || recoveryPlans[0]);
     setIsSagaOpen(true);
@@ -228,8 +240,25 @@ export default function App() {
         </>
       )}
 
-      {/* 4. MAIN ROUTE: / (Landing Page with 3D Peeled Sheet & Full Platform) */}
-      {currentRoute !== '/booking' && currentRoute !== '/profile' && (
+      {/* 4. DEDICATED ROUTE: /disruption (Disruption Resolver) */}
+      {currentRoute === '/disruption' && (
+        <>
+          <DisruptionPage
+            user={user}
+            itinerary={itinerary}
+            activeDisruption={activeDisruption}
+            onNavigate={handleNavigate}
+            onSimulateAlpine={handleSimulateDisruption}
+            onResetDisruption={handleResetItinerary}
+            onOpenSaga={handleOpenSagaModal}
+            t={t}
+          />
+          <Footer />
+        </>
+      )}
+
+      {/* 5. MAIN ROUTE: / (Landing Page with 3D Peeled Sheet & Full Platform) */}
+      {currentRoute !== '/booking' && currentRoute !== '/profile' && currentRoute !== '/disruption' && (
         <PeeledSheetPull
           activeDisruption={activeDisruption}
           onSimulateAlpine={() => handleSimulateDisruption({

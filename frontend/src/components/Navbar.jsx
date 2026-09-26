@@ -39,20 +39,12 @@ export default function Navbar({
 
   const handleBookingsClick = () => {
     setMobileMenuOpen(false);
-    if (!user) {
-      onOpenAuth('login', '/booking');
-    } else {
-      onNavigate('/booking');
-    }
+    onNavigate('/booking');
   };
 
   const handleBookNow = () => {
     setMobileMenuOpen(false);
-    if (!user) {
-      onOpenAuth('signup', '/booking');
-    } else {
-      onNavigate('/booking');
-    }
+    onNavigate('/booking');
   };
 
   const handleProfileClick = () => {
@@ -66,11 +58,7 @@ export default function Navbar({
 
   const handleDisruptionSolving = () => {
     setMobileMenuOpen(false);
-    if (onOpenSaga) {
-      onOpenSaga();
-    } else if (onQuickSimulate) {
-      onQuickSimulate();
-    }
+    onNavigate('/disruption');
   };
 
   const languages = [
@@ -122,16 +110,6 @@ export default function Navbar({
               className="font-googleSans font-normal text-sm lg:text-[15px] text-white/85 hover:text-white transition-colors duration-200 whitespace-nowrap cursor-pointer hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
             >
               {t?.flights || 'Flights'}
-            </button>
-            <button
-              onClick={handleBookingsClick}
-              className={`font-googleSans font-normal text-sm lg:text-[15px] transition-colors duration-200 whitespace-nowrap cursor-pointer ${
-                currentRoute === '/booking'
-                  ? 'text-white font-bold underline decoration-[#F1A501] decoration-2 underline-offset-4'
-                  : 'text-white/85 hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'
-              }`}
-            >
-              {t?.bookings || 'Bookings'}
             </button>
           </div>
 
@@ -273,12 +251,6 @@ export default function Navbar({
               className="text-base font-googleSans text-white/90 hover:text-white font-medium py-1"
             >
               {t?.flights || 'Flights'}
-            </button>
-            <button
-              onClick={handleBookingsClick}
-              className="text-base font-googleSans text-white/90 hover:text-white font-medium py-1"
-            >
-              {t?.bookings || 'Bookings'}
             </button>
             {user && (
               <button
