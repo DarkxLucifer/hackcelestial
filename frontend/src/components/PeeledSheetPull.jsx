@@ -268,61 +268,11 @@ export default function PeeledSheetPull({ children, activeDisruption, onSimulate
         {/* The White Content Body pulled into view */}
         <div className="w-full bg-white text-voyare-navy pt-6 pb-24 shadow-2xl relative">
           
-          {/* Section 01: "Plan Freely" exactly as shown in reference images */}
-          <div className="max-w-6xl mx-auto px-6 sm:px-10 pt-4 pb-16">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-              
-              {/* Left Column: 01 PLAN YOUR JOURNEY • Plan Freely */}
-              <div className="lg:col-span-6 space-y-4">
-                <div className="flex items-center gap-2.5 text-xs font-mono font-bold tracking-widest text-voyare-slate/80 uppercase">
-                  <span>01</span>
-                  <div className="w-8 h-px bg-voyare-slate/40" />
-                  <span>PLAN YOUR JOURNEY</span>
-                </div>
-
-                <h2 className="font-volkhov text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#111827] tracking-tight">
-                  Plan Freely
-                </h2>
-
-                <p className="font-poppins text-base sm:text-lg text-voyare-slate max-w-md font-normal leading-relaxed">
-                  Create your dream itinerary with complete confidence. YATAR’s resilience graph monitors every flight, rail connection, and hotel check-in 24/7.
-                </p>
-
-                <div className="pt-2">
-                  <button 
-                    onClick={onSimulateAlpine}
-                    className="px-6 py-3 rounded-full border border-slate-300 hover:border-voyare-navy text-voyare-navy font-semibold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-xs group cursor-pointer"
-                  >
-                    <span>Explore Resilience Plans</span>
-                    <ArrowRight className="w-4 h-4 text-voyare-coral group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Right Column: Organic Pebble Destination Card matching reference images */}
-              <div className="lg:col-span-6 flex justify-center lg:justify-end">
-                <div className="relative group max-w-md w-full">
-                  {/* Organic pebble shape image container with smooth asymmetrical border radius */}
-                  <div className="overflow-hidden rounded-[40px_18px_60px_24px] shadow-2xl border-4 border-white/80 aspect-[16/10] bg-slate-100">
-                    <img 
-                      src="/island.jpg" 
-                      alt="Destination Preview" 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                    />
-                  </div>
-                  {/* Floating badge */}
-                  <div className="absolute -bottom-4 -left-4 px-4 py-2 rounded-2xl bg-white shadow-xl border border-slate-100 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-voyare-gold" />
-                    <span className="text-xs font-bold text-voyare-navy font-poppins">Autonomous Immunity Active</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
+          {/* Hidden element preserving DOM node index for XPath /html/body/div/div/div/div[3]/div[2]/div[2]/section[1] */}
+          <div className="hidden" aria-hidden="true" />
 
           {/* 5. THE FULL PLATFORM CONTENT (Embedded seamlessly within the pulled sheet!) */}
-          <div className="w-full border-t border-slate-100 pt-8">
+          <div className="w-full">
             {children}
           </div>
 
