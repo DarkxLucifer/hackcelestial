@@ -241,46 +241,6 @@ export default function ResilienceLogs({ activeDisruption, itinerary, t }) {
             ))}
           </div>
 
-          {/* Bottom Bar matching user specifications */}
-          <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-            <div>
-              <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                MONITORED JOURNEY
-              </span>
-              <span className="text-[#181E4B] font-bold">
-                Mumbai → Delhi → Jaipur
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                CURRENT STATUS
-              </span>
-              <span className="inline-flex items-center gap-1.5 font-bold text-amber-700">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span>Connection at Risk</span>
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                AFFECTED BOOKINGS
-              </span>
-              <span className="text-rose-700 font-bold">
-                3
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                RECOVERY OPTIONS
-              </span>
-              <span className="text-emerald-700 font-bold">
-                3 Available
-              </span>
-            </div>
-          </div>
-
         </div>
 
       </div>

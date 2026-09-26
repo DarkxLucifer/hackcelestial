@@ -13,7 +13,7 @@ export default function DemoJourneyGraph({
   t 
 }) {
   const [selectedNodeId, setSelectedNodeId] = useState('node_flight_1');
-  const [activeView, setActiveView] = useState('graph'); // 'graph' | 'map'
+  const [activeView, setActiveView] = useState('map'); // 'map' (default) | 'graph'
 
   // Mathematical Graph Model (Vertices V and Directed Edges E)
   const nodes = [
@@ -173,13 +173,6 @@ export default function DemoJourneyGraph({
               <Map className="w-3.5 h-3.5" />
               <span>Carto Basemap</span>
             </button>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-mono text-[#181E4B]">
-            <span className="text-slate-400">DRI:</span>
-            <span className={`font-bold ${activeDisruption ? 'text-red-500' : 'text-emerald-600'}`}>
-              {activeDisruption ? '78/100 (HIGH)' : '48/100 (NOMINAL)'}
-            </span>
           </div>
 
           <button
