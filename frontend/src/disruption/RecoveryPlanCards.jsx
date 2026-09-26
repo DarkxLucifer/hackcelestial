@@ -15,33 +15,35 @@ export default function RecoveryPlanCards({
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 items-stretch pt-6 pb-2">
       
       {/* ------------------------------------------------------------- */}
-      {/* CARD 1: PLAN A (MINIMUM COST)                                */}
+      {/* CARD 1: PLAN A (BUDGET STATE TRANSPORT / EXPRESS REBOOKING)  */}
       {/* ------------------------------------------------------------- */}
       <div className="bg-white rounded-[28px] border border-slate-200/90 shadow-sm p-6 sm:p-7 flex flex-col justify-between transition-all hover:shadow-md">
         <div>
           {/* Top Pills */}
           <div className="flex items-center justify-between gap-2 mb-4">
             <span className="text-[10px] font-mono font-bold tracking-wider text-slate-700 bg-slate-100 px-3 py-1 rounded-full uppercase">
-              PLAN A: MINIMUM COST
+              PLAN A: BUDGET RECOVERY
             </span>
             <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-              ₹0 EXTRA
+              {isTrain ? "₹385 EXTRA" : "₹1,250 EXTRA"}
             </span>
           </div>
 
           {/* Heading */}
           <h3 className="font-volkhov font-bold text-2xl text-[#181E4B] mb-4">
-            {isTrain ? "Railway Rebooking & IRCTC TDR" : "Airline Rebooking"}
+            {isTrain ? "MSRTC Shivshahi / Rail Tatkal" : "Airline Rebooking + Transit"}
           </h3>
 
           {/* Price & Route */}
           <div className="mb-5 pb-4 border-b border-slate-100">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-volkhov font-bold text-3xl text-[#181E4B]">₹0</span>
-              <span className="text-xs text-[#5E6282] font-mono">out-of-pocket</span>
+              <span className="font-volkhov font-bold text-3xl text-[#181E4B]">
+                {isTrain ? "₹385" : "₹1,250"}
+              </span>
+              <span className="text-xs text-[#5E6282] font-mono">fare difference</span>
             </div>
-            <div className="text-xs text-[#5E6282] font-mono mt-1">
-              {isTrain ? "Next scheduled express train on corridor" : "New flight: Mumbai → Delhi"}
+            <div className="text-xs text-[#5E6282] font-mono mt-1 font-semibold">
+              {isTrain ? "MSRTC Shivshahi AC Bus / Next Express Service" : (routeCorridor ? `Rescheduled service: ${routeCorridor}` : "Next available departure")}
             </div>
           </div>
 
@@ -52,7 +54,7 @@ export default function RecoveryPlanCards({
                 ARRIVAL
               </div>
               <div className="text-xs font-bold text-[#181E4B] mt-0.5 font-mono">
-                Tomorrow 08:40
+                {isTrain ? "Tonight 22:30" : "Tomorrow 08:40"}
               </div>
             </div>
             <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
@@ -60,7 +62,7 @@ export default function RecoveryPlanCards({
                 ITINERARY IMPACT
               </div>
               <div className="text-xs font-bold text-[#D96B43] mt-0.5 font-mono">
-                {isTrain ? "1 transfer adjusted" : "2 bookings affected"}
+                {isTrain ? "Direct Corridor" : "1 transfer adjusted"}
               </div>
             </div>
           </div>
@@ -69,29 +71,29 @@ export default function RecoveryPlanCards({
           <div className="space-y-3 mb-6 text-xs text-[#5E6282] leading-relaxed font-poppins">
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span>{isTrain ? "IRCTC Rule 4 Full 100% TDR refund claim filed" : "Airline rebooking on next available flight"}</span>
+              <span>{isTrain ? "MSRTC Shivshahi AC reserved seat / Tatkal quota express" : "Airline rebooking on next scheduled morning service"}</span>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span>{isTrain ? "Rebooked on next morning express service" : "Jaipur hotel reservation retained"}</span>
+              <span>{isTrain ? "Departs Central Bus Stand / Station with zero wait" : "Downstream hotel reservation notified & retained"}</span>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span>Hotel notified about late arrival</span>
+              <span>{isTrain ? "IRCTC TDR claim filed in parallel for full 100% refund" : "Statutory meal & refreshment voucher at terminal"}</span>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span>{isTrain ? "Connecting local transfer shifted" : "Existing Jaipur transfer rescheduled"}</span>
+              <span>{isTrain ? "Live telemetry GPS bus tracking on route" : "Connecting destination transfer rescheduled"}</span>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span>No additional travel payment required</span>
+              <span>Reliable state-backed recovery option</span>
             </div>
           </div>
 
           {/* Trade-off Box */}
           <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100 mb-6 text-[11px] text-[#5E6282] leading-relaxed">
-            <strong className="text-[#181E4B] font-semibold">Trade-off:</strong> Arrives next morning and misses tonight's hotel check-in window.
+            <strong className="text-[#181E4B] font-semibold">Trade-off:</strong> {isTrain ? "Standard AC bus seat; economical and direct without overnight delay." : "Departs next morning and requires hotel check-in reschedule."}
           </div>
         </div>
 
@@ -100,7 +102,7 @@ export default function RecoveryPlanCards({
           onClick={() => onSelectPlan && onSelectPlan('plan_a')}
           className="w-full py-3 rounded-2xl font-googleSans font-bold text-xs text-[#181E4B] bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
         >
-          <span>Select Lowest-Cost Plan</span>
+          <span>Select Budget Recovery Plan</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -173,7 +175,7 @@ export default function RecoveryPlanCards({
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-              <span>{isTrain ? "Departs Dhaula Kuan 19:00 IST via NH48 Express" : "Delhi → Jaipur train connection found"}</span>
+              <span>{isTrain ? "Departs Dhaula Kuan 19:00 IST via NH48 Express" : (routeCorridor.includes("Jaipur") ? "Delhi → Jaipur train connection found" : "Connecting destination transfer found")}</span>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -234,7 +236,7 @@ export default function RecoveryPlanCards({
               <span className="text-xs text-[#5E6282] font-mono">additional cost</span>
             </div>
             <div className="text-xs text-[#5E6282] font-mono mt-1">
-              Direct highway transfer via NH48
+              {routeCorridor ? `Direct door-to-door transfer: ${routeCorridor}` : "Direct highway transfer via NH48"}
             </div>
           </div>
 

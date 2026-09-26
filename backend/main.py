@@ -299,96 +299,213 @@ def list_external_disruptions():
         "disruptions": records
     }
 
-def sync_itinerary_from_disruption(record: Dict[str, Any]):
+def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional[List[Dict[str, Any]]] = None):
     """
     Dynamically constructs an authentic Connection Graph (TDAG) reflecting the user's
     real train or flight data, calculates CPM temporal slacks and Domino Risk Index.
+    Supports single tickets and multi-leg connected itineraries.
     """
     global current_itinerary, active_impact
-    carrier = record.get("carrier", "Air India")
-    service = record.get("service_number", "AI 882")
-    origin = record.get("origin", "Mumbai (BOM)")
-    dest = record.get("destination", "Delhi (DEL)")
-    delay_m = int(record.get("delay_minutes", 45))
-    is_canc = bool(record.get("is_cancellation", False))
-    is_train = "rail" in carrier.lower() or "train" in carrier.lower() or "#" in service or "vande" in service.lower()
 
-    orig_coords_raw = record.get("origin_coords") or {}
-    dest_coords_raw = record.get("dest_coords") or {}
-    orig_lat = float(orig_coords_raw.get("lat", 19.0896 if not is_train else 28.6139))
-    orig_lng = float(orig_coords_raw.get("lng", 72.8656 if not is_train else 77.2090))
-    dest_lat = float(dest_coords_raw.get("lat", 28.5562 if not is_train else 26.9124))
-    dest_lng = float(dest_coords_raw.get("lng", 77.1000 if not is_train else 75.7873))
+    records_to_sync = all_records if (all_records and len(all_records) > 0) else [record]
+    primary_record = record or records_to_sync[-1]
 
-    if is_train:
-        # Pull live telemetry from RailRadar
-        clean_num = "".join(c for c in service if c.isdigit()) or "20978"
-        t_data = RailRadarTracker.get_live_train_status(clean_num)
-        train_name = t_data.get("train_name", service)
-        source_stn = t_data.get("origin", origin)
-        dest_stn = t_data.get("destination", dest)
-        platform = t_data.get("platform_number", "Platform 16 (NDLS)")
+    if len(records_to_sync) > 1:
+        # Multi-leg journey across multiple uploaded documents (e.g. Flight + Train)
+        nodes = []
+        edges = []
+        cumulative_cost = 0.0
+        max_delay = 0
+        corridor_parts = []
+
+        for idx, rec in enumerate(records_to_sync):
+            rec_carrier = rec.get("carrier", "Carrier")
+            rec_service = rec.get("service_number", f"Leg {idx+1}")
+            rec_origin = rec.get("origin", "Origin")
+            rec_dest = rec.get("destination", "Destination")
+            rec_delay = int(rec.get("delay_minutes", 0))
+            rec_canc = bool(rec.get("is_cancellation", False))
+            rec_cost = float(rec.get("ticket_cost", 3500.0))
+            cumulative_cost += rec_cost
+            if rec_delay > max_delay:
+                max_delay = rec_delay
+
+            orig_c = rec.get("origin_coords") or {"lat": 12.9716, "lng": 77.5946}
+            dest_c = rec.get("dest_coords") or {"lat": 17.2403, "lng": 78.4294}
+
+            is_train = "rail" in rec_carrier.lower() or "train" in rec_carrier.lower() or "#" in rec_service
+
+            node_id = f"node_leg_{idx+1}"
+            corridor_parts.append(rec_origin)
+            if idx == len(records_to_sync) - 1:
+                corridor_parts.append(rec_dest)
+
+            leg_node = ItineraryNode(
+                id=node_id,
+                name=f"{rec_carrier} {rec_service}",
+                type=NodeType.TRANSPORT,
+                mode=TransportMode.TRAIN if is_train else TransportMode.FLIGHT,
+                carrier=rec_carrier,
+                service_number=rec_service,
+                origin=rec_origin,
+                destination=rec_dest,
+                origin_coords=Coordinates(lat=float(orig_c.get("lat", 12.9716)), lng=float(orig_c.get("lng", 77.5946))),
+                dest_coords=Coordinates(lat=float(dest_c.get("lat", 17.2403)), lng=float(dest_c.get("lng", 78.4294))),
+                start_time=f"{10 + idx*4:02d}:00",
+                end_time=f"{13 + idx*4:02d}:30",
+                duration_minutes=210,
+                cost=rec_cost,
+                currency="INR",
+                status=NodeStatus.DELAYED if rec_delay > 0 else NodeStatus.CONFIRMED,
+                slack_minutes=max(0.0, 45.0 - rec_delay),
+                details={"pnr": rec.get("pnr", "N/A"), "status": "Uploaded Ticket"}
+            )
+            nodes.append(leg_node)
+
+            if idx > 0:
+                prev_id = f"node_leg_{idx}"
+                edges.append(
+                    ItineraryEdge(
+                        source_id=prev_id,
+                        target_id=node_id,
+                        min_connection_time=30,
+                        transfer_duration=25,
+                        slack=45.0 - rec_delay,
+                        is_breached=rec_delay > 45
+                    )
+                )
+
+        # Add final lodging / destination anchor
+        last_rec = records_to_sync[-1]
+        last_dest = last_rec.get("destination", "Final Destination")
+        last_dest_c = last_rec.get("dest_coords") or {"lat": 17.2403, "lng": 78.4294}
+        anchor_node = ItineraryNode(
+            id="node_final_anchor",
+            name=f"{last_dest} Destination Anchor",
+            type=NodeType.RESERVATION,
+            reservation_type=ReservationType.HOTEL,
+            carrier="Hospitality Protected Link",
+            service_number="RES-ANCHOR",
+            origin=last_dest,
+            destination=last_dest,
+            origin_coords=Coordinates(lat=float(last_dest_c.get("lat", 17.2403)), lng=float(last_dest_c.get("lng", 78.4294))),
+            dest_coords=Coordinates(lat=float(last_dest_c.get("lat", 17.2403)), lng=float(last_dest_c.get("lng", 78.4294))),
+            start_time="21:00",
+            end_time="23:59",
+            duration_minutes=179,
+            cost=2500.0,
+            currency="INR",
+            status=NodeStatus.CONFIRMED,
+            slack_minutes=0.0,
+            critical_anchor=True
+        )
+        nodes.append(anchor_node)
+        edges.append(
+            ItineraryEdge(
+                source_id=f"node_leg_{len(records_to_sync)}",
+                target_id="node_final_anchor",
+                min_connection_time=20,
+                transfer_duration=15,
+                slack=60.0 - max_delay,
+                is_breached=max_delay > 60
+            )
+        )
+
+        title = f"Multi-Modal Corridor: {' ➔ '.join(corridor_parts)}"
+        current_itinerary = Itinerary(
+            id=f"itinerary_{primary_record.get('pnr', 'multi')}",
+            title=title,
+            traveler_name=primary_record.get("passenger_name", "Elena Vance"),
+            total_cost=cumulative_cost,
+            currency="INR",
+            nodes=nodes,
+            edges=edges,
+            domino_risk_index=95.0 if max_delay > 30 else 20.0,
+            active_disruption={
+                "node_id": nodes[0].id,
+                "delay_minutes": max_delay,
+                "is_cancellation": any(r.get("is_cancellation") for r in records_to_sync),
+                "reason": primary_record.get("disruption_reason", "Operational Delay")
+            }
+        )
+    else:
+        # Single ticket flow with genuine origin and destination coordinates
+        carrier = primary_record.get("carrier", "Air India")
+        service = primary_record.get("service_number", "AI 882")
+        origin = primary_record.get("origin", "Bangalore (BLR)")
+        dest = primary_record.get("destination", "Hyderabad (HYD)")
+        delay_m = int(primary_record.get("delay_minutes", 45))
+        is_canc = bool(primary_record.get("is_cancellation", False))
+        is_train = "rail" in carrier.lower() or "train" in carrier.lower() or "#" in service or "vande" in service.lower()
+
+        orig_coords_raw = primary_record.get("origin_coords") or {}
+        dest_coords_raw = primary_record.get("dest_coords") or {}
+        orig_lat = float(orig_coords_raw.get("lat", 12.9716 if not is_train else 28.6139))
+        orig_lng = float(orig_coords_raw.get("lng", 77.5946 if not is_train else 77.2090))
+        dest_lat = float(dest_coords_raw.get("lat", 17.2403 if not is_train else 26.9124))
+        dest_lng = float(dest_coords_raw.get("lng", 78.4294 if not is_train else 75.7873))
 
         node_main = ItineraryNode(
-            id="node_train_1",
-            name=f"{train_name}",
+            id="node_main_1",
+            name=f"{carrier} {service}",
             type=NodeType.TRANSPORT,
-            mode=TransportMode.TRAIN,
-            carrier="Indian Railways",
-            service_number=f"#{clean_num}",
-            origin=source_stn,
-            destination=dest_stn,
+            mode=TransportMode.TRAIN if is_train else TransportMode.FLIGHT,
+            carrier=carrier,
+            service_number=service,
+            origin=origin,
+            destination=dest,
             origin_coords=Coordinates(lat=orig_lat, lng=orig_lng),
             dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
-            start_time="15:15",
-            end_time="19:20",
-            duration_minutes=245,
-            cost=float(record.get("ticket_cost", 1850.0)),
+            start_time="14:30",
+            end_time="16:45",
+            duration_minutes=135,
+            cost=float(primary_record.get("ticket_cost", 5500.0)),
             currency="INR",
             status=NodeStatus.DELAYED if delay_m > 0 else NodeStatus.CONFIRMED,
-            slack_minutes=max(0.0, 60.0 - delay_m),
+            slack_minutes=max(0.0, 45.0 - delay_m),
             details={
-                "speed_kmh": t_data.get("speed_kmh", 115),
-                "platform": platform,
-                "approaching": t_data.get("current_location", source_stn),
-                "telemetry_source": "RailRadar Live Telemetry Stream (railradar.in)"
+                "pnr": primary_record.get("pnr", "N/A"),
+                "carrier": carrier,
+                "service": service
             }
         )
 
         node_transfer = ItineraryNode(
             id="node_transfer_1",
-            name=f"{dest_stn} Station Terminal Link",
+            name=f"{dest} Ground Link / Transit Hub",
             type=NodeType.TRANSPORT,
             mode=TransportMode.WALK,
-            carrier="Local Ground Link",
+            carrier="Local Ground Transit",
             service_number="Station Transfer",
-            origin=dest_stn,
-            destination=f"{dest_stn} Transit Hub",
-            start_time="19:20",
-            end_time="19:40",
+            origin=dest,
+            destination=f"{dest} Central Hub",
+            origin_coords=Coordinates(lat=dest_lat, lng=dest_lng),
+            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
+            start_time="17:00",
+            end_time="17:20",
             duration_minutes=20,
             cost=0.0,
             currency="INR",
             status=NodeStatus.CONFIRMED,
-            slack_minutes=max(0.0, 45.0 - delay_m),
-            details={"connection": "Platform Exit to Pre-paid Cab & Bus Stand"}
+            slack_minutes=max(0.0, 30.0 - delay_m),
+            details={"connection": "Terminal Exit to City Connection"}
         )
 
         node_destination = ItineraryNode(
             id="node_hotel_1",
-            name=f"{dest_stn} Destination / Hotel Anchor",
+            name=f"{dest} Destination Anchor",
             type=NodeType.RESERVATION,
             reservation_type=ReservationType.HOTEL,
             carrier="Destination Hospitality",
             service_number="RES-ANCHOR-9941",
-            origin=dest_stn,
-            destination=dest_stn,
+            origin=dest,
+            destination=dest,
             origin_coords=Coordinates(lat=dest_lat, lng=dest_lng),
             dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
-            start_time="20:30",
+            start_time="18:30",
             end_time="23:59",
-            duration_minutes=209,
-            cost=4200.0,
+            duration_minutes=329,
+            cost=3200.0,
             currency="INR",
             status=NodeStatus.CONFIRMED,
             slack_minutes=0.0,
@@ -397,105 +514,27 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
         )
 
         edges = [
-            ItineraryEdge(source_id="node_train_1", target_id="node_transfer_1", min_connection_time=20, transfer_duration=15, slack=30.0 - delay_m, is_breached=delay_m > 30),
+            ItineraryEdge(source_id="node_main_1", target_id="node_transfer_1", min_connection_time=25, transfer_duration=20, slack=30.0 - delay_m, is_breached=delay_m > 30),
             ItineraryEdge(source_id="node_transfer_1", target_id="node_hotel_1", min_connection_time=30, transfer_duration=30, slack=70.0 - delay_m, is_breached=delay_m > 70)
         ]
 
-        title = f"Corridor Expedition: {source_stn} ➔ {dest_stn} via {train_name}"
-    else:
-        # Flight Corridor
-        f_tracker = AviationStackTracker()
-        f_data = f_tracker.get_flight_status(service)
-
-        node_main = ItineraryNode(
-            id="node_flight_1",
-            name=f"{f_data.get('airline', carrier)} {f_data.get('flight_iata', service)}",
-            type=NodeType.TRANSPORT,
-            mode=TransportMode.FLIGHT,
-            carrier=f_data.get("airline", carrier),
-            service_number=f_data.get("flight_iata", service),
-            origin=origin,
-            destination=dest,
-            origin_coords=Coordinates(lat=orig_lat, lng=orig_lng),
-            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
-            start_time="15:30",
-            end_time="17:50",
-            duration_minutes=140,
-            cost=float(record.get("ticket_cost", 6450.0)),
+        title = f"Travel Corridor: {origin} ➔ {dest}"
+        current_itinerary = Itinerary(
+            id=f"itinerary_{primary_record.get('pnr', 'live')}",
+            title=title,
+            traveler_name=primary_record.get("passenger_name", "Elena Vance"),
+            total_cost=float(primary_record.get("ticket_cost", 5500.0)),
             currency="INR",
-            status=NodeStatus.DELAYED if delay_m > 0 else NodeStatus.CONFIRMED,
-            slack_minutes=max(0.0, 45.0 - delay_m),
-            details={
-                "aircraft": f_data.get("aircraft", "Airbus A321neo"),
-                "gate": f_data.get("departure_gate", "Gate 44B"),
-                "terminal": f_data.get("departure_terminal", "T2"),
-                "telemetry_source": "AviationStack Realtime Radar Stream"
+            nodes=[node_main, node_transfer, node_destination],
+            edges=edges,
+            domino_risk_index=95.0 if delay_m > 30 else 24.0,
+            active_disruption={
+                "node_id": node_main.id,
+                "delay_minutes": delay_m,
+                "is_cancellation": is_canc,
+                "reason": primary_record.get("disruption_reason", "Operational Delay")
             }
         )
-
-        node_transfer = ItineraryNode(
-            id="node_transfer_1",
-            name=f"{dest} Ground Express / Connecting Transit",
-            type=NodeType.TRANSPORT,
-            mode=TransportMode.TRAIN,
-            carrier="Transit Express Link",
-            service_number="Connecting Link",
-            origin=dest,
-            destination=f"{dest} Central Hub",
-            start_time="18:15",
-            end_time="18:36",
-            duration_minutes=21,
-            cost=60.0,
-            currency="INR",
-            status=NodeStatus.CONFIRMED,
-            slack_minutes=max(0.0, 30.0 - delay_m),
-            details={"frequency": "Every 10 min", "specification": "GTFS 2.0 Feed"}
-        )
-
-        node_destination = ItineraryNode(
-            id="node_hotel_1",
-            name=f"{dest} Onward Anchor / Destination",
-            type=NodeType.TRANSPORT,
-            mode=TransportMode.TRAIN,
-            carrier="Connecting Regional Service",
-            service_number="Connecting Transit",
-            origin=dest,
-            destination=dest,
-            origin_coords=Coordinates(lat=dest_lat, lng=dest_lng),
-            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
-            start_time="19:00",
-            end_time="23:15",
-            duration_minutes=255,
-            cost=1850.0,
-            currency="INR",
-            status=NodeStatus.CONFIRMED,
-            slack_minutes=0.0,
-            critical_anchor=True
-        )
-
-        edges = [
-            ItineraryEdge(source_id="node_flight_1", target_id="node_transfer_1", min_connection_time=30, transfer_duration=25, slack=25.0 - delay_m, is_breached=delay_m > 25),
-            ItineraryEdge(source_id="node_transfer_1", target_id="node_hotel_1", min_connection_time=20, transfer_duration=15, slack=30.0 - delay_m, is_breached=delay_m > 30)
-        ]
-
-        title = f"Multi-Modal Corridor: {origin} ➔ {dest} ➔ Jaipur"
-
-    current_itinerary = Itinerary(
-        id=f"itinerary_{record.get('pnr', 'live')}",
-        title=title,
-        traveler_name=record.get("passenger_name", "Elena Vance"),
-        total_cost=float(record.get("ticket_cost", 6450.0)),
-        currency="INR",
-        nodes=[node_main, node_transfer, node_destination],
-        edges=edges,
-        domino_risk_index=99.0 if delay_m > 30 else 24.0,
-        active_disruption={
-            "node_id": node_main.id,
-            "delay_minutes": delay_m,
-            "is_cancellation": is_canc,
-            "reason": record.get("disruption_reason", "Operational Delay")
-        }
-    )
 
     # Recalculate CPM slacks
     engine = GraphEngine(current_itinerary)
@@ -525,55 +564,15 @@ def upload_ticket_disruption(payload: Dict[str, Any] = Body(...)):
     stores in SQLite database, and returns the evaluated recovery plan.
     """
     filename = payload.get("filename", "e-ticket.pdf")
-    file_type = payload.get("file_type", "pdf")
     raw_text = payload.get("text", "")
+    content_type = payload.get("content_type", "application/pdf")
     
-    # Heuristic / regex parser for common airline ticket fields
-    carrier = payload.get("carrier")
-    if not carrier:
-        lower_txt = (raw_text + " " + filename).lower()
-        if "indigo" in lower_txt or "6e" in lower_txt:
-            carrier = "IndiGo"
-        elif "spicejet" in lower_txt or "sg" in lower_txt:
-            carrier = "SpiceJet"
-        elif "vande bharat" in lower_txt or "irctc" in lower_txt or "rail" in lower_txt:
-            carrier = "Indian Railways"
-        elif "vistara" in lower_txt or "uk" in lower_txt:
-            carrier = "Vistara"
-        else:
-            carrier = "Air India"
+    file_bytes = raw_text.encode("utf-8")
+    result = parse_document_file(file_bytes, filename, content_type)
+    if result.get("structured_data"):
+        sync_itinerary_from_disruption(result["structured_data"])
 
-    service_number = payload.get("service_number") or ("6E 521" if "IndiGo" in carrier else "AI 882")
-    pnr = payload.get("pnr") or f"VY-{int(time.time()) % 100000:05d}-IN"
-    origin = payload.get("origin") or "Mumbai (BOM)"
-    destination = payload.get("destination") or "Delhi (DEL)"
-    delay_minutes = int(payload.get("delay_minutes", 195))
-    ticket_cost = float(payload.get("ticket_cost", 6450.0))
-    reason = payload.get("reason") or "ATC Ground Hold & Technical Crew Rotation"
-
-    extracted_data = {
-        "pnr": pnr,
-        "passenger_name": payload.get("passenger_name", "Elena Vance"),
-        "booking_source": f"Parsed Ticket File ({filename})",
-        "carrier": carrier,
-        "service_number": service_number,
-        "origin": origin,
-        "destination": destination,
-        "scheduled_departure": payload.get("scheduled_departure", "15:30"),
-        "scheduled_arrival": payload.get("scheduled_arrival", "17:50"),
-        "delay_minutes": delay_minutes,
-        "is_cancellation": payload.get("is_cancellation", False),
-        "disruption_reason": reason,
-        "ticket_cost": ticket_cost,
-        "currency": "INR"
-    }
-
-    result = save_external_disruption(extracted_data)
-    return {
-        "status": "SUCCESSFULLY_PARSED_AND_STORED",
-        "extracted_file": filename,
-        "record": result
-    }
+    return result
 
 @app.post("/api/disruptions/claim-refund")
 def submit_refund_claim(payload: Dict[str, Any] = Body(...)):
@@ -620,62 +619,114 @@ def get_refund_policies():
 def ai_chat(payload: Dict[str, Any] = Body(...)):
     """
     Executes LangGraph agent with automatic fallback:
-    Groq (llama-3.3-70b) -> Google Gemini (gemini-2.0-flash) -> Voyage Expert Engine.
+    Groq (qwen/qwen3.8-27b) -> Google Gemini (gemini-2.5-flash) -> Voyage Expert Engine.
     Handles travel disruptions, passenger rights, and code writing.
     """
     messages = payload.get("messages", [])
     query = payload.get("query")
     groq_key = payload.get("groq_key")
     gemini_key = payload.get("gemini_key")
+    active_ticket = payload.get("active_ticket")
+    uploaded_tickets = payload.get("uploaded_tickets")
 
-    result = run_ai_chat(messages, query, groq_key, gemini_key)
+    result = run_ai_chat(
+        messages, 
+        query, 
+        groq_key, 
+        gemini_key,
+        active_ticket=active_ticket,
+        uploaded_tickets=uploaded_tickets
+    )
     return result
 
 @app.post("/api/ai/upload-document")
 async def ai_upload_document(
-    request: Request,
-    file: Optional[UploadFile] = None
+    request: Request
 ):
     """
-    Parses real document file (PDF, Image, Text) using pypdf / vision,
+    Parses real document file(s) (PDF, Image, Text) using pypdf / AI structured extraction,
     extracts structured travel disruption parameters, and stores in SQLite.
-    Supports both multipart/form-data and application/json.
+    Supports single-file upload or multi-file batch upload (via 'files' or 'file' fields).
     """
     content_type = request.headers.get("content-type", "")
-    
+    parsed_records = []
+    results = []
+
     if "application/json" in content_type:
         payload = await request.json()
         if "base64_data" in payload:
             filename = payload.get("filename", "ticket.pdf")
             c_type = payload.get("content_type", "application/pdf")
             file_bytes = base64.b64decode(payload["base64_data"])
+            res = parse_document_file(file_bytes, filename, c_type)
+            results.append(res)
+            if res.get("structured_data"):
+                parsed_records.append(res["structured_data"])
         elif "text" in payload:
             filename = payload.get("filename", "ticket.txt")
             c_type = "text/plain"
             file_bytes = payload["text"].encode("utf-8")
-        else:
-            raise HTTPException(status_code=400, detail="Missing text or base64_data in json payload")
+            res = parse_document_file(file_bytes, filename, c_type)
+            results.append(res)
+            if res.get("structured_data"):
+                parsed_records.append(res["structured_data"])
+        elif "files" in payload and isinstance(payload["files"], list):
+            for item in payload["files"]:
+                fn = item.get("filename", "ticket.pdf")
+                ct = item.get("content_type", "application/pdf")
+                if "base64_data" in item:
+                    fb = base64.b64decode(item["base64_data"])
+                else:
+                    fb = item.get("text", "").encode("utf-8")
+                res = parse_document_file(fb, fn, ct)
+                results.append(res)
+                if res.get("structured_data"):
+                    parsed_records.append(res["structured_data"])
     elif "multipart/form-data" in content_type:
         form = await request.form()
-        uploaded_file = form.get("file")
-        if not uploaded_file:
+        uploaded_files = form.getlist("files") or form.getlist("file")
+        if not uploaded_files:
+            single = form.get("file") or form.get("files")
+            if single:
+                uploaded_files = [single]
+
+        if not uploaded_files:
             raise HTTPException(status_code=400, detail="No file found in form data")
-        filename = getattr(uploaded_file, "filename", "ticket.pdf")
-        c_type = getattr(uploaded_file, "content_type", "application/pdf")
-        file_bytes = await uploaded_file.read()
+
+        for f in uploaded_files:
+            filename = getattr(f, "filename", "ticket.pdf")
+            c_type = getattr(f, "content_type", "application/pdf")
+            file_bytes = await f.read()
+            res = parse_document_file(file_bytes, filename, c_type)
+            results.append(res)
+            if res.get("structured_data"):
+                parsed_records.append(res["structured_data"])
     else:
-        # Fallback read raw body
         file_bytes = await request.body()
-        filename = "uploaded_ticket.pdf"
-        c_type = "application/pdf"
+        res = parse_document_file(file_bytes, "uploaded_ticket.pdf", "application/pdf")
+        results.append(res)
+        if res.get("structured_data"):
+            parsed_records.append(res["structured_data"])
 
-    result = parse_document_file(file_bytes, filename, c_type)
-    if result.get("structured_data"):
-        sync_itinerary_from_disruption(result["structured_data"])
-    return result
+    if parsed_records:
+        sync_itinerary_from_disruption(parsed_records[-1], all_records=parsed_records)
 
-@app.post("/api/disruptions/sync-train")
-def sync_train_disruption_endpoint(train_number: str = "20978", delay_minutes: int = 45):
+    last_res = results[-1] if results else {}
+    return {
+        "status": "SUCCESSFULLY_PARSED_AND_STORED",
+        "total_files": len(results),
+        "structured_data": last_res.get("structured_data"),
+        "all_records": parsed_records,
+        "results": results,
+        "filename": last_res.get("filename", "ticket.pdf"),
+        "text_preview": last_res.get("text_preview", "")
+    }
+
+@app.post("/api/ai/upload-documents")
+async def ai_upload_multiple_documents(request: Request):
+    """Alias batch endpoint for uploading multiple travel documents."""
+    return await ai_upload_document(request)
+
     """
     Directly pulls real telemetry from RailRadar and builds a live Connection Graph for this train.
     """

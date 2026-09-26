@@ -63,6 +63,21 @@ def init_db():
     """)
     
     conn.commit()
+
+    # Ensure all extended schema columns exist in legacy databases
+    for col, col_type in [
+        ("travel_date", "TEXT"),
+        ("is_past_journey", "INTEGER DEFAULT 0"),
+        ("journey_status", "TEXT DEFAULT 'ON_TIME'"),
+        ("origin_coords", "TEXT"),
+        ("dest_coords", "TEXT")
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE external_disruptions ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+
+    conn.commit()
     conn.close()
 
 def evaluate_disruption_rights(carrier: str, delay_minutes: int, is_cancellation: bool, ticket_cost: float) -> Dict[str, Any]:
@@ -147,18 +162,19 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
     dest = data.get("destination", "Delhi (DEL)")
     service = data.get("service_number", "AI 882")
 
+    is_rail = any(kw in carrier.lower() for kw in ["rail", "train", "irctc", "express", "vande"])
     recommended_plans = [
         {
             "id": "ext_plan_a",
-            "title": "PLAN A: MINIMUM COST (AIRLINE REBOOKING)",
-            "badge": "₹0 OUT-OF-POCKET",
-            "cost_delta": 0,
+            "title": "PLAN A: STANDARD REBOOKING (MINIMUM FARE)",
+            "badge": "₹385 STATUTORY REBOOKING" if is_rail else "₹1,250 CARRIER REBOOKING",
+            "cost_delta": 385 if is_rail else 1250,
             "time_delta": "+5h 30m next morning",
-            "impact": "Next available carrier rebooking, zero out of pocket expense.",
+            "impact": "Next available carrier rebooking, protected under statutory passenger charter.",
             "steps": [
-                f"Automatic rebooking on next scheduled {carrier} flight",
+                f"Automatic rebooking on next scheduled {carrier} service",
                 "Hotel late arrival notification dispatched",
-                "Airport transfer rescheduled at zero extra cost"
+                "Airport / station transfer rescheduled at zero extra cost"
             ]
         },
         {
@@ -190,14 +206,19 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
     ]
 
     now_iso = datetime.now().isoformat()
+    travel_date = data.get("travel_date") or datetime.now().strftime("%Y-%m-%d")
+    is_past_journey = 1 if data.get("is_past_journey") else 0
+    journey_status = data.get("journey_status") or ("COMPLETED" if is_past_journey else ("CANCELLED" if is_cancellation else ("DELAYED" if delay_minutes > 15 else "ON_TIME")))
+
     cursor.execute("""
     INSERT INTO external_disruptions (
         pnr, passenger_name, booking_source, carrier, service_number,
         origin, destination, scheduled_departure, scheduled_arrival,
         delay_minutes, is_cancellation, disruption_reason, ticket_cost,
         currency, refund_eligible, refund_amount, statutory_compensation,
-        total_claim, applicable_law, recommended_plan, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_claim, applicable_law, recommended_plan, status, created_at,
+        travel_date, is_past_journey, journey_status, origin_coords, dest_coords
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get("pnr", "VY-EXT-8820"),
         data.get("passenger_name", "Elena Vance"),
@@ -220,7 +241,12 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
         rights["applicable_law"],
         json.dumps(recommended_plans),
         "RESOLVING",
-        now_iso
+        now_iso,
+        travel_date,
+        is_past_journey,
+        journey_status,
+        json.dumps(data.get("origin_coords")) if data.get("origin_coords") else None,
+        json.dumps(data.get("dest_coords")) if data.get("dest_coords") else None
     ))
 
     inserted_id = cursor.lastrowid
@@ -235,6 +261,9 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
         "service_number": service,
         "origin": origin,
         "destination": dest,
+        "travel_date": travel_date,
+        "is_past_journey": bool(is_past_journey),
+        "journey_status": journey_status,
         "delay_minutes": delay_minutes,
         "is_cancellation": bool(is_cancellation),
         "disruption_reason": data.get("disruption_reason", "Technical maintenance"),

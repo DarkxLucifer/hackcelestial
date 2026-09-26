@@ -3,78 +3,296 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Plane, Train, Building2, MapPin, Layers, Navigation, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-export default function CartoJourneyMap({ activeDisruption, disruptedTicket, itinerary }) {
+const KNOWN_AIRPORT_COORDS = {
+  // Indian Railway Hubs & Junctions
+  ami: [20.9374, 77.7796],
+  amravati: [20.9374, 77.7796],
+  bsl: [21.0455, 75.8011],
+  bhusaval: [21.0455, 75.8011],
+  bhusawal: [21.0455, 75.8011],
+  bd: [20.8569, 77.7289],
+  badnera: [20.8569, 77.7289],
+  ak: [20.7059, 77.0219],
+  akola: [20.7059, 77.0219],
+  wr: [20.7453, 78.6022],
+  wardha: [20.7453, 78.6022],
+  ngp: [21.1524, 79.0888],
+  nagpur: [21.1524, 79.0888],
+  nag: [21.1524, 79.0888],
+  jl: [21.0077, 75.5626],
+  jalgaon: [21.0077, 75.5626],
+  mmr: [20.2520, 74.4410],
+  manmad: [20.2520, 74.4410],
+  nk: [19.9572, 73.8340],
+  nashik: [19.9572, 73.8340],
+  kyn: [19.2437, 73.1355],
+  kalyan: [19.2437, 73.1355],
+  tna: [19.1860, 72.9759],
+  thane: [19.1860, 72.9759],
+  dr: [19.0178, 72.8478],
+  dadar: [19.0178, 72.8478],
+  csmt: [18.9401, 72.8351],
+  cst: [18.9401, 72.8351],
+  bct: [18.9696, 72.8193],
+  pune: [18.5284, 73.8744],
+  pnq: [18.5822, 73.9197],
+  bpl: [23.2684, 77.4126],
+  bhopal: [23.2684, 77.4126],
+  bho: [23.2875, 77.3374],
+  et: [21.9213, 77.7554],
+  itarsi: [21.9213, 77.7554],
+  jbp: [23.1686, 79.9547],
+  jabalpur: [23.1686, 79.9547],
+  hwh: [22.5839, 88.3426],
+  howrah: [22.5839, 88.3426],
+  ccu: [22.5726, 88.3639],
+  r: [21.2514, 81.6296],
+  raipur: [21.2514, 81.6296],
+  durg: [21.1904, 81.2849],
+  bsp: [22.0797, 82.1409],
+  bilaspur: [22.0797, 82.1409],
+  ndls: [28.6415, 77.2194],
+  delhi: [28.5562, 77.1000],
+  del: [28.5562, 77.1000],
+  mumbai: [19.0896, 72.8656],
+  bom: [19.0896, 72.8656],
+  blr: [12.9716, 77.5946],
+  bangalore: [12.9716, 77.5946],
+  bengaluru: [12.9716, 77.5946],
+  sbc: [12.9778, 77.5713],
+  hyd: [17.2403, 78.4294],
+  hyderabad: [17.2403, 78.4294],
+  secunderabad: [17.4344, 78.5011],
+  sc: [17.4344, 78.5011],
+  jai: [26.9124, 75.7873],
+  jaipur: [26.9124, 75.7873],
+  jp: [26.9196, 75.7878],
+  maa: [13.0827, 80.2707],
+  chennai: [13.0827, 80.2707],
+  mas: [13.0827, 80.2757],
+  amd: [23.0734, 72.6347],
+  ahmedabad: [23.0734, 72.6347],
+  adi: [23.0232, 72.6006],
+  st: [21.2049, 72.8407],
+  surat: [21.2049, 72.8407],
+  brc: [22.3107, 73.1812],
+  vadodara: [22.3362, 73.2263],
+  bdq: [22.3362, 73.2263],
+  goi: [15.3800, 73.8318],
+  cok: [10.1518, 76.3930],
+  lko: [26.7606, 80.8893],
+  ixc: [30.6735, 76.7885],
+  vns: [25.4524, 82.8590],
+  pat: [25.5913, 85.0880],
+  atq: [31.7096, 74.7973],
+  bbi: [20.2444, 85.8178],
+  gau: [26.1061, 91.5859],
+  idr: [22.7217, 75.8011],
+  cjb: [11.0299, 77.0434],
+  ixe: [12.9613, 74.8901],
+  trv: [8.4821, 76.9200],
+  vtz: [17.7215, 83.2245],
+  sxr: [33.9871, 74.7741],
+  bza: [16.5304, 80.7968],
+  lhr: [51.4700, -0.4543],
+  zrh: [47.4582, 8.5555],
+  cdg: [49.0097, 2.5479],
+  fra: [50.0379, 8.5622],
+  dxb: [25.2532, 55.3657],
+  sin: [1.3644, 103.9915],
+  jfk: [40.6413, -73.7781],
+  sfo: [37.6213, -122.3790],
+  hnd: [35.5494, 139.7798]
+};
+
+function resolveCoords(name, coords, defaultFallback = [20.9374, 77.7796]) {
+  if (coords && typeof coords.lat === 'number' && typeof coords.lng === 'number' && (coords.lat !== 0 || coords.lng !== 0)) {
+    // Check if coordinates were accidentally set to the old blr/hyd defaults when name clearly indicates other stations
+    const isOldBlrDefault = Math.abs(coords.lat - 12.9716) < 0.01 && Math.abs(coords.lng - 77.5946) < 0.01;
+    const isOldHydDefault = Math.abs(coords.lat - 17.2403) < 0.01 && Math.abs(coords.lng - 78.4294) < 0.01;
+    const lowerName = (name || '').toLowerCase();
+    
+    if ((isOldBlrDefault || isOldHydDefault) && !lowerName.includes('blr') && !lowerName.includes('bangalore') && !lowerName.includes('hyd') && !lowerName.includes('hyderabad')) {
+      // Overwrite accidental default with genuine name lookup
+      for (const [code, c] of Object.entries(KNOWN_AIRPORT_COORDS)) {
+        if (lowerName.includes(code)) return c;
+      }
+    } else {
+      return [coords.lat, coords.lng];
+    }
+  }
+  if (!name) return defaultFallback;
+  const lower = name.toLowerCase();
+  for (const [code, c] of Object.entries(KNOWN_AIRPORT_COORDS)) {
+    const rx = new RegExp(`\\b${code}\\b`, 'i');
+    if (rx.test(lower) || lower.includes(code)) return c;
+  }
+  return defaultFallback;
+}
+
+export default function CartoJourneyMap({ 
+  activeDisruption, 
+  disruptedTicket, 
+  disruptedTickets = [],
+  itinerary 
+}) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [mapType, setMapType] = useState('roadmap'); // 'roadmap' | 'satellite' | 'terrain' | 'carto'
-  const [selectedRoute, setSelectedRoute] = useState(disruptedTicket ? 'uploaded' : 'india');
+  const hasUploaded = Boolean(disruptedTicket || (disruptedTickets && disruptedTickets.length > 0));
+  const [selectedRoute, setSelectedRoute] = useState(hasUploaded ? 'uploaded' : 'empty');
 
-  // Synchronize when disruptedTicket changes
+  // Synchronize when disruptedTicket or disruptedTickets change
   useEffect(() => {
-    if (disruptedTicket) {
+    if (disruptedTicket || (disruptedTickets && disruptedTickets.length > 0)) {
       setSelectedRoute('uploaded');
+    } else {
+      setSelectedRoute('empty');
     }
-  }, [disruptedTicket]);
+  }, [disruptedTicket, disruptedTickets]);
 
   // Carto API Key from .env if user wants Carto layer
   const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
 
-  // Dynamic route for uploaded document
+  // Dynamic route for uploaded document(s)
   const uploadedRoute = React.useMemo(() => {
-    if (!disruptedTicket) return null;
-    const origName = disruptedTicket.origin || "Origin Hub";
-    const destName = disruptedTicket.destination || "Destination Hub";
-    const carrier = disruptedTicket.carrier || "Transit";
-    const service = disruptedTicket.service_number || "Service";
-    const delay = disruptedTicket.delay_minutes || 45;
+    const ticketList = (disruptedTickets && disruptedTickets.length > 0) 
+      ? disruptedTickets 
+      : (disruptedTicket ? [disruptedTicket] : []);
 
-    const origLat = disruptedTicket.origin_coords?.lat ?? 19.0896;
-    const origLng = disruptedTicket.origin_coords?.lng ?? 72.8656;
-    const destLat = disruptedTicket.dest_coords?.lat ?? 28.5562;
-    const destLng = disruptedTicket.dest_coords?.lng ?? 77.1000;
+    if (ticketList.length === 0) return null;
+
+    if (ticketList.length > 1) {
+      // Multi-leg journey across multiple uploaded documents
+      const waypoints = [];
+      const legs = [];
+      const allCoords = [];
+
+      ticketList.forEach((t, idx) => {
+        const origName = t.origin || `Leg ${idx + 1} Origin`;
+        const destName = t.destination || `Leg ${idx + 1} Destination`;
+        const carrier = t.carrier || "Transit";
+        const service = t.service_number || `Transit ${idx + 1}`;
+        const delay = t.delay_minutes || 0;
+        const isTrain = (carrier.toLowerCase().includes("rail") || carrier.toLowerCase().includes("train") || service.includes("#"));
+
+        const oCoords = resolveCoords(origName, t.origin_coords, [12.9716, 77.5946]);
+        const dCoords = resolveCoords(destName, t.dest_coords, [17.2403, 78.4294]);
+
+        allCoords.push(oCoords);
+        allCoords.push(dCoords);
+
+        // Add Origin Waypoint if first leg or distinct
+        if (idx === 0) {
+          waypoints.push({
+            id: 1,
+            name: origName,
+            coords: oCoords,
+            type: isTrain ? "rail" : "flight",
+            badge: isTrain ? "RAIL DEPARTURE" : "FLIGHT DEPARTURE",
+            title: `${origName} Departure Terminal`,
+            status: delay > 0 ? `Delayed +${delay}m` : "On Schedule",
+            color: delay > 0 ? "#ea4335" : "#34a853",
+            info: `${carrier} ${service} • Leg 1`
+          });
+        }
+
+        // Add Destination Waypoint for this leg
+        waypoints.push({
+          id: waypoints.length + 1,
+          name: destName,
+          coords: dCoords,
+          type: idx === ticketList.length - 1 ? "hotel" : "transfer",
+          badge: idx === ticketList.length - 1 ? "FINAL DESTINATION" : "CONNECTION TRANSFER",
+          title: `${destName} Terminal / Transfer Link`,
+          status: idx === ticketList.length - 1 ? "Protected Arrival" : "Connection Window",
+          color: idx === ticketList.length - 1 ? "#34a853" : "#fbbc05",
+          info: `Leg ${idx + 1} Arrival • ${carrier} ${service}`
+        });
+
+        legs.push({
+          from: oCoords,
+          to: dCoords,
+          label: `${service}: ${origName} → ${destName}`,
+          color: delay > 0 ? "#ea4335" : "#4285f4",
+          dashArray: "8, 8",
+          weight: 4.5
+        });
+      });
+
+      const avgLat = allCoords.reduce((acc, c) => acc + c[0], 0) / allCoords.length;
+      const avgLng = allCoords.reduce((acc, c) => acc + c[1], 0) / allCoords.length;
+      const firstOrigin = ticketList[0].origin || "Origin";
+      const lastDest = ticketList[ticketList.length - 1].destination || "Destination";
+
+      return {
+        name: `${firstOrigin} ➔ ... ➔ ${lastDest}`,
+        center: [avgLat, avgLng],
+        zoom: 6,
+        waypoints,
+        legs
+      };
+    }
+
+    // Single uploaded ticket
+    const single = ticketList[0];
+    const origName = single.origin || "Origin Hub";
+    const destName = single.destination || "Destination Hub";
+    const carrier = single.carrier || "Transit";
+    const service = single.service_number || "Service";
+    const actualDelay = typeof single.delay_minutes === 'number' ? single.delay_minutes : 0;
+    const isDisrupted = actualDelay > 15 || Boolean(single.is_cancellation);
+    const isPast = Boolean(single.is_past_journey);
+
+    const origCoords = resolveCoords(origName, single.origin_coords, [20.9374, 77.7796]);
+    const destCoords = resolveCoords(destName, single.dest_coords, [21.0455, 75.8011]);
 
     const isTrain = (carrier.toLowerCase().includes("rail") || carrier.toLowerCase().includes("train") || service.includes("#"));
 
     return {
       name: `${origName} → ${destName}`,
-      center: [(origLat + destLat) / 2, (origLng + destLng) / 2],
-      zoom: 6,
+      center: [(origCoords[0] + destCoords[0]) / 2, (origCoords[1] + destCoords[1]) / 2],
+      zoom: 7,
       waypoints: [
         {
           id: 1,
           name: origName,
-          coords: [origLat, origLng],
+          coords: origCoords,
           type: isTrain ? "rail" : "flight",
           badge: isTrain ? "RAIL DEPARTURE" : "FLIGHT DEPARTURE",
-          title: `${origName} Terminal`,
-          status: `Delayed +${delay}m (Disruption Reported)`,
-          color: "#ea4335",
-          info: `${carrier} ${service} • Uploaded Document`
+          title: `${origName} Departure Terminal`,
+          status: isPast 
+            ? "Journey Completed (Historical Run)" 
+            : (isDisrupted ? `Delayed +${actualDelay}m` : "On Schedule (Running Right Time)"),
+          color: isPast ? "#5E6282" : (isDisrupted ? "#ea4335" : "#34a853"),
+          info: `${carrier} ${service} • ${isPast ? "Past Travel Document" : "Live Trajectory"}`
         },
         {
           id: 2,
           name: destName,
-          coords: [destLat, destLng],
+          coords: destCoords,
           type: isTrain ? "rail" : "transfer",
           badge: "DESTINATION TRANSIT",
-          title: `${destName} Arrival Station / Airport`,
-          status: "Downstream Connection Alert",
-          color: "#fbbc05",
-          info: `Buffer impacted by +${delay}m delay`
+          title: `${destName} Arrival Terminal / Station`,
+          status: isPast 
+            ? "Service Run Finished" 
+            : (isDisrupted ? "Downstream Connection Alert" : "Connection Window Nominal"),
+          color: isPast ? "#5E6282" : (isDisrupted ? "#fbbc05" : "#34a853"),
+          info: isDisrupted ? `Buffer impacted by +${actualDelay}m delay` : "On schedule • Protected arrival"
         }
       ],
       legs: [
         {
-          from: [origLat, origLng],
-          to: [destLat, destLng],
+          from: origCoords,
+          to: destCoords,
           label: `${service}: ${origName} → ${destName}`,
-          color: "#ea4335",
+          color: isPast ? "#84829A" : (isDisrupted ? "#ea4335" : "#4285f4"),
           dashArray: "8, 8",
           weight: 4.5
         }
       ]
     };
-  }, [disruptedTicket]);
+  }, [disruptedTicket, disruptedTickets]);
 
   // Multi-modal routes data
   const routes = {
@@ -235,7 +453,15 @@ export default function CartoJourneyMap({ activeDisruption, disruptedTicket, iti
     ...(uploadedRoute ? { uploaded: uploadedRoute } : {})
   };
 
-  const currentRouteData = routes[selectedRoute] || (uploadedRoute || routes.india);
+  const emptyRoute = {
+    name: "Neutral Map",
+    center: [21.5, 78.5],
+    zoom: 5,
+    waypoints: [],
+    legs: []
+  };
+
+  const currentRouteData = uploadedRoute || (hasUploaded ? (routes[selectedRoute] || emptyRoute) : emptyRoute);
 
   // Tile layer generator matching user's requested Google Maps look
   const getTileConfig = (type) => {
@@ -416,45 +642,8 @@ export default function CartoJourneyMap({ activeDisruption, disruptedTicket, iti
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
       
-      {/* Top Google Maps Bar: Route & Style Controls */}
-      <div className="absolute top-3 left-3 right-3 z-[400] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        
-        {/* Route Selector (Google style rounded card) */}
-        <div className="pointer-events-auto flex items-center bg-white shadow-md border border-slate-200 rounded-xl px-1.5 py-1 text-xs">
-          {uploadedRoute && (
-            <button
-              onClick={() => setSelectedRoute('uploaded')}
-              className={`px-3 py-1.5 rounded-lg font-sans font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedRoute === 'uploaded'
-                  ? 'bg-purple-700 text-white shadow-xs'
-                  : 'text-purple-700 bg-purple-50 hover:bg-purple-100'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Ticket: {uploadedRoute.name}</span>
-            </button>
-          )}
-          <button
-            onClick={() => setSelectedRoute('india')}
-            className={`px-3 py-1.5 rounded-lg font-sans font-semibold transition-all cursor-pointer ${
-              selectedRoute === 'india'
-                ? 'bg-[#181E4B] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Mumbai → Delhi → Jaipur
-          </button>
-          <button
-            onClick={() => setSelectedRoute('alpine')}
-            className={`px-3 py-1.5 rounded-lg font-sans font-semibold transition-all cursor-pointer ${
-              selectedRoute === 'alpine'
-                ? 'bg-[#181E4B] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            London → Zermatt
-          </button>
-        </div>
+      {/* Top Google Maps Bar: Map Layer Controls */}
+      <div className="absolute top-3 right-3 z-[400] flex items-center gap-2 pointer-events-none">
 
         {/* Map Layer Switcher (Google Roadmap / Satellite / Terrain) */}
         <div className="pointer-events-auto flex items-center bg-white shadow-md border border-slate-200 rounded-xl px-1 py-1 text-xs">
@@ -495,21 +684,28 @@ export default function CartoJourneyMap({ activeDisruption, disruptedTicket, iti
         style={{ width: '100%', height: '440px', minHeight: '440px', position: 'relative', zIndex: 1 }} 
       />
 
-      {/* Bottom Google Maps Legend Bar */}
-      <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-700 flex flex-wrap items-center gap-3">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3.5 h-1.5 bg-[#34a853] rounded-full inline-block" />
-          <span className="font-medium text-[11px]">Flight Leg</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3.5 h-1.5 bg-[#4285f4] rounded-full inline-block" />
-          <span className="font-medium text-[11px]">Transit &amp; Rail</span>
-        </span>
-        <span className="text-slate-300">|</span>
-        <span className="text-slate-500 text-[11px]">
-          Click Google Map pins to view timing &amp; connection status
-        </span>
-      </div>
+      {/* Bottom Google Maps Legend Bar / Cleared Status Indicator */}
+      {currentRouteData.waypoints && currentRouteData.waypoints.length > 0 ? (
+        <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-700 flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3.5 h-1.5 bg-[#34a853] rounded-full inline-block" />
+            <span className="font-medium text-[11px]">Flight Leg</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3.5 h-1.5 bg-[#4285f4] rounded-full inline-block" />
+            <span className="font-medium text-[11px]">Transit &amp; Rail</span>
+          </span>
+          <span className="text-slate-300">|</span>
+          <span className="text-slate-500 text-[11px]">
+            Click Google Map pins to view timing &amp; connection status
+          </span>
+        </div>
+      ) : (
+        <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-600 flex items-center gap-2">
+          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+          <span className="font-medium text-[11px]">Map Ready • No active ticket markings</span>
+        </div>
+      )}
 
     </div>
   );

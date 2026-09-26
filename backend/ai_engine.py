@@ -117,11 +117,26 @@ def get_groq_key(custom_key: Optional[str] = None) -> Optional[str]:
 def get_gemini_key(custom_key: Optional[str] = None) -> Optional[str]:
     return custom_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
+def get_system_prompt_with_ticket(state: AgentState) -> str:
+    prompt = SYSTEM_PROMPT
+    if state.get("structured_ticket"):
+        st = state["structured_ticket"]
+        is_past = bool(st.get("is_past_journey", False))
+        travel_dt = st.get("travel_date", "")
+        delay_m = st.get("delay_minutes", 0)
+        prompt += f"\n\nCURRENT PASSENGER TICKET CONTEXT:\n- Carrier & Service: {st.get('carrier')} {st.get('service_number')}\n- Route: {st.get('origin')} to {st.get('destination')}\n- Travel Date: {travel_dt or 'Recent'}\n- Journey Historical Status: {'PAST DOCUMENT (COMPLETED)' if is_past else 'ACTIVE/UPCOMING'}\n- Delay: +{delay_m} mins\n- Status: {'Cancelled' if st.get('is_cancellation') else ('Completed Run' if is_past else ('Delayed' if delay_m > 0 else 'On Schedule'))}\n- PNR: {st.get('pnr')}\n- Fare: ₹{st.get('ticket_cost', 6450)} {st.get('currency', 'INR')}\n- Reason: {st.get('disruption_reason')}"
+        if is_past:
+            prompt += "\nIMPORTANT: The user uploaded a past travel document. This service has ALREADY COMPLETED its scheduled run. It is not currently running. Clearly explain that the service is completed. Ask the user if they caught the train or missed it, and explain retrospective IRCTC TDR filing rules and refund deadlines if they did not travel or if it was delayed."
+        else:
+            prompt += "\nWhen the user asks about their trip, flight, train, or schedule, use these exact details to provide an authoritative, direct response."
+    return prompt
+
 def call_groq(state: AgentState, groq_key: str) -> AgentState:
     """Attempts generation via Groq API with robust model fallback."""
     try:
         client = Groq(api_key=groq_key)
-        formatted_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        sys_prompt = get_system_prompt_with_ticket(state)
+        formatted_messages = [{"role": "system", "content": sys_prompt}]
         for m in state["messages"]:
             formatted_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
         if state["user_query"] and (not state["messages"] or state["messages"][-1].get("content") != state["user_query"]):
@@ -177,13 +192,14 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
             chat_history.append({"role": role, "parts": [m.get("content", "")]})
         
         query = state["user_query"] or (state["messages"][-1]["content"] if state["messages"] else "Hello")
+        sys_prompt = get_system_prompt_with_ticket(state)
 
         last_err = None
         for model_name in candidate_models:
             try:
                 model = genai.GenerativeModel(
                     model_name=model_name,
-                    system_instruction=SYSTEM_PROMPT
+                    system_instruction=sys_prompt
                 )
                 if chat_history:
                     chat = model.start_chat(history=chat_history)
@@ -221,6 +237,70 @@ def call_expert_engine(state: AgentState) -> AgentState:
             "Please let me know if you would like help with an upcoming flight, train, or travel disruption!"
         )
         state["provider"] = "Voyage AI Engine"
+    # Case 0: Active passenger ticket context exists and query asks about trip/details
+    active_t = state.get("structured_ticket")
+    if active_t and any(k in lower for k in ["trip", "detail", "flight", "train", "status", "ticket", "pnr", "my", "delay", "booking", "schedule", "summary", "give", "caught", "running", "completed", "yesterday", "old", "miss"]):
+        carrier = active_t.get("carrier", "Carrier")
+        service = active_t.get("service_number", "Transit Link")
+        orig = active_t.get("origin", "Origin")
+        dest = active_t.get("destination", "Destination")
+        delay_m = int(active_t.get("delay_minutes", 0) or 0)
+        pnr = active_t.get("pnr", "VY-XXXXX-IN")
+        fare = float(active_t.get("ticket_cost", 6450.0) or 6450.0)
+        curr = active_t.get("currency", "INR")
+        reason = active_t.get("disruption_reason", "Operational schedule change")
+        is_canc = bool(active_t.get("is_cancellation", False))
+        is_past = bool(active_t.get("is_past_journey", False))
+        travel_dt = active_t.get("travel_date", "")
+
+        rights = evaluate_disruption_rights(carrier, delay_m, is_canc, fare)
+
+        if is_past:
+            reply = f"""### 🚆 Historical Journey Record (Completed Service)
+
+This travel document is for **{carrier} {service}** ({orig} ➔ {dest}) scheduled on **{travel_dt or 'a previous date'}**.
+
+• **Service Run Status**: **ALREADY COMPLETED**. This train/service has completed its scheduled journey and is **no longer currently running**.
+• **Route Corridor**: **{orig} ➔ {dest}** (PNR: `{pnr}`)
+• **Scheduled Departure**: Completed as scheduled.
+
+---
+
+#### ❓ Did you catch this train or miss it?
+• **If you caught & boarded the train**:
+  Your journey has already been completed. No further action is required unless the train arrived with an operational delay exceeding 3 hours and you wish to file a customer grievance.
+
+• **If you missed the train**:
+  Under Indian Railways / IRCTC rules:
+  1. You can file an **online TDR (Ticket Deposit Receipt)** on the IRCTC portal under reason code *"Passenger Not Travelled"* or *"Train Running Late > 3 Hours"*.
+  2. TDR filing window: Must be filed before or within statutory IRCTC timelines (within 72 hours of chart preparation depending on the reason).
+  3. If eligible, IRCTC will process a statutory refund after verification by the train ticket examiner (TTE) charting system.
+
+Feel free to ask any specific questions about your rights or refund options!"""
+        else:
+            reply = f"""### ✈️ Trip Details & Resilience Status
+
+Here is the complete summary of your trip for **{carrier} {service}**:
+
+• **Route Corridor**: **{orig} ➔ {dest}**
+• **Booking Reference / PNR**: `{pnr}`
+• **Current Status**: **{"+ " + str(delay_m) + " minutes delay" if delay_m > 0 else "On Schedule"}** {"(Flight Cancelled)" if is_canc else ""}
+• **Disruption Reason**: {reason}
+• **Total Ticket Fare**: ₹{fare:,.2f} {curr}
+
+---
+
+#### 🛡️ Statutory Passenger Rights & Protection:
+• **Governing Framework**: {rights['applicable_law']}
+• **Full Fare Refund**: {"Eligible (100% refund without cancellation deductions)" if rights['refund_eligible'] else "Standard carrier refund policy"}
+• **Direct Statutory Compensation**: **₹{rights['statutory_compensation']:,.2f} INR**
+• **Duty of Care**: Mandatory refreshments/meals at departure terminal during delays exceeding 2 hours.
+
+#### 🗺️ Next Steps & Recovery:
+- Click **Upload Another** if you have a connecting flight, train, or hotel voucher to analyze.
+- Click **Done (View Map)** to inspect your trip on the Google Maps visualizer and view recovery plans."""
+        state["response"] = reply
+        state["provider"] = "voyage_trip_expert"
         return state
 
     # Case 1: User asks to write code
@@ -475,7 +555,9 @@ def run_ai_chat(
     messages: List[Dict[str, str]], 
     user_query: Optional[str] = None,
     groq_api_key: Optional[str] = None,
-    gemini_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None,
+    active_ticket: Optional[Dict[str, Any]] = None,
+    uploaded_tickets: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """
     Executes Voyage AI Agent with domain restrictions and multi-provider failover:
@@ -505,7 +587,7 @@ def run_ai_chat(
         "user_query": query,
         "response": None,
         "provider": None,
-        "structured_ticket": None,
+        "structured_ticket": active_ticket,
         "error": None
     }
 
@@ -540,215 +622,455 @@ def run_ai_chat(
         "success": True
     }
 
-def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content_type: Optional[str] = "application/pdf") -> Dict[str, Any]:
-    """
-    Parses real document file (PDF, TXT, Image), extracts travel details,
-    and stores structured disruption in SQLite database.
-    """
-    extracted_text = ""
-    safe_fn = (filename or "ticket.pdf").lower()
-    safe_ct = (content_type or "").lower()
-
-    # PDF extraction
-    if safe_fn.endswith(".pdf") or "pdf" in safe_ct:
-        if pypdf is not None:
-            try:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                for page in reader.pages:
-                    txt = page.extract_text()
-                    if txt:
-                        extracted_text += txt + "\n"
-            except Exception as e:
-                extracted_text = f"PDF Read Error: {e}"
-    else:
-        # Text or raw
-        try:
-            extracted_text = file_bytes.decode("utf-8", errors="ignore")
-        except Exception:
-            extracted_text = f"Binary file {filename}"
-
 KNOWN_LOCATIONS = {
-    "bom": {"name": "Mumbai (BOM)", "lat": 19.0896, "lng": 72.8656, "aliases": ["mumbai", "bombay", "cst", "csmt", "bom"]},
-    "del": {"name": "Delhi (DEL)", "lat": 28.5562, "lng": 77.1000, "aliases": ["delhi", "new delhi", "ndls", "igi", "del"]},
-    "blr": {"name": "Bangalore (BLR)", "lat": 12.9716, "lng": 77.5946, "aliases": ["bangalore", "bengaluru", "sbc", "blr", "kempegowda"]},
-    "hyd": {"name": "Hyderabad (HYD)", "lat": 17.2403, "lng": 78.4294, "aliases": ["hyderabad", "secunderabad", "hyd", "rgia"]},
-    "jai": {"name": "Jaipur (JAI)", "lat": 26.9124, "lng": 75.7873, "aliases": ["jaipur", "jp", "jai", "sanganer"]},
-    "maa": {"name": "Chennai (MAA)", "lat": 13.0827, "lng": 80.2707, "aliases": ["chennai", "madras", "maa", "mas"]},
-    "ccu": {"name": "Kolkata (CCU)", "lat": 22.5726, "lng": 88.3639, "aliases": ["kolkata", "calcutta", "ccu", "howrah", "hwh"]},
-    "amd": {"name": "Ahmedabad (AMD)", "lat": 23.0734, "lng": 72.6347, "aliases": ["ahmedabad", "amd", "adi"]},
-    "pnq": {"name": "Pune (PNQ)", "lat": 18.5822, "lng": 73.9197, "aliases": ["pune", "poona", "pnq"]},
-    "goi": {"name": "Goa (GOI)", "lat": 15.3800, "lng": 73.8318, "aliases": ["goa", "dabolim", "goi", "mopa", "gox"]},
-    "cok": {"name": "Kochi (COK)", "lat": 10.1518, "lng": 76.3930, "aliases": ["kochi", "cochin", "cok"]},
-    "lko": {"name": "Lucknow (LKO)", "lat": 26.7606, "lng": 80.8893, "aliases": ["lucknow", "lko"]},
-    "ixc": {"name": "Chandigarh (IXC)", "lat": 30.6735, "lng": 76.7885, "aliases": ["chandigarh", "ixc"]},
-    "vns": {"name": "Varanasi (VNS)", "lat": 25.4524, "lng": 82.8590, "aliases": ["varanasi", "banaras", "vns", "bsb"]},
-    "pat": {"name": "Patna (PAT)", "lat": 25.5913, "lng": 85.0880, "aliases": ["patna", "pat"]},
-    "lhr": {"name": "London (LHR)", "lat": 51.4700, "lng": -0.4543, "aliases": ["london", "lhr", "heathrow", "gatwick", "lgw"]},
-    "zrh": {"name": "Zurich (ZRH)", "lat": 47.4582, "lng": 8.5555, "aliases": ["zurich", "zrh", "kloten", "zurich hb"]},
-    "visp": {"name": "Visp", "lat": 46.2934, "lng": 7.8814, "aliases": ["visp"]},
-    "zermatt": {"name": "Zermatt", "lat": 45.9765, "lng": 7.7491, "aliases": ["zermatt", "matterhorn"]},
-    "gva": {"name": "Geneva (GVA)", "lat": 46.2370, "lng": 6.1092, "aliases": ["geneva", "gva"]},
-    "cdg": {"name": "Paris (CDG)", "lat": 49.0097, "lng": 2.5479, "aliases": ["paris", "cdg", "roissy", "ory"]},
-    "fra": {"name": "Frankfurt (FRA)", "lat": 50.0379, "lng": 8.5622, "aliases": ["frankfurt", "fra"]},
-    "dxb": {"name": "Dubai (DXB)", "lat": 25.2532, "lng": 55.3657, "aliases": ["dubai", "dxb"]},
-    "sin": {"name": "Singapore (SIN)", "lat": 1.3644, "lng": 103.9915, "aliases": ["singapore", "sin", "changi"]},
-    "jfk": {"name": "New York (JFK)", "lat": 40.6413, "lng": -73.7781, "aliases": ["new york", "jfk", "nyc", "newark", "ewr"]},
-    "sfo": {"name": "San Francisco (SFO)", "lat": 37.6213, "lng": -122.3790, "aliases": ["san francisco", "sfo"]},
-    "hnd": {"name": "Tokyo (HND)", "lat": 35.5494, "lng": 139.7798, "aliases": ["tokyo", "hnd", "haneda", "narita", "nrt"]}
+    # Major Indian Aviation & Rail Hubs (including Maharashtra & Central Railway corridors)
+    "ami": {"name": "Amravati (AMI)", "city": "Amravati", "code": "AMI", "lat": 20.9374, "lng": 77.7796, "aliases": ["amravati", "ami"]},
+    "bsl": {"name": "Bhusaval Jn. (BSL)", "city": "Bhusaval", "code": "BSL", "lat": 21.0455, "lng": 75.8011, "aliases": ["bhusaval", "bhusawal", "bsl", "bhusaval jn", "bhusawal jn"]},
+    "bd": {"name": "Badnera Jn. (BD)", "city": "Badnera", "code": "BD", "lat": 20.8569, "lng": 77.7289, "aliases": ["badnera", "bd", "badnera jn"]},
+    "ak": {"name": "Akola Jn. (AK)", "city": "Akola", "code": "AK", "lat": 20.7059, "lng": 77.0219, "aliases": ["akola", "ak", "akola jn"]},
+    "wr": {"name": "Wardha Jn. (WR)", "city": "Wardha", "code": "WR", "lat": 20.7453, "lng": 78.6022, "aliases": ["wardha", "wr", "wardha jn"]},
+    "ngp": {"name": "Nagpur Jn. (NGP)", "city": "Nagpur", "code": "NGP", "lat": 21.1524, "lng": 79.0888, "aliases": ["nagpur", "ngp", "nag", "nagpur jn"]},
+    "jl": {"name": "Jalgaon Jn. (JL)", "city": "Jalgaon", "code": "JL", "lat": 21.0077, "lng": 75.5626, "aliases": ["jalgaon", "jl", "jalgaon jn"]},
+    "mmr": {"name": "Manmad Jn. (MMR)", "city": "Manmad", "code": "MMR", "lat": 20.2520, "lng": 74.4410, "aliases": ["manmad", "mmr", "manmad jn"]},
+    "nk": {"name": "Nashik Road (NK)", "city": "Nashik", "code": "NK", "lat": 19.9572, "lng": 73.8340, "aliases": ["nashik", "nasik", "nk", "nashik road"]},
+    "kyn": {"name": "Kalyan Jn. (KYN)", "city": "Kalyan", "code": "KYN", "lat": 19.2437, "lng": 73.1355, "aliases": ["kalyan", "kyn", "kalyan jn"]},
+    "tna": {"name": "Thane (TNA)", "city": "Thane", "code": "TNA", "lat": 19.1860, "lng": 72.9759, "aliases": ["thane", "tna"]},
+    "dr": {"name": "Dadar (DR)", "city": "Mumbai", "code": "DR", "lat": 19.0178, "lng": 72.8478, "aliases": ["dadar", "dr"]},
+    "csmt": {"name": "Mumbai CSMT (CSMT)", "city": "Mumbai", "code": "CSMT", "lat": 18.9401, "lng": 72.8351, "aliases": ["csmt", "cst", "mumbai csmt", "chhatrapati shivaji maharaj terminus"]},
+    "del": {"name": "Delhi (DEL)", "city": "Delhi", "code": "DEL", "lat": 28.5562, "lng": 77.1000, "aliases": ["delhi", "new delhi", "ndls", "igi", "del"]},
+    "bom": {"name": "Mumbai (BOM)", "city": "Mumbai", "code": "BOM", "lat": 19.0896, "lng": 72.8656, "aliases": ["mumbai", "bombay", "bom"]},
+    "blr": {"name": "Bangalore (BLR)", "city": "Bangalore", "code": "BLR", "lat": 12.9716, "lng": 77.5946, "aliases": ["bangalore", "bengaluru", "sbc", "blr", "kempegowda", "ypr"]},
+    "hyd": {"name": "Hyderabad (HYD)", "city": "Hyderabad", "code": "HYD", "lat": 17.2403, "lng": 78.4294, "aliases": ["hyderabad", "secunderabad", "hyd", "rgia", "sc", "kcg"]},
+    "jai": {"name": "Jaipur (JAI)", "city": "Jaipur", "code": "JAI", "lat": 26.9124, "lng": 75.7873, "aliases": ["jaipur", "jp", "jai", "sanganer"]},
+    "maa": {"name": "Chennai (MAA)", "city": "Chennai", "code": "MAA", "lat": 13.0827, "lng": 80.2707, "aliases": ["chennai", "madras", "maa", "mas", "ms"]},
+    "ccu": {"name": "Kolkata (CCU)", "city": "Kolkata", "code": "CCU", "lat": 22.5726, "lng": 88.3639, "aliases": ["kolkata", "calcutta", "ccu", "howrah", "hwh"]},
+    "amd": {"name": "Ahmedabad (AMD)", "city": "Ahmedabad", "code": "AMD", "lat": 23.0734, "lng": 72.6347, "aliases": ["ahmedabad", "amd", "adi"]},
+    "pnq": {"name": "Pune (PNQ)", "city": "Pune", "code": "PNQ", "lat": 18.5822, "lng": 73.9197, "aliases": ["pune", "poona", "pnq", "pune jn"]},
+    "goi": {"name": "Goa (GOI)", "city": "Goa", "code": "GOI", "lat": 15.3800, "lng": 73.8318, "aliases": ["goa", "dabolim", "goi", "mopa", "gox", "madgaon", "mao"]},
+    "cok": {"name": "Kochi (COK)", "city": "Kochi", "code": "COK", "lat": 10.1518, "lng": 76.3930, "aliases": ["kochi", "cochin", "cok", "ers"]},
+    "lko": {"name": "Lucknow (LKO)", "city": "Lucknow", "code": "LKO", "lat": 26.7606, "lng": 80.8893, "aliases": ["lucknow", "lko"]},
+    "ixc": {"name": "Chandigarh (IXC)", "city": "Chandigarh", "code": "IXC", "lat": 30.6735, "lng": 76.7885, "aliases": ["chandigarh", "ixc", "cdg"]},
+    "vns": {"name": "Varanasi (VNS)", "city": "Varanasi", "code": "VNS", "lat": 25.4524, "lng": 82.8590, "aliases": ["varanasi", "banaras", "vns", "bsb"]},
+    "pat": {"name": "Patna (PAT)", "city": "Patna", "code": "PAT", "lat": 25.5913, "lng": 85.0880, "aliases": ["patna", "pat", "pnbe"]},
+    "atq": {"name": "Amritsar (ATQ)", "city": "Amritsar", "code": "ATQ", "lat": 31.7096, "lng": 74.7973, "aliases": ["amritsar", "atq", "asr"]},
+    "bbi": {"name": "Bhubaneswar (BBI)", "city": "Bhubaneswar", "code": "BBI", "lat": 20.2444, "lng": 85.8178, "aliases": ["bhubaneswar", "bbi", "bbs"]},
+    "gau": {"name": "Guwahati (GAU)", "city": "Guwahati", "code": "GAU", "lat": 26.1061, "lng": 91.5859, "aliases": ["guwahati", "gau", "ghy"]},
+    "idr": {"name": "Indore (IDR)", "city": "Indore", "code": "IDR", "lat": 22.7217, "lng": 75.8011, "aliases": ["indore", "idr", "indb"]},
+    "cjb": {"name": "Coimbatore (CJB)", "city": "Coimbatore", "code": "CJB", "lat": 11.0299, "lng": 77.0434, "aliases": ["coimbatore", "cjb", "cbe"]},
+    "ixe": {"name": "Mangalore (IXE)", "city": "Mangalore", "code": "IXE", "lat": 12.9613, "lng": 74.8901, "aliases": ["mangalore", "mangaluru", "ixe", "maq"]},
+    "trv": {"name": "Trivandrum (TRV)", "city": "Trivandrum", "code": "TRV", "lat": 8.4821, "lng": 76.9200, "aliases": ["trivandrum", "thiruvananthapuram", "trv", "tvc"]},
+    "vtz": {"name": "Visakhapatnam (VTZ)", "city": "Visakhapatnam", "code": "VTZ", "lat": 17.7215, "lng": 83.2245, "aliases": ["visakhapatnam", "vizag", "vtz", "vskp"]},
+    "sxr": {"name": "Srinagar (SXR)", "city": "Srinagar", "code": "SXR", "lat": 33.9871, "lng": 74.7741, "aliases": ["srinagar", "sxr"]},
+    "bza": {"name": "Vijayawada (BZA)", "city": "Vijayawada", "code": "BZA", "lat": 16.5304, "lng": 80.7968, "aliases": ["vijayawada", "bza"]},
+    "bdq": {"name": "Vadodara (BDQ)", "city": "Vadodara", "code": "BDQ", "lat": 22.3362, "lng": 73.2263, "aliases": ["vadodara", "baroda", "bdq", "brc"]},
+    "udr": {"name": "Udaipur (UDR)", "city": "Udaipur", "code": "UDR", "lat": 24.6177, "lng": 73.8961, "aliases": ["udaipur", "udr", "udz"]},
+    "ixr": {"name": "Ranchi (IXR)", "city": "Ranchi", "code": "IXR", "lat": 23.3143, "lng": 85.3217, "aliases": ["ranchi", "ixr", "rnc"]},
+    "bho": {"name": "Bhopal (BHO)", "city": "Bhopal", "code": "BHO", "lat": 23.2875, "lng": 77.3374, "aliases": ["bhopal", "bho", "bpl"]},
+    "gwl": {"name": "Gwalior (GWL)", "city": "Gwalior", "code": "GWL", "lat": 26.2933, "lng": 78.2278, "aliases": ["gwalior", "gwl"]},
+    "agr": {"name": "Agra (AGR)", "city": "Agra", "code": "AGR", "lat": 27.1558, "lng": 77.9609, "aliases": ["agra", "agr", "agc"]},
+    "r": {"name": "Raipur Jn. (R)", "city": "Raipur", "code": "R", "lat": 21.2514, "lng": 81.6296, "aliases": ["raipur", "r", "raipur jn"]},
+    "durg": {"name": "Durg Jn. (DURG)", "city": "Durg", "code": "DURG", "lat": 21.1904, "lng": 81.2849, "aliases": ["durg", "durg jn"]},
+    "bsp": {"name": "Bilaspur Jn. (BSP)", "city": "Bilaspur", "code": "BSP", "lat": 22.0797, "lng": 82.1409, "aliases": ["bilaspur", "bsp", "bilaspur jn"]},
+    "et": {"name": "Itarsi Jn. (ET)", "city": "Itarsi", "code": "ET", "lat": 21.9213, "lng": 77.7554, "aliases": ["itarsi", "et", "itarsi jn"]},
+    "jbp": {"name": "Jabalpur (JBP)", "city": "Jabalpur", "code": "JBP", "lat": 23.1686, "lng": 79.9547, "aliases": ["jabalpur", "jbp"]},
+    "st": {"name": "Surat (ST)", "city": "Surat", "code": "ST", "lat": 21.2049, "lng": 72.8407, "aliases": ["surat", "st"]},
+    "awb": {"name": "Chhatrapati Sambhaji Nagar (AWB)", "city": "Aurangabad", "code": "AWB", "lat": 19.8636, "lng": 75.3528, "aliases": ["aurangabad", "sambhaji nagar", "chhatrapati sambhaji nagar", "awb"]},
+    "ned": {"name": "Nanded (NED)", "city": "Nanded", "code": "NED", "lat": 19.1627, "lng": 77.3168, "aliases": ["nanded", "ned"]},
+    "kop": {"name": "Kolhapur (KOP)", "city": "Kolhapur", "code": "KOP", "lat": 16.7050, "lng": 74.2433, "aliases": ["kolhapur", "kop"]},
+    "sur": {"name": "Solapur (SUR)", "city": "Solapur", "code": "SUR", "lat": 17.6599, "lng": 75.9064, "aliases": ["solapur", "sur"]},
+    # Global & European Transport Hubs
+    "lhr": {"name": "London (LHR)", "city": "London", "code": "LHR", "lat": 51.4700, "lng": -0.4543, "aliases": ["london", "lhr", "heathrow", "gatwick", "lgw"]},
+    "zrh": {"name": "Zurich (ZRH)", "city": "Zurich", "code": "ZRH", "lat": 47.4582, "lng": 8.5555, "aliases": ["zurich", "zrh", "kloten", "zurich hb"]},
+    "visp": {"name": "Visp", "city": "Visp", "code": "VISP", "lat": 46.2934, "lng": 7.8814, "aliases": ["visp"]},
+    "zermatt": {"name": "Zermatt", "city": "Zermatt", "code": "ZER", "lat": 45.9765, "lng": 7.7491, "aliases": ["zermatt", "matterhorn"]},
+    "gva": {"name": "Geneva (GVA)", "city": "Geneva", "code": "GVA", "lat": 46.2370, "lng": 6.1092, "aliases": ["geneva", "gva"]},
+    "cdg": {"name": "Paris (CDG)", "city": "Paris", "code": "CDG", "lat": 49.0097, "lng": 2.5479, "aliases": ["paris", "cdg", "roissy", "ory"]},
+    "fra": {"name": "Frankfurt (FRA)", "city": "Frankfurt", "code": "FRA", "lat": 50.0379, "lng": 8.5622, "aliases": ["frankfurt", "fra"]},
+    "muc": {"name": "Munich (MUC)", "city": "Munich", "code": "MUC", "lat": 48.3537, "lng": 11.7750, "aliases": ["munich", "muc"]},
+    "dxb": {"name": "Dubai (DXB)", "city": "Dubai", "code": "DXB", "lat": 25.2532, "lng": 55.3657, "aliases": ["dubai", "dxb"]},
+    "sin": {"name": "Singapore (SIN)", "city": "Singapore", "code": "SIN", "lat": 1.3644, "lng": 103.9915, "aliases": ["singapore", "sin", "changi"]},
+    "bkk": {"name": "Bangkok (BKK)", "city": "Bangkok", "code": "BKK", "lat": 13.6900, "lng": 100.7501, "aliases": ["bangkok", "bkk", "suvarnabhumi"]},
+    "jfk": {"name": "New York (JFK)", "city": "New York", "code": "JFK", "lat": 40.6413, "lng": -73.7781, "aliases": ["new york", "jfk", "nyc", "newark", "ewr"]},
+    "sfo": {"name": "San Francisco (SFO)", "city": "San Francisco", "code": "SFO", "lat": 37.6213, "lng": -122.3790, "aliases": ["san francisco", "sfo"]},
+    "lax": {"name": "Los Angeles (LAX)", "city": "Los Angeles", "code": "LAX", "lat": 33.9416, "lng": -118.4085, "aliases": ["los angeles", "lax"]},
+    "hnd": {"name": "Tokyo (HND)", "city": "Tokyo", "code": "HND", "lat": 35.5494, "lng": 139.7798, "aliases": ["tokyo", "hnd", "haneda", "narita", "nrt"]}
 }
 
+def lookup_location(query: str) -> Optional[Dict[str, Any]]:
+    """Intelligently matches a location name, airport name, or 3-letter IATA code against KNOWN_LOCATIONS."""
+    if not query or not isinstance(query, str):
+        return None
+    clean_q = re.sub(r'[^a-zA-Z0-9\s]', ' ', query).strip().lower()
+    if not clean_q:
+        return None
+
+    # 1. Exact alias match
+    for key, loc in KNOWN_LOCATIONS.items():
+        if clean_q in loc["aliases"] or clean_q == key or clean_q == loc["code"].lower():
+            return loc
+
+    # 2. Token-level match with word boundary
+    tokens = clean_q.split()
+    for tok in tokens:
+        if len(tok) < 3:
+            continue
+        for key, loc in KNOWN_LOCATIONS.items():
+            if tok in loc["aliases"] or tok == key or tok == loc["code"].lower():
+                return loc
+
+    # 3. Substring match for longer city names (>= 4 characters)
+    for key, loc in KNOWN_LOCATIONS.items():
+        for alias in loc["aliases"]:
+            if len(alias) >= 4 and (alias in clean_q or clean_q in alias):
+                return loc
+
+    return None
+
 def detect_locations_from_text(text: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Finds origin and destination from document text using known location aliases and directional patterns."""
+    """
+    Finds origin and destination from document text using strict word boundaries
+    and directional travel patterns to prevent false substring collisions (e.g. 'del' inside 'delayed').
+    """
     text_lower = text.lower()
     
-    # Check explicit from ... to ... pattern
-    from_to = re.search(r'(?:from|departure|departing|origin)\s*[:\-]?\s*([a-z\s]+?)\s+(?:to|arrival|arriving|dest|destination)\s*[:\-]?\s*([a-z\s]+)', text_lower)
-    if from_to:
-        f_cand, t_cand = from_to.group(1).strip(), from_to.group(2).strip()
-        loc_from = None
-        loc_to = None
-        for key, loc in KNOWN_LOCATIONS.items():
-            if any(alias in f_cand for alias in loc["aliases"]):
-                loc_from = loc
-            if any(alias in t_cand for alias in loc["aliases"]):
-                loc_to = loc
-        if loc_from and loc_to and loc_from != loc_to:
-            return loc_from, loc_to
+    # 1. Check explicit directional travel patterns (e.g. 'Sector: BLR - HYD', 'From: Bengaluru To: Hyderabad')
+    directional_patterns = [
+        r'(?:sector|route|flight|journey)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30}?)\s*(?:to|➔|->|--|-)\s*([a-zA-Z\s\(\)]{3,30})',
+        r'(?:from|departure|departing|origin|originating|boarding)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30}?)\s*(?:to|arrival|arriving|dest|destination|deboarding)\s*[:\-]?\s*([a-zA-Z\s\(\)]{3,30})',
+        r'\b([a-zA-Z]{3,15})\s*(?:to|➔|->)\s*([a-zA-Z]{3,15})\b'
+    ]
 
-    # Scan for all occurring locations in sequential order
-    occurrences = []
+    for pat in directional_patterns:
+        match = re.search(pat, text_lower)
+        if match:
+            cand1 = match.group(1).strip()
+            cand2 = match.group(2).strip()
+            loc1 = lookup_location(cand1)
+            loc2 = lookup_location(cand2)
+            if loc1 and loc2 and loc1["name"] != loc2["name"]:
+                return loc1, loc2
+
+    # 2. Scan for occurring locations using STRICT WORD BOUNDARIES \b...\b
+    occurrences: List[Tuple[int, Dict[str, Any]]] = []
     for key, loc in KNOWN_LOCATIONS.items():
-        min_pos = -1
         for alias in loc["aliases"]:
-            pos = text_lower.find(alias)
-            if pos != -1 and (min_pos == -1 or pos < min_pos):
-                min_pos = pos
-        if min_pos != -1:
-            occurrences.append((min_pos, loc))
+            pattern = rf'\b{re.escape(alias)}\b'
+            for m in re.finditer(pattern, text_lower):
+                occurrences.append((m.start(), loc))
 
+    # Sort sequentially by order of appearance in the document
     occurrences.sort(key=lambda x: x[0])
-    if len(occurrences) >= 2:
-        return occurrences[0][1], occurrences[1][1]
-    elif len(occurrences) == 1:
-        # If only one found, pair with Delhi or Mumbai
-        single = occurrences[0][1]
+    
+    unique_locs: List[Dict[str, Any]] = []
+    seen_names = set()
+    for _, loc in occurrences:
+        if loc["name"] not in seen_names:
+            seen_names.add(loc["name"])
+            unique_locs.append(loc)
+
+    if len(unique_locs) >= 2:
+        return unique_locs[0], unique_locs[1]
+    elif len(unique_locs) == 1:
+        single = unique_locs[0]
         default_pair = KNOWN_LOCATIONS["del"] if single["name"] != KNOWN_LOCATIONS["del"]["name"] else KNOWN_LOCATIONS["bom"]
         return single, default_pair
 
     # Default fallback
     return KNOWN_LOCATIONS["bom"], KNOWN_LOCATIONS["del"]
 
-def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content_type: Optional[str] = "application/pdf") -> Dict[str, Any]:
+def extract_ticket_with_ai(extracted_text: str, filename: str, file_bytes: bytes, content_type: str) -> Optional[Dict[str, Any]]:
     """
-    Parses real document file (PDF, TXT, Image), extracts travel details,
-    and stores structured disruption in SQLite database.
+    Leverages Gemini 2.5 Flash / Groq LLMs to accurately extract structured travel parameters
+    from tickets, boarding passes, and booking confirmations.
+    """
+    prompt = f"""You are a specialized travel ticket parsing engine.
+Extract the following travel parameters from this uploaded travel document in STRICT JSON format:
+{{
+  "carrier": "airline, railway, or bus operator name (e.g. IndiGo, Air India, Indian Railways, British Airways, etc.)",
+  "service_number": "flight or train number (e.g. 6E 521, AI 882, #20978, 11026, BA 712)",
+  "origin": "origin city and airport or station name with code (e.g. Amravati (AMI), Bhusaval (BSL), Bangalore (BLR), Mumbai (BOM), Delhi (DEL))",
+  "destination": "destination city and airport or station name with code (e.g. Bhusaval (BSL), Hyderabad (HYD), Jaipur (JAI), Delhi (DEL))",
+  "origin_code": "3-letter IATA code or station code (e.g. AMI, BSL, BLR, HYD, DEL, BOM, JAI)",
+  "destination_code": "3-letter IATA code or station code (e.g. BSL, AMI, HYD, JAI, DEL, BOM)",
+  "travel_date": "Date of journey string in YYYY-MM-DD, DD/MM/YYYY, or DD-Mon-YYYY format if found (e.g. 2024-09-24, 24-09-2024, or 24-Sep-2024)",
+  "is_past_journey": true if the travel date or journey date is before today or in a past year (e.g. 2024, 2025, or earlier date), false otherwise,
+  "scheduled_departure": "scheduled departure time string if available (e.g. 14:30)",
+  "scheduled_arrival": "scheduled arrival time string if available (e.g. 16:45)",
+  "delay_minutes": 0,
+  "is_cancellation": false,
+  "pnr": "PNR or booking reference number (e.g. VY-88291 or 10-digit IRCTC PNR code)",
+  "ticket_cost": 1250.0,
+  "currency": "INR",
+  "disruption_reason": "brief reason for delay or cancellation if explicitly mentioned, or Nominal Operation"
+}}
+
+IMPORTANT:
+- Ensure origin and destination are the actual cities/airports/stations indicated in the ticket.
+- Do NOT guess Mumbai or Delhi unless specifically mentioned in the ticket.
+- Default delay_minutes to 0 unless an operational delay is explicitly stated.
+- Return ONLY valid JSON, no markdown formatting or commentary.
+
+Document Filename: {filename}
+Document Content:
+\"\"\"
+{extracted_text[:4000]}
+\"\"\"
+"""
+    # 1. Try Gemini
+    gem_key = get_gemini_key()
+    if gem_key and genai is not None:
+        try:
+            genai.configure(api_key=gem_key)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            if response and response.text:
+                raw = response.text.strip()
+                if raw.startswith("```"):
+                    raw = re.sub(r'^```(?:json)?\n', '', raw)
+                    raw = re.sub(r'\n```$', '', raw)
+                data = json.loads(raw)
+                if isinstance(data, dict) and data.get("origin") and data.get("destination"):
+                    return data
+        except Exception:
+            pass
+
+    # 2. Try Groq
+    g_key = get_groq_key()
+    if g_key and Groq is not None:
+        try:
+            client = Groq(api_key=g_key)
+            completion = client.chat.completions.create(
+                model="qwen/qwen3.8-27b",
+                messages=[
+                    {"role": "system", "content": "You are a ticket extraction parser. Output strict JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=1000
+            )
+            raw = completion.choices[0].message.content.strip()
+            if raw.startswith("```"):
+                raw = re.sub(r'^```(?:json)?\n', '', raw)
+                raw = re.sub(r'\n```$', '', raw)
+            data = json.loads(raw)
+            if isinstance(data, dict) and data.get("origin") and data.get("destination"):
+                return data
+        except Exception:
+            pass
+
+    return None
+
+def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content_type: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Parses real document file (PDF, TXT, Image), extracts authentic travel details
+    using AI vision/structured extraction with rigorous geospatial fallback,
+    detects historical dates/completed journeys, and stores structured record in SQLite.
     """
     extracted_text = ""
     safe_fn = (filename or "ticket.pdf").lower()
     safe_ct = (content_type or "").lower()
 
-    # PDF extraction
-    if safe_fn.endswith(".pdf") or "pdf" in safe_ct:
-        if pypdf is not None:
+    # Determine if file is PDF
+    is_pdf = safe_fn.endswith(".pdf") or ("pdf" in safe_ct and not safe_fn.endswith((".txt", ".json", ".csv")))
+
+    if is_pdf and pypdf is not None:
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            for page in reader.pages:
+                txt = page.extract_text()
+                if txt:
+                    extracted_text += txt + "\n"
+        except Exception:
             try:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                for page in reader.pages:
-                    txt = page.extract_text()
-                    if txt:
-                        extracted_text += txt + "\n"
-            except Exception as e:
-                extracted_text = f"PDF Read Error: {e}"
+                extracted_text = file_bytes.decode("utf-8", errors="ignore")
+            except Exception:
+                extracted_text = ""
     else:
-        # Text or raw
         try:
             extracted_text = file_bytes.decode("utf-8", errors="ignore")
         except Exception:
             extracted_text = f"Binary file {filename}"
 
-    # Extract travel parameters using heuristic regex and keyword scanner
     combined_text = extracted_text + " " + filename
     lower = combined_text.lower()
 
-    # Resolve actual locations and coordinates from document
-    origin_loc, dest_loc = detect_locations_from_text(combined_text)
-    origin = origin_loc["name"]
-    destination = dest_loc["name"]
-    origin_coords = {"lat": origin_loc["lat"], "lng": origin_loc["lng"]}
-    dest_coords = {"lat": dest_loc["lat"], "lng": dest_loc["lng"]}
+    # 1. Attempt AI extraction first (Gemini 2.5 Flash / Groq)
+    ai_data = extract_ticket_with_ai(extracted_text, filename, file_bytes, content_type or "application/pdf")
 
-    # 1. Check for Train (Indian Railways / RailRadar)
-    train_num_match = re.search(r'\b(1\d{4}|2\d{4}|12\d{3}|20\d{3}|22\d{3})\b', lower)
-    is_train = bool(train_num_match) or any(k in lower for k in ["train", "vande bharat", "railway", "irctc", "express", "shatabdi", "rajdhani"])
+    travel_date_str = None
+    is_past_journey = False
 
-    if is_train:
-        carrier = "Indian Railways"
-        train_num = train_num_match.group(1) if train_num_match else "20978"
-        t_data = RailRadarTracker.get_live_train_status(train_num)
-        service_number = f"#{t_data['train_number']} {t_data['train_name']}"
-        if t_data.get("origin"): origin = t_data.get("origin")
-        if t_data.get("destination"): destination = t_data.get("destination")
-        live_delay = t_data.get("delay_minutes", 0)
-        mode = "train"
-    else:
-        mode = "flight"
-        carrier = "Air India"
-        if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
-        elif "spicejet" in lower or "sg" in lower: carrier = "SpiceJet"
-        elif "vistara" in lower or "uk" in lower: carrier = "Vistara"
-        elif "british" in lower or "ba" in lower: carrier = "British Airways"
-        elif "swiss" in lower or "lx" in lower: carrier = "SWISS"
-        elif "lufthansa" in lower or "lh" in lower: carrier = "Lufthansa"
-        elif "emirates" in lower or "ek" in lower: carrier = "Emirates"
-
-        # Flight or service number extraction
-        service_match = re.search(r'(6e|ai|sg|uk|ba|aa|dl|lx|lh|ek)[\s-]?(\d{2,4})', lower)
-        if service_match:
-            service_number = f"{service_match.group(1).upper()} {service_match.group(2)}"
-        else:
-            service_number = "6E 521" if "IndiGo" in carrier else ("BA 712" if "British" in carrier else "AI 882")
-
-        live_delay = 45
-
-    # PNR extraction
-    pnr_match = re.search(r'pnr[\s:=-]+([a-z0-9]{6,10})', lower)
-    pnr = f"VY-{pnr_match.group(1).upper()}" if pnr_match else f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN"
-
-    # Delay / Cancellation extraction
-    is_cancellation = "cancel" in lower or "cancelled" in lower
-    delay_minutes = live_delay if live_delay > 0 else 45
-    delay_match = re.search(r'(\d+)\s*(mins?|minutes?|hrs?|hours?)', lower)
-    if delay_match:
-        val = int(delay_match.group(1))
-        unit = delay_match.group(2)
-        delay_minutes = val * 60 if "hr" in unit else val
-    elif is_cancellation:
-        delay_minutes = 360
-
-    # Fare extraction
-    fare_match = re.search(r'(?:rs\.?|inr|₹|\$|€|£)\s*([\d,]+(?:\.\d{2})?)', lower)
-    ticket_cost = 1850.0 if mode == "train" else 6450.0
-    if fare_match:
+    if ai_data:
+        carrier = ai_data.get("carrier") or "Carrier"
+        service_number = ai_data.get("service_number") or "Transit Link"
+        raw_origin = ai_data.get("origin") or "Origin"
+        raw_destination = ai_data.get("destination") or "Destination"
+        travel_date_str = ai_data.get("travel_date")
+        if ai_data.get("is_past_journey") is True:
+            is_past_journey = True
+        
+        delay_val = ai_data.get("delay_minutes")
         try:
-            ticket_cost = float(fare_match.group(1).replace(",", ""))
-        except Exception:
-            pass
+            delay_minutes = int(delay_val) if delay_val is not None else 0
+        except (ValueError, TypeError):
+            delay_minutes = 0
 
-    # Save to SQLite database
+        is_cancellation = bool(ai_data.get("is_cancellation", False))
+        pnr = ai_data.get("pnr") or f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN"
+        
+        cost_val = ai_data.get("ticket_cost")
+        try:
+            ticket_cost = float(cost_val) if cost_val is not None else (1250.0 if "rail" in carrier.lower() or "train" in carrier.lower() else 4850.0)
+        except (ValueError, TypeError):
+            ticket_cost = 1250.0
+
+        currency = ai_data.get("currency") or "INR"
+        reason = ai_data.get("disruption_reason") or (f"Operational delay on {service_number}" if delay_minutes > 0 else "Nominal on-schedule operation")
+
+        # Resolve genuine coordinates from extracted locations
+        orig_match = lookup_location(ai_data.get("origin_code") or raw_origin)
+        dest_match = lookup_location(ai_data.get("destination_code") or raw_destination)
+
+        origin_name = orig_match["name"] if orig_match else raw_origin
+        dest_name = dest_match["name"] if dest_match else raw_destination
+        origin_coords = {"lat": orig_match["lat"], "lng": orig_match["lng"]} if orig_match else {"lat": 20.9374, "lng": 77.7796}
+        dest_coords = {"lat": dest_match["lat"], "lng": dest_match["lng"]} if dest_match else {"lat": 21.0455, "lng": 75.8011}
+    else:
+        # 2. Heuristic Regex Fallback with Strict Word Boundaries
+        origin_loc, dest_loc = detect_locations_from_text(combined_text)
+        origin_name = origin_loc["name"]
+        dest_name = dest_loc["name"]
+        origin_coords = {"lat": origin_loc["lat"], "lng": origin_loc["lng"]}
+        dest_coords = {"lat": dest_loc["lat"], "lng": dest_loc["lng"]}
+
+        # Check for Train (Indian Railways / RailRadar)
+        train_num_match = re.search(r'\b(1\d{4}|2\d{4}|12\d{3}|20\d{3}|22\d{3})\b', lower)
+        is_train = bool(train_num_match) or any(k in lower for k in ["train", "vande bharat", "railway", "irctc", "express", "shatabdi", "rajdhani", "ami", "bsl"])
+
+        if is_train:
+            carrier = "Indian Railways"
+            train_num = train_num_match.group(1) if train_num_match else "11026"
+            t_data = RailRadarTracker.get_live_train_status(train_num)
+            service_number = f"#{t_data.get('train_number', train_num)} {t_data.get('train_name', 'Express')}"
+            if not origin_loc and t_data.get("origin"):
+                origin_name = t_data.get("origin")
+            if not dest_loc and t_data.get("destination"):
+                dest_name = t_data.get("destination")
+            live_delay = t_data.get("delay_minutes", 0)
+            mode = "train"
+        else:
+            mode = "flight"
+            carrier = "Air India"
+            if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
+            elif "spicejet" in lower or "sg" in lower: carrier = "SpiceJet"
+            elif "vistara" in lower or "uk" in lower: carrier = "Vistara"
+            elif "british" in lower or "ba" in lower: carrier = "British Airways"
+            elif "swiss" in lower or "lx" in lower: carrier = "SWISS"
+            elif "lufthansa" in lower or "lh" in lower: carrier = "Lufthansa"
+            elif "emirates" in lower or "ek" in lower: carrier = "Emirates"
+
+            service_match = re.search(r'\b(6e|ai|sg|uk|ba|aa|dl|lx|lh|ek)[\s-]?(\d{2,4})\b', lower)
+            if service_match:
+                service_number = f"{service_match.group(1).upper()} {service_match.group(2)}"
+            else:
+                service_number = "6E 521" if "IndiGo" in carrier else ("BA 712" if "British" in carrier else "AI 882")
+
+            live_delay = 0
+
+        # PNR extraction
+        pnr_match = re.search(r'\bpnr[\s:=-]+([a-z0-9]{6,10})\b', lower)
+        pnr = f"VY-{pnr_match.group(1).upper()}" if pnr_match else f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN"
+
+        # Delay extraction
+        is_cancellation = "cancel" in lower or "cancelled" in lower
+        delay_minutes = live_delay if live_delay > 0 else 0
+        delay_match = re.search(r'(\d+)\s*(mins?|minutes?|hrs?|hours?)\s*(?:delay|late)', lower)
+        if delay_match:
+            val = int(delay_match.group(1))
+            unit = delay_match.group(2)
+            delay_minutes = val * 60 if "hr" in unit else val
+        elif is_cancellation:
+            delay_minutes = 360
+
+        # Fare extraction
+        fare_match = re.search(r'(?:rs\.?|inr|₹|\$|€|£)\s*([\d,]+(?:\.\d{2})?)', lower)
+        ticket_cost = 840.0 if mode == "train" else 4850.0
+        if fare_match:
+            try:
+                ticket_cost = float(fare_match.group(1).replace(",", ""))
+            except Exception:
+                pass
+        currency = "INR"
+        reason = f"Operational Delay on {service_number}" if delay_minutes > 0 else ("Service Cancellation" if is_cancellation else "Nominal on-schedule operation")
+
+    # Date extraction & past journey detection
+    import dateutil.parser
+
+    if not travel_date_str:
+        d_match = re.search(r'\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b', combined_text)
+        if d_match:
+            travel_date_str = d_match.group(0)
+        else:
+            d_match2 = re.search(r'\b(\d{1,2})\s*[-/ ]\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s*[-/ ]\s*(\d{2,4})\b', combined_text, re.IGNORECASE)
+            if d_match2:
+                travel_date_str = d_match2.group(0)
+            else:
+                d_match3 = re.search(r'\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2}),?\s+(\d{4})\b', combined_text, re.IGNORECASE)
+                if d_match3:
+                    travel_date_str = d_match3.group(0)
+
+    if travel_date_str:
+        try:
+            dt_obj = dateutil.parser.parse(str(travel_date_str).strip(), fuzzy=True)
+            if dt_obj.year < 100:
+                dt_obj = dt_obj.replace(year=2000 + dt_obj.year)
+            if dt_obj.date() < datetime.now().date():
+                is_past_journey = True
+        except Exception:
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d-%b-%Y", "%d %b %Y", "%d %B %Y"):
+                try:
+                    dt_obj = datetime.strptime(str(travel_date_str).strip(), fmt)
+                    if dt_obj.year < 100:
+                        dt_obj = dt_obj.replace(year=2000 + dt_obj.year)
+                    if dt_obj.date() < datetime.now().date():
+                        is_past_journey = True
+                    break
+                except Exception:
+                    pass
+
+    # Check for past years (2020-2025 or any year prior to current year) in text or date
+    if not is_past_journey:
+        past_years = re.findall(r'\b(20[12][0-5])\b', combined_text)
+        if past_years:
+            is_past_journey = True
+
+    # Check for keywords indicating completed or yesterday journey
+    if any(k in lower for k in ["yesterday", "completed", "past journey", "chart prepared", "traveled on", "historical", "already run"]):
+        is_past_journey = True
+
+    journey_status = "COMPLETED" if is_past_journey else ("CANCELLED" if is_cancellation else ("DELAYED" if delay_minutes > 15 else "ON_TIME"))
+    if is_past_journey:
+        reason = f"Historical Journey ({travel_date_str or 'Past date'}): Service already completed run"
+
+    # Build and persist disruption record with verified coordinates & past journey metadata
     disruption_record = {
         "pnr": pnr,
         "passenger_name": "Elena Vance",
         "booking_source": f"Parsed Ticket ({filename})",
         "carrier": carrier,
         "service_number": service_number,
-        "origin": origin,
-        "destination": destination,
+        "origin": origin_name,
+        "destination": dest_name,
         "origin_coords": origin_coords,
         "dest_coords": dest_coords,
+        "travel_date": travel_date_str or datetime.now().strftime("%Y-%m-%d"),
+        "is_past_journey": is_past_journey,
+        "journey_status": journey_status,
         "delay_minutes": delay_minutes,
         "is_cancellation": is_cancellation,
-        "disruption_reason": f"Operational Delay on {service_number}" if not is_cancellation else f"Service Cancellation on {service_number}",
+        "disruption_reason": reason,
         "ticket_cost": ticket_cost,
-        "currency": "INR"
+        "currency": currency
     }
 
     saved_data = save_external_disruption(disruption_record)
@@ -759,3 +1081,4 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         "text_preview": extracted_text[:300] if extracted_text else "Binary document processed",
         "structured_data": saved_data
     }
+

@@ -73,7 +73,7 @@ export default function Navbar({
       {/* UNIFIED SINGLE-LINE NAVBAR (Everything in the SAME LINE as requested)     */}
       {/* No multi-row stacking, pure clean vector logo without stickers!           */}
       {/* ========================================================================= */}
-      <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
+      <header className="fixed top-4 sm:top-5 left-0 right-0 z-[100] flex justify-center px-3 sm:px-6 pointer-events-none">
         <nav className="pointer-events-auto w-full max-w-6xl rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between bg-[#072422]/90 backdrop-blur-xl border border-white/20 shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
           
           {/* LEFT: EXACT UPLOADED VOYAGE LOGO */}
