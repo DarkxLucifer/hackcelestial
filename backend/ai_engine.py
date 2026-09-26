@@ -2,7 +2,7 @@ import os
 import io
 import json
 import re
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional, TypedDict, Tuple
 from datetime import datetime
 
 # Import AI SDKs
@@ -567,8 +567,114 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         except Exception:
             extracted_text = f"Binary file {filename}"
 
+KNOWN_LOCATIONS = {
+    "bom": {"name": "Mumbai (BOM)", "lat": 19.0896, "lng": 72.8656, "aliases": ["mumbai", "bombay", "cst", "csmt", "bom"]},
+    "del": {"name": "Delhi (DEL)", "lat": 28.5562, "lng": 77.1000, "aliases": ["delhi", "new delhi", "ndls", "igi", "del"]},
+    "blr": {"name": "Bangalore (BLR)", "lat": 12.9716, "lng": 77.5946, "aliases": ["bangalore", "bengaluru", "sbc", "blr", "kempegowda"]},
+    "hyd": {"name": "Hyderabad (HYD)", "lat": 17.2403, "lng": 78.4294, "aliases": ["hyderabad", "secunderabad", "hyd", "rgia"]},
+    "jai": {"name": "Jaipur (JAI)", "lat": 26.9124, "lng": 75.7873, "aliases": ["jaipur", "jp", "jai", "sanganer"]},
+    "maa": {"name": "Chennai (MAA)", "lat": 13.0827, "lng": 80.2707, "aliases": ["chennai", "madras", "maa", "mas"]},
+    "ccu": {"name": "Kolkata (CCU)", "lat": 22.5726, "lng": 88.3639, "aliases": ["kolkata", "calcutta", "ccu", "howrah", "hwh"]},
+    "amd": {"name": "Ahmedabad (AMD)", "lat": 23.0734, "lng": 72.6347, "aliases": ["ahmedabad", "amd", "adi"]},
+    "pnq": {"name": "Pune (PNQ)", "lat": 18.5822, "lng": 73.9197, "aliases": ["pune", "poona", "pnq"]},
+    "goi": {"name": "Goa (GOI)", "lat": 15.3800, "lng": 73.8318, "aliases": ["goa", "dabolim", "goi", "mopa", "gox"]},
+    "cok": {"name": "Kochi (COK)", "lat": 10.1518, "lng": 76.3930, "aliases": ["kochi", "cochin", "cok"]},
+    "lko": {"name": "Lucknow (LKO)", "lat": 26.7606, "lng": 80.8893, "aliases": ["lucknow", "lko"]},
+    "ixc": {"name": "Chandigarh (IXC)", "lat": 30.6735, "lng": 76.7885, "aliases": ["chandigarh", "ixc"]},
+    "vns": {"name": "Varanasi (VNS)", "lat": 25.4524, "lng": 82.8590, "aliases": ["varanasi", "banaras", "vns", "bsb"]},
+    "pat": {"name": "Patna (PAT)", "lat": 25.5913, "lng": 85.0880, "aliases": ["patna", "pat"]},
+    "lhr": {"name": "London (LHR)", "lat": 51.4700, "lng": -0.4543, "aliases": ["london", "lhr", "heathrow", "gatwick", "lgw"]},
+    "zrh": {"name": "Zurich (ZRH)", "lat": 47.4582, "lng": 8.5555, "aliases": ["zurich", "zrh", "kloten", "zurich hb"]},
+    "visp": {"name": "Visp", "lat": 46.2934, "lng": 7.8814, "aliases": ["visp"]},
+    "zermatt": {"name": "Zermatt", "lat": 45.9765, "lng": 7.7491, "aliases": ["zermatt", "matterhorn"]},
+    "gva": {"name": "Geneva (GVA)", "lat": 46.2370, "lng": 6.1092, "aliases": ["geneva", "gva"]},
+    "cdg": {"name": "Paris (CDG)", "lat": 49.0097, "lng": 2.5479, "aliases": ["paris", "cdg", "roissy", "ory"]},
+    "fra": {"name": "Frankfurt (FRA)", "lat": 50.0379, "lng": 8.5622, "aliases": ["frankfurt", "fra"]},
+    "dxb": {"name": "Dubai (DXB)", "lat": 25.2532, "lng": 55.3657, "aliases": ["dubai", "dxb"]},
+    "sin": {"name": "Singapore (SIN)", "lat": 1.3644, "lng": 103.9915, "aliases": ["singapore", "sin", "changi"]},
+    "jfk": {"name": "New York (JFK)", "lat": 40.6413, "lng": -73.7781, "aliases": ["new york", "jfk", "nyc", "newark", "ewr"]},
+    "sfo": {"name": "San Francisco (SFO)", "lat": 37.6213, "lng": -122.3790, "aliases": ["san francisco", "sfo"]},
+    "hnd": {"name": "Tokyo (HND)", "lat": 35.5494, "lng": 139.7798, "aliases": ["tokyo", "hnd", "haneda", "narita", "nrt"]}
+}
+
+def detect_locations_from_text(text: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Finds origin and destination from document text using known location aliases and directional patterns."""
+    text_lower = text.lower()
+    
+    # Check explicit from ... to ... pattern
+    from_to = re.search(r'(?:from|departure|departing|origin)\s*[:\-]?\s*([a-z\s]+?)\s+(?:to|arrival|arriving|dest|destination)\s*[:\-]?\s*([a-z\s]+)', text_lower)
+    if from_to:
+        f_cand, t_cand = from_to.group(1).strip(), from_to.group(2).strip()
+        loc_from = None
+        loc_to = None
+        for key, loc in KNOWN_LOCATIONS.items():
+            if any(alias in f_cand for alias in loc["aliases"]):
+                loc_from = loc
+            if any(alias in t_cand for alias in loc["aliases"]):
+                loc_to = loc
+        if loc_from and loc_to and loc_from != loc_to:
+            return loc_from, loc_to
+
+    # Scan for all occurring locations in sequential order
+    occurrences = []
+    for key, loc in KNOWN_LOCATIONS.items():
+        min_pos = -1
+        for alias in loc["aliases"]:
+            pos = text_lower.find(alias)
+            if pos != -1 and (min_pos == -1 or pos < min_pos):
+                min_pos = pos
+        if min_pos != -1:
+            occurrences.append((min_pos, loc))
+
+    occurrences.sort(key=lambda x: x[0])
+    if len(occurrences) >= 2:
+        return occurrences[0][1], occurrences[1][1]
+    elif len(occurrences) == 1:
+        # If only one found, pair with Delhi or Mumbai
+        single = occurrences[0][1]
+        default_pair = KNOWN_LOCATIONS["del"] if single["name"] != KNOWN_LOCATIONS["del"]["name"] else KNOWN_LOCATIONS["bom"]
+        return single, default_pair
+
+    # Default fallback
+    return KNOWN_LOCATIONS["bom"], KNOWN_LOCATIONS["del"]
+
+def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content_type: Optional[str] = "application/pdf") -> Dict[str, Any]:
+    """
+    Parses real document file (PDF, TXT, Image), extracts travel details,
+    and stores structured disruption in SQLite database.
+    """
+    extracted_text = ""
+    safe_fn = (filename or "ticket.pdf").lower()
+    safe_ct = (content_type or "").lower()
+
+    # PDF extraction
+    if safe_fn.endswith(".pdf") or "pdf" in safe_ct:
+        if pypdf is not None:
+            try:
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+                for page in reader.pages:
+                    txt = page.extract_text()
+                    if txt:
+                        extracted_text += txt + "\n"
+            except Exception as e:
+                extracted_text = f"PDF Read Error: {e}"
+    else:
+        # Text or raw
+        try:
+            extracted_text = file_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            extracted_text = f"Binary file {filename}"
+
     # Extract travel parameters using heuristic regex and keyword scanner
-    lower = (extracted_text + " " + filename).lower()
+    combined_text = extracted_text + " " + filename
+    lower = combined_text.lower()
+
+    # Resolve actual locations and coordinates from document
+    origin_loc, dest_loc = detect_locations_from_text(combined_text)
+    origin = origin_loc["name"]
+    destination = dest_loc["name"]
+    origin_coords = {"lat": origin_loc["lat"], "lng": origin_loc["lng"]}
+    dest_coords = {"lat": dest_loc["lat"], "lng": dest_loc["lng"]}
 
     # 1. Check for Train (Indian Railways / RailRadar)
     train_num_match = re.search(r'\b(1\d{4}|2\d{4}|12\d{3}|20\d{3}|22\d{3})\b', lower)
@@ -579,8 +685,8 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         train_num = train_num_match.group(1) if train_num_match else "20978"
         t_data = RailRadarTracker.get_live_train_status(train_num)
         service_number = f"#{t_data['train_number']} {t_data['train_name']}"
-        origin = t_data.get("origin", "New Delhi (NDLS)")
-        destination = t_data.get("destination", "Jaipur Junction (JP)")
+        if t_data.get("origin"): origin = t_data.get("origin")
+        if t_data.get("destination"): destination = t_data.get("destination")
         live_delay = t_data.get("delay_minutes", 0)
         mode = "train"
     else:
@@ -589,23 +695,18 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
         elif "spicejet" in lower or "sg" in lower: carrier = "SpiceJet"
         elif "vistara" in lower or "uk" in lower: carrier = "Vistara"
+        elif "british" in lower or "ba" in lower: carrier = "British Airways"
+        elif "swiss" in lower or "lx" in lower: carrier = "SWISS"
+        elif "lufthansa" in lower or "lh" in lower: carrier = "Lufthansa"
+        elif "emirates" in lower or "ek" in lower: carrier = "Emirates"
 
         # Flight or service number extraction
-        service_match = re.search(r'(6e|ai|sg|uk|ba|aa|dl)[\s-]?(\d{3,4})', lower)
+        service_match = re.search(r'(6e|ai|sg|uk|ba|aa|dl|lx|lh|ek)[\s-]?(\d{2,4})', lower)
         if service_match:
             service_number = f"{service_match.group(1).upper()} {service_match.group(2)}"
         else:
-            service_number = "6E 521" if "IndiGo" in carrier else "AI 882"
+            service_number = "6E 521" if "IndiGo" in carrier else ("BA 712" if "British" in carrier else "AI 882")
 
-        # Route extraction for flights
-        origin = "Mumbai (BOM)"
-        destination = "Delhi (DEL)"
-        if "delhi" in lower and "jaipur" in lower:
-            origin = "Delhi (DEL)"
-            destination = "Jaipur (JAI)"
-        elif "bangalore" in lower or "blr" in lower:
-            origin = "Bangalore (BLR)"
-            destination = "Delhi (DEL)"
         live_delay = 45
 
     # PNR extraction
@@ -614,7 +715,7 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
 
     # Delay / Cancellation extraction
     is_cancellation = "cancel" in lower or "cancelled" in lower
-    delay_minutes = live_delay if live_delay > 0 else 120
+    delay_minutes = live_delay if live_delay > 0 else 45
     delay_match = re.search(r'(\d+)\s*(mins?|minutes?|hrs?|hours?)', lower)
     if delay_match:
         val = int(delay_match.group(1))
@@ -624,7 +725,7 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         delay_minutes = 360
 
     # Fare extraction
-    fare_match = re.search(r'(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{2})?)', lower)
+    fare_match = re.search(r'(?:rs\.?|inr|₹|\$|€|£)\s*([\d,]+(?:\.\d{2})?)', lower)
     ticket_cost = 1850.0 if mode == "train" else 6450.0
     if fare_match:
         try:
@@ -641,6 +742,8 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         "service_number": service_number,
         "origin": origin,
         "destination": destination,
+        "origin_coords": origin_coords,
+        "dest_coords": dest_coords,
         "delay_minutes": delay_minutes,
         "is_cancellation": is_cancellation,
         "disruption_reason": f"Operational Delay on {service_number}" if not is_cancellation else f"Service Cancellation on {service_number}",

@@ -360,6 +360,7 @@ export default function DisruptionPage({
             {/* Live Map / TDAG Component */}
             <DemoJourneyGraph
               itinerary={itinerary}
+              disruptedTicket={disruptedTicket}
               activeDisruption={activeDisruption || {
                 node_id: "node_flight_1",
                 delay_minutes: disruptedTicket?.delay_minutes || 45,
@@ -402,12 +403,14 @@ export default function DisruptionPage({
         </div>
       )}
 
-      {/* Floating Voyage Logo in Bottom Right Corner ("bottom right crack") */}
-      {/* Minimized chatbot widget that allows re-opening anytime */}
-      {isChatMinimized && (
+      {/* Floating AI Chatbot in Bottom Right Corner */}
+      {/* If minimized: shows "AI Chatbot" pill matching media_1790441117824.jpg */}
+      {/* If expanded: shows floating responsive AI concierge window */}
+      {isDisputeActive && (
         <DisruptionChatbot
-          isOpen={false}
-          isMinimized={true}
+          isOpen={!isChatMinimized}
+          isMinimized={isChatMinimized}
+          isFloating={true}
           onMinimize={() => setIsChatMinimized(true)}
           onRestore={() => {
             setHasEndedChat(false);

@@ -242,6 +242,8 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
         "currency": "INR",
         "rights_evaluation": rights,
         "recommended_plans": recommended_plans,
+        "origin_coords": data.get("origin_coords"),
+        "dest_coords": data.get("dest_coords"),
         "status": "RESOLVING",
         "created_at": now_iso
     }

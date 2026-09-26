@@ -8,6 +8,7 @@ import CartoJourneyMap from './CartoJourneyMap';
 export default function DemoJourneyGraph({ 
   itinerary, 
   activeDisruption, 
+  disruptedTicket,
   onSimulateAlpine, 
   onOpenSaga,
   t 
@@ -15,8 +16,68 @@ export default function DemoJourneyGraph({
   const [selectedNodeId, setSelectedNodeId] = useState('node_flight_1');
   const [activeView, setActiveView] = useState('map'); // 'map' (default) | 'graph'
 
+  const carrier = disruptedTicket?.carrier || "Carrier";
+  const service = disruptedTicket?.service_number || "Transit";
+  const orig = disruptedTicket?.origin || "Origin";
+  const dest = disruptedTicket?.destination || "Destination";
+  const delay = disruptedTicket?.delay_minutes || 45;
+  const isTrain = Boolean(carrier.toLowerCase().includes("rail") || carrier.toLowerCase().includes("train") || service.includes("#"));
+
   // Mathematical Graph Model (Vertices V and Directed Edges E)
-  const nodes = [
+  const nodes = disruptedTicket ? [
+    {
+      id: "node_flight_1",
+      vertexId: "V1",
+      name: `${carrier} ${service}`,
+      mode: isTrain ? "train" : "flight",
+      origin: orig,
+      destination: dest,
+      window: "14:00 → 16:45",
+      delayWindow: `Delayed +${delay}m`,
+      mct: "45m",
+      slack: "+45m",
+      breachSlack: `-${delay}m (BREACH)`,
+      status: "delayed",
+      statusLabel: `DELAYED +${delay}m`,
+      x: 15,
+      y: 45
+    },
+    {
+      id: "node_transfer_1",
+      vertexId: "V2",
+      name: `${dest} Transit Link`,
+      mode: "walk",
+      origin: dest,
+      destination: `${dest} Transit Hub`,
+      window: "17:15 → 17:35",
+      delayWindow: "Connection Window Compromised",
+      mct: "20m",
+      slack: "+20m",
+      breachSlack: `-${Math.max(10, delay - 25)}m (BREACH)`,
+      status: "missed",
+      statusLabel: "CONNECTION IMPACTED",
+      x: 50,
+      y: 45
+    },
+    {
+      id: "node_hotel_1",
+      vertexId: "V3",
+      name: `${dest} Anchor / Destination`,
+      mode: "hotel",
+      origin: dest,
+      destination: dest,
+      window: "Check-in: 20:30",
+      delayWindow: "Protected via Voyage Saga",
+      mct: "15m",
+      slack: "Strict Cutoff",
+      breachSlack: "Ghost Hold Active",
+      status: "protected",
+      statusLabel: "GHOST HOLD PROTECTED",
+      isAnchor: true,
+      x: 85,
+      y: 45
+    }
+  ] : [
     {
       id: "node_flight_1",
       vertexId: "V1",
@@ -191,7 +252,7 @@ export default function DemoJourneyGraph({
 
       {activeView === 'map' ? (
         <div className="mt-4">
-          <CartoJourneyMap activeDisruption={activeDisruption} />
+          <CartoJourneyMap activeDisruption={activeDisruption} disruptedTicket={disruptedTicket} itinerary={itinerary} />
         </div>
       ) : (
         <>

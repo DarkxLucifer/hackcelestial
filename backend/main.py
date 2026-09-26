@@ -313,6 +313,13 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
     is_canc = bool(record.get("is_cancellation", False))
     is_train = "rail" in carrier.lower() or "train" in carrier.lower() or "#" in service or "vande" in service.lower()
 
+    orig_coords_raw = record.get("origin_coords") or {}
+    dest_coords_raw = record.get("dest_coords") or {}
+    orig_lat = float(orig_coords_raw.get("lat", 19.0896 if not is_train else 28.6139))
+    orig_lng = float(orig_coords_raw.get("lng", 72.8656 if not is_train else 77.2090))
+    dest_lat = float(dest_coords_raw.get("lat", 28.5562 if not is_train else 26.9124))
+    dest_lng = float(dest_coords_raw.get("lng", 77.1000 if not is_train else 75.7873))
+
     if is_train:
         # Pull live telemetry from RailRadar
         clean_num = "".join(c for c in service if c.isdigit()) or "20978"
@@ -331,8 +338,8 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
             service_number=f"#{clean_num}",
             origin=source_stn,
             destination=dest_stn,
-            origin_coords=Coordinates(lat=28.6139, lng=77.2090),
-            dest_coords=Coordinates(lat=26.9124, lng=75.7873),
+            origin_coords=Coordinates(lat=orig_lat, lng=orig_lng),
+            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
             start_time="15:15",
             end_time="19:20",
             duration_minutes=245,
@@ -343,7 +350,7 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
             details={
                 "speed_kmh": t_data.get("speed_kmh", 115),
                 "platform": platform,
-                "approaching": t_data.get("current_location", "Delhi Cantt (DEC)"),
+                "approaching": t_data.get("current_location", source_stn),
                 "telemetry_source": "RailRadar Live Telemetry Stream (railradar.in)"
             }
         )
@@ -369,15 +376,15 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
 
         node_destination = ItineraryNode(
             id="node_hotel_1",
-            name="Jaipur Heritage Hotel Check-in / Business Anchor",
+            name=f"{dest_stn} Destination / Hotel Anchor",
             type=NodeType.RESERVATION,
             reservation_type=ReservationType.HOTEL,
             carrier="Destination Hospitality",
-            service_number="RES-JP-9941",
-            origin="Jaipur",
-            destination="Jaipur",
-            origin_coords=Coordinates(lat=26.9124, lng=75.7873),
-            dest_coords=Coordinates(lat=26.9124, lng=75.7873),
+            service_number="RES-ANCHOR-9941",
+            origin=dest_stn,
+            destination=dest_stn,
+            origin_coords=Coordinates(lat=dest_lat, lng=dest_lng),
+            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
             start_time="20:30",
             end_time="23:59",
             duration_minutes=209,
@@ -407,10 +414,10 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
             mode=TransportMode.FLIGHT,
             carrier=f_data.get("airline", carrier),
             service_number=f_data.get("flight_iata", service),
-            origin=f_data.get("departure_airport", origin),
-            destination=f_data.get("arrival_airport", dest),
-            origin_coords=Coordinates(lat=19.0896, lng=72.8656),
-            dest_coords=Coordinates(lat=28.5562, lng=77.1000),
+            origin=origin,
+            destination=dest,
+            origin_coords=Coordinates(lat=orig_lat, lng=orig_lng),
+            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
             start_time="15:30",
             end_time="17:50",
             duration_minutes=140,
@@ -428,13 +435,13 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
 
         node_transfer = ItineraryNode(
             id="node_transfer_1",
-            name="Delhi Airport Express Metro (DMRC GTFS 2.0)",
+            name=f"{dest} Ground Express / Connecting Transit",
             type=NodeType.TRANSPORT,
             mode=TransportMode.TRAIN,
-            carrier="Delhi Metro Rail Corporation",
-            service_number="Orange Line Express",
-            origin="IGI Airport Terminal 3",
-            destination="New Delhi Railway Station (NDLS)",
+            carrier="Transit Express Link",
+            service_number="Connecting Link",
+            origin=dest,
+            destination=f"{dest} Central Hub",
             start_time="18:15",
             end_time="18:36",
             duration_minutes=21,
@@ -447,15 +454,15 @@ def sync_itinerary_from_disruption(record: Dict[str, Any]):
 
         node_destination = ItineraryNode(
             id="node_hotel_1",
-            name="Vande Bharat Express (#20978 NDLS ➔ Jaipur) / Onward Anchor",
+            name=f"{dest} Onward Anchor / Destination",
             type=NodeType.TRANSPORT,
             mode=TransportMode.TRAIN,
-            carrier="Indian Railways",
-            service_number="#20978 Vande Bharat",
-            origin="New Delhi (NDLS)",
-            destination="Jaipur (JP)",
-            origin_coords=Coordinates(lat=28.6139, lng=77.2090),
-            dest_coords=Coordinates(lat=26.9124, lng=75.7873),
+            carrier="Connecting Regional Service",
+            service_number="Connecting Transit",
+            origin=dest,
+            destination=dest,
+            origin_coords=Coordinates(lat=dest_lat, lng=dest_lng),
+            dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
             start_time="19:00",
             end_time="23:15",
             duration_minutes=255,

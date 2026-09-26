@@ -3,14 +3,78 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Plane, Train, Building2, MapPin, Layers, Navigation, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-export default function CartoJourneyMap({ activeDisruption }) {
+export default function CartoJourneyMap({ activeDisruption, disruptedTicket, itinerary }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [mapType, setMapType] = useState('roadmap'); // 'roadmap' | 'satellite' | 'terrain' | 'carto'
-  const [selectedRoute, setSelectedRoute] = useState('india'); // 'india' | 'alpine'
+  const [selectedRoute, setSelectedRoute] = useState(disruptedTicket ? 'uploaded' : 'india');
+
+  // Synchronize when disruptedTicket changes
+  useEffect(() => {
+    if (disruptedTicket) {
+      setSelectedRoute('uploaded');
+    }
+  }, [disruptedTicket]);
 
   // Carto API Key from .env if user wants Carto layer
   const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
+
+  // Dynamic route for uploaded document
+  const uploadedRoute = React.useMemo(() => {
+    if (!disruptedTicket) return null;
+    const origName = disruptedTicket.origin || "Origin Hub";
+    const destName = disruptedTicket.destination || "Destination Hub";
+    const carrier = disruptedTicket.carrier || "Transit";
+    const service = disruptedTicket.service_number || "Service";
+    const delay = disruptedTicket.delay_minutes || 45;
+
+    const origLat = disruptedTicket.origin_coords?.lat ?? 19.0896;
+    const origLng = disruptedTicket.origin_coords?.lng ?? 72.8656;
+    const destLat = disruptedTicket.dest_coords?.lat ?? 28.5562;
+    const destLng = disruptedTicket.dest_coords?.lng ?? 77.1000;
+
+    const isTrain = (carrier.toLowerCase().includes("rail") || carrier.toLowerCase().includes("train") || service.includes("#"));
+
+    return {
+      name: `${origName} → ${destName}`,
+      center: [(origLat + destLat) / 2, (origLng + destLng) / 2],
+      zoom: 6,
+      waypoints: [
+        {
+          id: 1,
+          name: origName,
+          coords: [origLat, origLng],
+          type: isTrain ? "rail" : "flight",
+          badge: isTrain ? "RAIL DEPARTURE" : "FLIGHT DEPARTURE",
+          title: `${origName} Terminal`,
+          status: `Delayed +${delay}m (Disruption Reported)`,
+          color: "#ea4335",
+          info: `${carrier} ${service} • Uploaded Document`
+        },
+        {
+          id: 2,
+          name: destName,
+          coords: [destLat, destLng],
+          type: isTrain ? "rail" : "transfer",
+          badge: "DESTINATION TRANSIT",
+          title: `${destName} Arrival Station / Airport`,
+          status: "Downstream Connection Alert",
+          color: "#fbbc05",
+          info: `Buffer impacted by +${delay}m delay`
+        }
+      ],
+      legs: [
+        {
+          from: [origLat, origLng],
+          to: [destLat, destLng],
+          label: `${service}: ${origName} → ${destName}`,
+          color: "#ea4335",
+          dashArray: "8, 8",
+          weight: 4.5
+        }
+      ]
+    };
+  }, [disruptedTicket]);
 
   // Multi-modal routes data
   const routes = {
@@ -167,10 +231,11 @@ export default function CartoJourneyMap({ activeDisruption }) {
           weight: 4
         }
       ]
-    }
+    },
+    ...(uploadedRoute ? { uploaded: uploadedRoute } : {})
   };
 
-  const currentRouteData = routes[selectedRoute];
+  const currentRouteData = routes[selectedRoute] || (uploadedRoute || routes.india);
 
   // Tile layer generator matching user's requested Google Maps look
   const getTileConfig = (type) => {
@@ -307,6 +372,16 @@ export default function CartoJourneyMap({ activeDisruption }) {
       `);
     });
 
+    // Auto-fit bounds to waypoints so map dynamically centers and zooms to the route
+    if (currentRouteData.waypoints && currentRouteData.waypoints.length > 0) {
+      try {
+        const bounds = L.latLngBounds(currentRouteData.waypoints.map(wp => wp.coords));
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
+      } catch (err) {
+        console.warn("fitBounds warning:", err);
+      }
+    }
+
     // Automatic Invalidate Size for Instant Render
     const invalidate = () => {
       if (mapInstanceRef.current) {
@@ -336,7 +411,7 @@ export default function CartoJourneyMap({ activeDisruption }) {
         mapInstanceRef.current = null;
       }
     };
-  }, [selectedRoute, activeDisruption, mapType, cartoApiKey]);
+  }, [selectedRoute, activeDisruption, mapType, cartoApiKey, uploadedRoute]);
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
@@ -346,6 +421,19 @@ export default function CartoJourneyMap({ activeDisruption }) {
         
         {/* Route Selector (Google style rounded card) */}
         <div className="pointer-events-auto flex items-center bg-white shadow-md border border-slate-200 rounded-xl px-1.5 py-1 text-xs">
+          {uploadedRoute && (
+            <button
+              onClick={() => setSelectedRoute('uploaded')}
+              className={`px-3 py-1.5 rounded-lg font-sans font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedRoute === 'uploaded'
+                  ? 'bg-purple-700 text-white shadow-xs'
+                  : 'text-purple-700 bg-purple-50 hover:bg-purple-100'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Ticket: {uploadedRoute.name}</span>
+            </button>
+          )}
           <button
             onClick={() => setSelectedRoute('india')}
             className={`px-3 py-1.5 rounded-lg font-sans font-semibold transition-all cursor-pointer ${
