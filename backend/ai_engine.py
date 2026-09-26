@@ -204,9 +204,11 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
         if state["user_query"] and (not state["messages"] or state["messages"][-1].get("content") != state["user_query"]):
             formatted_messages.append({"role": "user", "content": state["user_query"]})
 
+        # Updated Sep 2026: llama-3.3-70b-versatile & llama-3.1-8b-instant retired Aug 16 2026.
+        # Current available Groq text models:
         candidate_models = [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant"
+            "qwen/qwen3.8-27b",
+            "openai/gpt-oss-20b",
         ]
 
         last_err = None
@@ -217,7 +219,7 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
                     messages=formatted_messages,
                     temperature=0.4,
                     max_tokens=2048,
-                    timeout=8.0
+                    timeout=20.0
                 )
                 reply = completion.choices[0].message.content
                 if reply and reply.strip():
@@ -238,16 +240,32 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
     """Attempts generation via Google Gemini API with robust model fallback."""
     try:
         genai.configure(api_key=gemini_key)
+        # Priority: cheapest Gemini models first (Sep 2026 pricing)
+        # gemini-3.1-flash-lite: ~$0.25/$1.50 per 1M tokens (cheapest)
+        # gemini-3.5-flash-lite: ~$0.30/$2.50 per 1M tokens
+        # gemini-2.5-flash-lite: budget tier
+        # gemini-2.5-flash: stable fallback
         candidate_models = [
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash-lite",
             "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash"
         ]
 
+        # Build chat history safely, ensuring alternating user/model roles
         chat_history = []
-        for m in state["messages"][:-1]:
-            role = "model" if m.get("role") in ["assistant", "model", "bot"] else "user"
-            chat_history.append({"role": role, "parts": [m.get("content", "")]})
+        if state["messages"] and len(state["messages"]) > 1:
+            for m in state["messages"][:-1]:
+                role = "model" if m.get("role") in ["assistant", "model", "bot"] else "user"
+                content = m.get("content", "")
+                if not content:
+                    continue
+                # Ensure alternating roles (Gemini API requirement)
+                if chat_history and chat_history[-1]["role"] == role:
+                    # Merge consecutive same-role messages
+                    chat_history[-1]["parts"][0] += "\n" + content
+                else:
+                    chat_history.append({"role": role, "parts": [content]})
         
         query = state["user_query"] or (state["messages"][-1]["content"] if state["messages"] else "Hello")
         sys_prompt = get_system_prompt_with_ticket(state)
@@ -1021,7 +1039,8 @@ Document Content:
         for gk in gem_keys:
             try:
                 genai.configure(api_key=gk)
-                model = genai.GenerativeModel("gemini-2.5-flash")
+                # Use cheapest Gemini model for ticket parsing
+                model = genai.GenerativeModel("gemini-3.1-flash-lite")
                 response = model.generate_content(prompt)
                 if response and response.text:
                     raw = response.text.strip()
@@ -1210,7 +1229,11 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
         reason = f"Operational Delay on {service_number}" if delay_minutes > 0 else ("Service Cancellation" if is_cancellation else "Nominal on-schedule operation")
 
     # Date extraction & past journey detection
-    import dateutil.parser
+    try:
+        import dateutil.parser
+        _has_dateutil = True
+    except ImportError:
+        _has_dateutil = False
 
     if not travel_date_str:
         d_match = re.search(r'\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b', combined_text)
@@ -1226,13 +1249,18 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
                     travel_date_str = d_match3.group(0)
 
     if travel_date_str:
-        try:
-            dt_obj = dateutil.parser.parse(str(travel_date_str).strip(), fuzzy=True)
-            if dt_obj.year < 100:
-                dt_obj = dt_obj.replace(year=2000 + dt_obj.year)
-            if dt_obj.date() < datetime.now().date():
-                is_past_journey = True
-        except Exception:
+        parsed_date = False
+        if _has_dateutil:
+            try:
+                dt_obj = dateutil.parser.parse(str(travel_date_str).strip(), fuzzy=True)
+                if dt_obj.year < 100:
+                    dt_obj = dt_obj.replace(year=2000 + dt_obj.year)
+                if dt_obj.date() < datetime.now().date():
+                    is_past_journey = True
+                parsed_date = True
+            except Exception:
+                pass
+        if not parsed_date:
             for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d-%b-%Y", "%d %b %Y", "%d %B %Y"):
                 try:
                     dt_obj = datetime.strptime(str(travel_date_str).strip(), fmt)
@@ -1244,11 +1272,19 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
                 except Exception:
                     pass
 
-    # Check for past years (2020-2025 or any year prior to current year) in text or date
-    if not is_past_journey:
-        past_years = re.findall(r'\b(20[12][0-5])\b', combined_text)
-        if past_years:
-            is_past_journey = True
+    # Only check for past years if a date was explicitly parsed from the travel_date field,
+    # NOT from raw document text (avoids false positives on fares like ₹2,024 or PNR containing 2024)
+    # This check is now based only on the AI-extracted travel_date_str or the parsed date object
+    if not is_past_journey and travel_date_str:
+        # Check if the parsed date string explicitly contains a past year
+        year_in_date = re.search(r'\b(20[0-2]\d)\b', str(travel_date_str))
+        if year_in_date:
+            try:
+                yr = int(year_in_date.group(1))
+                if yr < datetime.now().year:
+                    is_past_journey = True
+            except ValueError:
+                pass
 
     # Check for keywords indicating completed or yesterday journey
     if any(k in lower for k in ["yesterday", "completed", "past journey", "chart prepared", "traveled on", "historical", "already run"]):

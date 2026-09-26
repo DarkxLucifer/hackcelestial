@@ -59,12 +59,14 @@ class AviationStackTracker:
                     flights = data.get("data", [])
                     if flights:
                         f = flights[0]
-                        dep = f.get("departure", {})
-                        arr = f.get("arrival", {})
+                        dep = f.get("departure") or {}
+                        arr = f.get("arrival") or {}
+                        airline_info = f.get("airline") or {}
+                        aircraft_info = f.get("aircraft") or {}
                         delay_m = int(dep.get("delay") or arr.get("delay") or 0)
                         return {
                             "flight_iata": flight_code,
-                            "airline": f.get("airline", {}).get("name", ""),
+                            "airline": airline_info.get("name", ""),
                             "status": f.get("flight_status", "unknown"),
                             "departure_airport": dep.get("airport", ""),
                             "departure_iata": dep.get("iata", ""),
@@ -80,19 +82,28 @@ class AviationStackTracker:
                             "scheduled_arrival": arr.get("scheduled"),
                             "estimated_arrival": arr.get("estimated"),
                             "delay_minutes": delay_m,
-                            "aircraft": f.get("aircraft", {}).get("iata", ""),
-                            "live_telemetry": f.get("live", {}),
+                            "aircraft": aircraft_info.get("iata", ""),
+                            "live_telemetry": f.get("live") or {},
+                            "source": "AviationStack Realtime API"
+                        }
+                    else:
+                        # Flight not found in AviationStack (not flying today, wrong code, etc.)
+                        return {
+                            "flight_iata": flight_code,
+                            "status": "not_found",
+                            "delay_minutes": 0,
+                            "note": f"Flight {flight_code} not found in AviationStack. It may not be flying today or the flight code is incorrect.",
                             "source": "AviationStack Realtime API"
                         }
             except Exception as e:
                 pass  # fall through to unavailable
 
-        # --- No API key or API failed: return transparent unavailable ---
+        # --- No API key or API call failed entirely ---
         return {
             "flight_iata": flight_code,
             "status": "unavailable",
             "delay_minutes": 0,
-            "note": "AviationStack API key not configured. Set AVIATIONSTACK_API_KEY in .env for live flight data.",
+            "note": "AviationStack API key not configured or API call failed. Set AVIATIONSTACK_API_KEY in .env for live flight data." if not self.api_key else "AviationStack API request failed. Check your API key and rate limits.",
             "source": "none"
         }
 
@@ -138,16 +149,22 @@ class RailRadarTracker:
                 envelope = resp.json()
                 data = envelope.get("data", envelope)
                 # Real field names from RailRadar v1 response:
-                train_info = data.get("train", {})
-                source_stn = train_info.get("source", {})
-                dest_stn = train_info.get("destination", {})
-                cur_loc = data.get("currentLocation", {})
-                next_halt = data.get("nextHalt", {})
-                prev_halt = data.get("previousHalt", {})
+                # Use `or {}` to handle null values (e.g. train yet_to_start has null currentLocation)
+                train_info = data.get("train") or {}
+                source_stn = train_info.get("source") or {}
+                dest_stn = train_info.get("destination") or {}
+                cur_loc = data.get("currentLocation") or {}
+                next_halt = data.get("nextHalt") or {}
+                prev_halt = data.get("previousHalt") or {}
 
                 delay_val = int(data.get("delayMinutes") or cur_loc.get("delayMinutes") or 0)
                 status_str = data.get("status", "unknown")   # "running", "completed", "yet_to_start"
                 is_live = data.get("isLive", False)
+
+                # Safe distance calculation (handles None values)
+                total_distance = train_info.get("distance") or 0
+                from_origin = cur_loc.get("distanceFromOriginKm") or 0
+                distance_remaining = round(max(0, total_distance - from_origin), 1)
 
                 return {
                     "train_number": data.get("trainNumber", clean_num),
@@ -163,11 +180,9 @@ class RailRadarTracker:
                     "upcoming_station": next_halt.get("stationName", ""),
                     "prev_station": prev_halt.get("stationName", ""),
                     "delay_minutes": delay_val,
-                    "distance_from_origin_km": cur_loc.get("distanceFromOriginKm", 0),
-                    "distance_remaining_km": round(
-                        train_info.get("distance", 0) - cur_loc.get("distanceFromOriginKm", 0), 1
-                    ),
-                    "avg_speed_kmh": train_info.get("avgSpeed", 0),
+                    "distance_from_origin_km": from_origin,
+                    "distance_remaining_km": distance_remaining,
+                    "avg_speed_kmh": train_info.get("avgSpeed") or 0,
                     "tracking_mode": data.get("trackingMode", ""),
                     "start_date": data.get("startDate", ""),
                     "last_updated": data.get("lastUpdatedAt", ""),

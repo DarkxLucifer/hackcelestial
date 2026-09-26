@@ -214,8 +214,9 @@ def commit_recovery_plan(payload: Dict[str, Any] = Body(...)):
     # Apply replacement nodes to current itinerary
     # Mark old disrupted nodes as resolved / replaced
     for node in current_itinerary.nodes:
-        if node.status.value in ["delayed", "cancelled", "at_risk", "missed"]:
-            node.status = "rebooked"
+        status_val = node.status.value if hasattr(node.status, 'value') else str(node.status)
+        if status_val in ["delayed", "cancelled", "at_risk", "missed"]:
+            node.status = NodeStatus.REBOOKED
 
     current_itinerary.active_disruption = None
     active_impact = None
@@ -249,14 +250,17 @@ def get_passenger_rights():
         "delay_minutes": 65,
         "is_cancellation": False
     }
-    flight_node = current_itinerary.nodes[0]
-    delay = disruption.get("delay_minutes", 65)
-    is_canc = disruption.get("is_cancellation", False)
+    # Find appropriate nodes by transport mode instead of hardcoding indices
+    flight_node = next((n for n in current_itinerary.nodes if n.mode and n.mode.value == "flight"), None)
+    train_node = next((n for n in current_itinerary.nodes if n.mode and n.mode.value == "train"), None)
+    # Fallback to first node if no specific mode found
+    primary_node = flight_node or train_node or current_itinerary.nodes[0]
+    rail_node = train_node or primary_node
 
-    eu261 = PassengerRightsEngine.evaluate_eu261(flight_node, delay, is_canc)
-    us_dot = PassengerRightsEngine.evaluate_us_dot(flight_node, delay, is_canc)
-    rail = PassengerRightsEngine.evaluate_rail_rights(current_itinerary.nodes[2], delay)
-    bridge = PassengerRightsEngine.calculate_parametric_liquidity_bridge(flight_node, delay, is_canc)
+    eu261 = PassengerRightsEngine.evaluate_eu261(primary_node, delay, is_canc)
+    us_dot = PassengerRightsEngine.evaluate_us_dot(primary_node, delay, is_canc)
+    rail = PassengerRightsEngine.evaluate_rail_rights(rail_node, delay)
+    bridge = PassengerRightsEngine.calculate_parametric_liquidity_bridge(primary_node, delay, is_canc)
 
     return {
         "eu261": eu261,
@@ -440,10 +444,10 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
 
         orig_coords_raw = primary_record.get("origin_coords") or {}
         dest_coords_raw = primary_record.get("dest_coords") or {}
-        orig_lat = float(orig_coords_raw.get("lat", 12.9716 if not is_train else 28.6139))
-        orig_lng = float(orig_coords_raw.get("lng", 77.5946 if not is_train else 77.2090))
-        dest_lat = float(dest_coords_raw.get("lat", 17.2403 if not is_train else 26.9124))
-        dest_lng = float(dest_coords_raw.get("lng", 78.4294 if not is_train else 75.7873))
+        orig_lat = float(orig_coords_raw.get("lat") or (12.9716 if not is_train else 28.6139))
+        orig_lng = float(orig_coords_raw.get("lng") or (77.5946 if not is_train else 77.2090))
+        dest_lat = float(dest_coords_raw.get("lat") or (17.2403 if not is_train else 26.9124))
+        dest_lng = float(dest_coords_raw.get("lng") or (78.4294 if not is_train else 75.7873))
 
         node_main = ItineraryNode(
             id="node_main_1",
@@ -727,21 +731,23 @@ async def ai_upload_multiple_documents(request: Request):
     """Alias batch endpoint for uploading multiple travel documents."""
     return await ai_upload_document(request)
 
+@app.post("/api/disruptions/sync-train")
+def sync_train_disruption_endpoint(train_number: str = "20978", delay_minutes: int = 45):
     """
     Directly pulls real telemetry from RailRadar and builds a live Connection Graph for this train.
     """
     t_data = RailRadarTracker.get_live_train_status(train_number)
     record = {
         "carrier": "Indian Railways",
-        "service_number": f"#{t_data['train_number']} {t_data['train_name']}",
+        "service_number": f"#{t_data.get('train_number', train_number)} {t_data.get('train_name', 'Express')}",
         "origin": t_data.get("origin", "New Delhi (NDLS)"),
         "destination": t_data.get("destination", "Jaipur Junction (JP)"),
         "delay_minutes": delay_minutes or t_data.get("delay_minutes", 45),
         "is_cancellation": False,
-        "disruption_reason": f"Signal Clearance Delay on #{t_data['train_number']}",
+        "disruption_reason": f"Signal Clearance Delay on #{t_data.get('train_number', train_number)}",
         "ticket_cost": 1850.0,
         "currency": "INR",
-        "pnr": f"VY-RR-{t_data['train_number']}"
+        "pnr": f"VY-RR-{t_data.get('train_number', train_number)}"
     }
     saved = save_external_disruption(record)
     updated_itin = sync_itinerary_from_disruption(saved)
@@ -758,18 +764,16 @@ def get_ai_models_endpoint():
     """
     return {
         "groq_models": [
-            {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B Versatile", "type": "production", "speed": "Ultra-fast (~300 t/s)", "use_case": "General reasoning, code generation, disruption analysis"},
-            {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B Instant", "type": "production", "speed": "Instant (~800 t/s)", "use_case": "Low-latency dialog, intent classification"},
-            {"id": "qwen/qwen3.8-27b", "name": "Qwen 3.8 27B", "type": "production", "speed": "High-throughput", "use_case": "Multilingual reasoning"},
+            {"id": "qwen/qwen3.8-27b", "name": "Qwen 3.8 27B", "type": "production", "speed": "High-throughput", "use_case": "General reasoning, code generation, disruption analysis, multilingual"},
+            {"id": "openai/gpt-oss-20b", "name": "GPT-OSS 20B", "type": "production", "speed": "Fast (~400 t/s)", "use_case": "Fallback reasoning and intent classification"},
             {"id": "whisper-large-v3", "name": "Whisper Large V3", "type": "audio", "speed": "Real-time speech-to-text", "use_case": "Voice input transcription for tickets & delays"},
             {"id": "whisper-large-v3-turbo", "name": "Whisper Large V3 Turbo", "type": "audio", "speed": "Ultra-fast audio transcription", "use_case": "Low-latency voice disruption reporting"}
         ],
         "gemini_models": [
-            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash (Flagship 2026)", "type": "multimodal_agentic", "speed": "High-speed agentic", "use_case": "State-of-the-art agent workflows, Maps/Grounding, Vision"},
-            {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "type": "multimodal_agentic", "speed": "Fast reasoning", "use_case": "Long-horizon travel resilience & multi-modal routing"},
-            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "type": "production", "speed": "Fast", "use_case": "Stable multimodal processing"},
-            {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "type": "fallback", "speed": "Fast", "use_case": "Pre-configured fallback model in ai_engine.py"},
-            {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "type": "legacy", "speed": "Standard", "use_case": "Secondary legacy fallback"}
+            {"id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite (Cheapest)", "type": "production", "speed": "Ultra-fast budget", "use_case": "Primary model — lowest cost text generation"},
+            {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash Lite", "type": "production", "speed": "Fast budget", "use_case": "Secondary budget model with improved reasoning"},
+            {"id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash Lite", "type": "production", "speed": "Fast", "use_case": "Budget fallback tier"},
+            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "type": "production", "speed": "Fast", "use_case": "Stable multimodal processing fallback"}
         ]
     }
 
