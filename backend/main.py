@@ -52,6 +52,8 @@ if os.path.exists(DIST_DIR):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 @app.get("/")
+@app.get("/booking")
+@app.get("/profile")
 def serve_index():
     if os.path.exists(DIST_DIR):
         index_file = os.path.join(DIST_DIR, "index.html")
@@ -65,37 +67,20 @@ def serve_index():
         "docs": "/docs"
     }
 
-@app.get("/plane.png")
-def serve_plane():
-    plane_path = os.path.join(DIST_DIR, "plane.png")
-    if os.path.exists(plane_path):
-        return FileResponse(plane_path)
-    raise HTTPException(status_code=404, detail="plane.png not found")
+@app.get("/{file_name}")
+def serve_static_root(file_name: str):
+    """Serves static root files or SPA routes (booking, profile)."""
+    if file_name in ["booking", "profile"]:
+        if os.path.exists(DIST_DIR):
+            index_file = os.path.join(DIST_DIR, "index.html")
+            if os.path.exists(index_file):
+                return FileResponse(index_file)
 
-@app.get("/island.jpg")
-def serve_island():
-    island_path = os.path.join(DIST_DIR, "island.jpg")
-    if os.path.exists(island_path):
-        return FileResponse(island_path)
-    raise HTTPException(status_code=404, detail="island.jpg not found")
-
-@app.get("/voyage_logo.png")
-@app.get("/voyage_logo_crop.png")
-@app.get("/voyage_logo_transparent.png")
-def serve_voyage_logo():
-    logo_path = os.path.join(DIST_DIR, "voyage_logo_crop.png")
-    if not os.path.exists(logo_path):
-        logo_path = os.path.join(DIST_DIR, "voyage_logo.png")
-    if os.path.exists(logo_path):
-        return FileResponse(logo_path)
-    raise HTTPException(status_code=404, detail="voyage logo not found")
-
-@app.get("/navbar_ref.png")
-def serve_navbar_ref():
-    nav_path = os.path.join(DIST_DIR, "navbar_ref.png")
-    if os.path.exists(nav_path):
-        return FileResponse(nav_path)
-    raise HTTPException(status_code=404, detail="navbar_ref.png not found")
+    if os.path.exists(DIST_DIR):
+        file_path = os.path.join(DIST_DIR, file_name)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail=f"File {file_name} not found")
 
 @app.get("/api/itinerary")
 def get_itinerary():

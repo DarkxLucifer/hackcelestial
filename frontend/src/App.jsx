@@ -3,13 +3,12 @@ import Navbar from './components/Navbar';
 import PeeledSheetPull from './components/PeeledSheetPull';
 import Hero from './components/Hero';
 import ResilienceLogs from './components/ResilienceLogs';
-import ResiliencePlans from './components/ResiliencePlans';
-import RecoveryComparison from './components/RecoveryComparison';
-import PassengerRightsBridge from './components/PassengerRightsBridge';
-import AgenticSagaModal from './components/AgenticSagaModal';
-import AuthModal from './components/AuthModal';
-import BookingModal from './components/BookingModal';
+import TravelDisputePlans from './components/TravelDisputePlans';
 import TravelAgencySections from './components/TravelAgencySections';
+import BookingPage from './components/BookingPage';
+import ProfilePage from './components/ProfilePage';
+import AuthModal from './components/AuthModal';
+import AgenticSagaModal from './components/AgenticSagaModal';
 import Footer from './components/Footer';
 import { translations } from './translations';
 
@@ -30,21 +29,40 @@ export default function App() {
   const [recoveryPlans, setRecoveryPlans] = useState([]);
   const [passengerRights, setPassengerRights] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
   
-  // Internationalization Language state ('en' | 'mr' | 'hi')
+  // Real SPA Route state ('/' | '/booking' | '/profile')
+  const [currentRoute, setCurrentRoute] = useState(
+    typeof window !== 'undefined' ? (window.location.pathname || '/') : '/'
+  );
+
+  // Multi-Language state ('en' | 'mr' | 'hi')
   const [language, setLanguage] = useState('en');
   const t = translations[language] || translations.en;
 
-  // Authentication & Booking Routing state
-  const [user, setUser] = useState({ name: 'Elena Vance', email: 'elena.vance@voyage.io', tier: 'Plus' });
+  // User state
+  const [user, setUser] = useState({ 
+    name: 'Elena Vance', 
+    email: 'elena.vance@voyage.io', 
+    tier: 'Plus' 
+  });
+
+  // Auth Modal state
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authInitialTab, setAuthInitialTab] = useState('login');
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [postAuthRedirect, setPostAuthRedirect] = useState(null);
 
   // Saga Modal state
   const [isSagaOpen, setIsSagaOpen] = useState(false);
   const [selectedPlanForSaga, setSelectedPlanForSaga] = useState(null);
+
+  // Sync browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentRoute(window.location.pathname || '/');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -125,6 +143,29 @@ export default function App() {
     }
   };
 
+  const handleNavigate = (path) => {
+    setCurrentRoute(path);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleOpenAuth = (tab = 'login', redirectAfter = null) => {
+    setAuthInitialTab(tab);
+    setPostAuthRedirect(redirectAfter);
+    setIsAuthOpen(true);
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setIsAuthOpen(false);
+    if (postAuthRedirect) {
+      handleNavigate(postAuthRedirect);
+      setPostAuthRedirect(null);
+    }
+  };
+
   const handleOpenSagaModal = (plan) => {
     setSelectedPlanForSaga(plan || recoveryPlans[0]);
     setIsSagaOpen(true);
@@ -136,21 +177,10 @@ export default function App() {
     loadInitialData();
   };
 
-  const handleOpenAuth = (tab = 'login') => {
-    setAuthInitialTab(tab);
-    setIsAuthOpen(true);
-  };
-
-  const handleLoginSuccess = (userData) => {
-    setUser(userData);
-    setIsAuthOpen(false);
-    setIsBookingOpen(true);
-  };
-
   return (
     <div className="min-h-screen relative flex flex-col bg-[#FAF9F6] text-voyare-navy font-poppins selection:bg-voyare-coral selection:text-white">
       
-      {/* 1. Navbar matching media_1790416291459.png with EN/MR/HI, Book Now, Resolve Disruption */}
+      {/* 1. SINGLE-LINE UNIFIED NAVBAR (All in the same line without stickers) */}
       <Navbar
         activeDisruption={activeDisruption}
         onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
@@ -161,28 +191,46 @@ export default function App() {
           reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
         })}
         user={user}
-        onLogout={() => setUser(null)}
+        onLogout={() => { setUser(null); handleNavigate('/'); }}
         onOpenAuth={handleOpenAuth}
-        onOpenBooking={() => setIsBookingOpen(true)}
+        onNavigate={handleNavigate}
+        currentRoute={currentRoute}
         language={language}
         onSelectLanguage={setLanguage}
         t={t}
       />
 
-      {/* 2. Fullscreen Island & Airplane 3D Peeled Sheet Scroll Engine */}
-      <PeeledSheetPull
-        activeDisruption={activeDisruption}
-        onSimulateAlpine={() => handleSimulateDisruption({
-          node_id: "node_flight_1",
-          delay_minutes: 65,
-          is_cancellation: false,
-          reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
-        })}
-        t={t}
-      >
-        {/* Section 1: Hero with Demo Journey in Format of Map (Replaced div[1] per user request) */}
-        <Hero
-          itinerary={itinerary}
+      {/* 2. DEDICATED ROUTE: /booking */}
+      {currentRoute === '/booking' && (
+        <>
+          <BookingPage
+            user={user}
+            itinerary={itinerary}
+            activeDisruption={activeDisruption}
+            onNavigate={handleNavigate}
+            onSimulateAlpine={() => handleSimulateDisruption()}
+            t={t}
+          />
+          <Footer />
+        </>
+      )}
+
+      {/* 3. DEDICATED ROUTE: /profile */}
+      {currentRoute === '/profile' && (
+        <>
+          <ProfilePage
+            user={user}
+            onNavigate={handleNavigate}
+            onLogout={() => { setUser(null); handleNavigate('/'); }}
+            t={t}
+          />
+          <Footer />
+        </>
+      )}
+
+      {/* 4. MAIN ROUTE: / (Landing Page with 3D Peeled Sheet & Full Platform) */}
+      {currentRoute !== '/booking' && currentRoute !== '/profile' && (
+        <PeeledSheetPull
           activeDisruption={activeDisruption}
           onSimulateAlpine={() => handleSimulateDisruption({
             node_id: "node_flight_1",
@@ -190,39 +238,53 @@ export default function App() {
             is_cancellation: false,
             reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
           })}
-          onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
           t={t}
-        />
+        >
+          {/* Section 1: Hero with Demo Journey in Format of Map (Replaced div[1]) */}
+          <Hero
+            itinerary={itinerary}
+            activeDisruption={activeDisruption}
+            onSimulateAlpine={() => handleSimulateDisruption({
+              node_id: "node_flight_1",
+              delay_minutes: 65,
+              is_cancellation: false,
+              reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
+            })}
+            onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
+            t={t}
+          />
 
-        {/* Section 2: Minimal Logs Format (Replaces CPM / Sliders / Simulators per user request) */}
-        <ResilienceLogs
-          itinerary={itinerary}
-          activeDisruption={activeDisruption}
-          t={t}
-        />
+          {/* Section 2: Minimal Logs Format (Low-latency Telemetry Stream) */}
+          <ResilienceLogs
+            itinerary={itinerary}
+            activeDisruption={activeDisruption}
+            t={t}
+          />
 
-        {/* Section 3: Plans in Format like Plan Images (Matching media_1790415846480.jpg) */}
-        <ResiliencePlans
-          onSelectPlan={(tier) => handleOpenSagaModal(recoveryPlans[0])}
-          t={t}
-        />
+          {/* Section 3: Travel Dispute & Disruption Plans in ALL-WHITE Format */}
+          <TravelDisputePlans
+            onSelectPlan={(planKey) => handleOpenSagaModal(recoveryPlans[0])}
+            activeDisruption={activeDisruption}
+            t={t}
+          />
 
-        {/* Section 4: Travel Agency Sections from Figma (Services, Top Destinations, 3 Easy Steps, Testimonials) */}
-        <TravelAgencySections
-          onSimulateAlpine={() => handleSimulateDisruption({
-            node_id: "node_flight_1",
-            delay_minutes: 65,
-            is_cancellation: false,
-            reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
-          })}
-          onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
-          activeDisruption={activeDisruption}
-          t={t}
-        />
+          {/* Section 4: Travel Agency Sections from Figma (Services, Destinations, Testimonials) */}
+          <TravelAgencySections
+            onSimulateAlpine={() => handleSimulateDisruption({
+              node_id: "node_flight_1",
+              delay_minutes: 65,
+              is_cancellation: false,
+              reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
+            })}
+            onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
+            activeDisruption={activeDisruption}
+            t={t}
+          />
 
-        {/* Section 5: Footer */}
-        <Footer />
-      </PeeledSheetPull>
+          {/* Section 5: Footer */}
+          <Footer />
+        </PeeledSheetPull>
+      )}
 
       {/* Auth Modal (Login / Sign Up) */}
       <AuthModal
@@ -233,17 +295,7 @@ export default function App() {
         t={t}
       />
 
-      {/* Bookings Dashboard Modal */}
-      <BookingModal
-        isOpen={isBookingOpen}
-        onClose={() => setIsBookingOpen(false)}
-        user={user}
-        itinerary={itinerary}
-        activeDisruption={activeDisruption}
-        t={t}
-      />
-
-      {/* Atomic Distributed Saga Orchestration Modal */}
+      {/* Distributed Saga Orchestrator Modal */}
       <AgenticSagaModal
         plan={selectedPlanForSaga}
         isOpen={isSagaOpen}
