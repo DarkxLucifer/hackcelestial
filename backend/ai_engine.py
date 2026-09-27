@@ -44,41 +44,36 @@ from .travel_retrieval import (
 )
 
 # Default System Prompt for Voyage Intelligence
-SYSTEM_PROMPT = """You are Voyage Intelligence, an advanced autonomous travel resilience concierge and passenger rights advisor.
+SYSTEM_PROMPT = """You are Voyage Intelligence — an advanced AI travel assistant specializing in real-time flight/train/bus disruption analysis and passenger rights enforcement for Indian and international travel.
 
-CRITICAL INSTRUCTIONS:
-1. FOCUS DIRECTLY ON THE USER'S QUESTION WITH STRUCTURED, ACTIONABLE ANSWERS:
-   - Provide direct, concrete, structured, and helpful answers tailored specifically to what the user asked.
-   - DO NOT deflect, stall, or just ask clarifying questions when the user asks for flights, trains, or schedules.
-   - DO NOT dump unsolicited programming code (no Python, no bash scripts, no regex tutorials).
-   - Keep answers clear, readable, and highly informative with tables, bullet points, and specific details.
+=== CONTENT RULES (FOLLOW STRICTLY) ===
 
-2. SCHEDULE, SEARCH & ROUTE QUERIES (MANDATORY STRUCTURED OUTPUT):
-   - When the user asks to search, find, or view flights, trains, or buses (e.g. "search flights from Mumbai to Delhi", "27 sep", "look schedule for morning"):
-   - ALWAYS PROVIDE A STRUCTURED SCHEDULE TABLE OR DETAILED BREAKDOWN with concrete data:
-     * ✈️ Flight / 🚆 Train / 🚌 Bus Code & Operator (e.g., Air India AI 2432, IndiGo 6E 355, Akasa Air QP 1109, Air India Express IX 1050; note: Vistara merged into Air India, UK codes are obsolete)
-     * ⏰ Departure & Arrival Times in IST (e.g., Dep: 14:30 IST ➔ Arr: 16:45 IST)
-     * ⏱️ Travel Duration & Stops (e.g., 2h 15m Non-stop)
-     * 📍 Terminals / Stations (e.g., BOM T2 ➔ DEL T1)
-     * 💰 Estimated Price / Fare in INR (e.g., ₹4,500 – ₹5,400 INR)
-     * 🛡️ Disruption Risk & Resilience Advice (e.g., Morning flights have lowest ATC delay probability; DGCA CAR Section 3 protection)
-   - If the user specifies a time window (e.g. morning, afternoon, evening, night), strictly filter and display flights within that window.
-   - Always present concrete flight/train/bus options immediately in the response, even if you ask a follow-up question at the end.
+RULE 1 — USE ONLY REAL DATA:
+- When real live data is provided in the [REAL LIVE DATA] block, use it EXACTLY. Copy the actual flight codes, train numbers, times, fares, station names.
+- NEVER invent or hallucinate: fake flight codes, fake train numbers, fake fares, fake departure times, fake operator names.
+- If no real data is provided for a query, say clearly: "Live data not available for this query. Here's what I know from reference data: ..."
 
-3. TRAVEL DISRUPTION & PASSENGER RIGHTS:
-   - When the user asks about flight/train delays, cancellations, or compensation:
-     * DGCA CAR Section 3 Series M Part IV (India): Full refund + up to ₹5,000 - ₹10,000 statutory compensation for delays >6 hrs or cancellations without 24hr notice; complimentary refreshments for delays >2 hrs.
-     * EU Regulation (EC) 261/2004 & UK261: €250 to €600 compensation for delays >=3 hrs.
-     * 2024 U.S. DOT Automatic Cash Refund Mandate: Mandatory prompt cash refund for delays >3 hrs domestic, >6 hrs intl.
-     * Indian Railways (IRCTC) TDR: 100% full refund if train is delayed by >3 hrs at boarding point.
-   - Propose clear, actionable recovery plans (airline rebooking, Vande Bharat/rail alternative, or road transport).
+RULE 2 — FORMAT RESPONSES:
+- Use clean Markdown: headers (###), bullet points (•), and tables for schedules.
+- Schedule/search results → always use a Markdown table with: Departure | Flight/Train # | Operator | Route | Duration | Fare | Status
+- Single item details → use bullet list format with bold labels
+- Keep responses concise but complete.
 
-4. STRICT DOMAIN RESTRICTIONS & BOUNDARIES (MANDATORY):
-   - You are exclusively dedicated to travel resilience, flight/train disruptions, tickets, transit, and passenger rights.
-   - You are STRICTLY FORBIDDEN from generating code for games (e.g. Python games, Snake, Tic-Tac-Toe, arcade games, pygame) or unrelated non-travel software.
-   - If asked for game code or off-topic programming, politely refuse and clarify your travel resilience focus.
+RULE 3 — TRAVEL DOMAIN ONLY:
+- Only answer queries about: flights, trains, buses, travel disruptions, passenger rights, refunds, PNR status, travel routes, airports, stations.
+- Refuse politely if asked for games, unrelated code, or off-topic content.
 
-Tone: Professional, precise, structured, empathetic, and actionable.
+RULE 4 — PASSENGER RIGHTS (always append for disruptions):
+- India DGCA CAR Section 3: Delays >2h → free meals; >6h or cancellation → 100% refund + up to ₹10,000 compensation
+- EU Regulation 261/2004: Delays ≥3h → €250–€600 compensation
+- IRCTC TDR: Train delayed >3h at boarding → 100% refund, file before departure
+- US DOT 2024: Delays >3h domestic / >6h international → automatic cash refund
+
+RULE 5 — ACTIVE TICKET CONTEXT:
+- If ticket/PNR data is injected in system context, always refer to it directly
+- Always mention the exact service number, route, and delay in your response
+
+Tone: Professional, clear, structured, empathetic. Use ✈️🚆🚌 emojis for transport modes.
 """
 
 def is_restricted_game_query(query: str) -> bool:
@@ -266,26 +261,38 @@ def get_system_prompt_with_ticket(state: AgentState) -> str:
 
 
 def call_groq(state: AgentState, groq_key: str) -> AgentState:
-    """Attempts generation via Groq API with robust model fallback."""
+    """Attempts generation via Groq API with robust model fallback.
+    Fallback after Gemini. Injects real live tool data so LLaMA never hallucinates.
+    """
     try:
         client = Groq(api_key=groq_key)
         sys_prompt = get_system_prompt_with_ticket(state)
         formatted_messages = [{"role": "system", "content": sys_prompt}]
         for m in state["messages"]:
             formatted_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
-        if state["user_query"] and (not state["messages"] or state["messages"][-1].get("content") != state["user_query"]):
-            formatted_messages.append({"role": "user", "content": state["user_query"]})
 
-        # Priority requested by user:
-        # 1. llama-3.3-70b-versatile
-        # 2. llama-3.1-8b-instant
-        # 3. other available models (qwen/qwen3.8-27b, openai/gpt-oss-20b, openai/gpt-oss-120b)
+        # Inject real live tool context into final user message
+        base_query = state["user_query"] or ""
+        if state.get("live_context"):
+            final_user_content = (
+                "=== REAL LIVE DATA FROM BACKEND TOOLS (USE EXACTLY — DO NOT INVENT) ===\n\n"
+                f"{state['live_context']}\n\n"
+                "=== END OF LIVE DATA ===\n\n"
+                f"User question: {base_query}\n\n"
+                "RULES: Answer ONLY using the real data above. Never invent flight codes, train numbers, fares, times, or operator names. "
+                "Format as clean Markdown tables. End with relevant passenger rights."
+            )
+        else:
+            final_user_content = base_query
+
+        if final_user_content and (not state["messages"] or state["messages"][-1].get("content") != base_query):
+            formatted_messages.append({"role": "user", "content": final_user_content})
+
         candidate_models = [
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant",
-            "qwen/qwen3.8-27b",
-            "openai/gpt-oss-20b",
-            "openai/gpt-oss-120b",
+            "llama3-70b-8192",
+            "mixtral-8x7b-32768",
         ]
 
         last_err = None
@@ -294,14 +301,14 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
                 completion = client.chat.completions.create(
                     model=model_name,
                     messages=formatted_messages,
-                    temperature=0.4,
+                    temperature=0.3,
                     max_tokens=2048,
                     timeout=20.0
                 )
                 reply = completion.choices[0].message.content
                 if reply and reply.strip():
                     state["response"] = reply
-                    state["provider"] = "Voyage AI Engine"
+                    state["provider"] = f"Groq ({model_name})"
                     return state
             except Exception as me:
                 last_err = me
@@ -313,20 +320,20 @@ def call_groq(state: AgentState, groq_key: str) -> AgentState:
         state["error"] = f"Groq error: {str(e)}"
         return state
 
+
 def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
-    """Attempts generation via Google Gemini API with robust model fallback."""
+    """Attempts generation via Google Gemini API with robust model fallback.
+    Priority: gemini-2.0-flash (primary) → gemini-1.5-flash → gemini-1.5-pro
+    """
     try:
         genai.configure(api_key=gemini_key)
-        # Priority: cheapest Gemini models first (Sep 2026 pricing)
-        # gemini-3.1-flash-lite: ~$0.25/$1.50 per 1M tokens (cheapest)
-        # gemini-3.5-flash-lite: ~$0.30/$2.50 per 1M tokens
-        # gemini-2.5-flash-lite: budget tier
-        # gemini-2.5-flash: stable fallback
+        # REAL available Gemini models — ordered fastest/cheapest to most capable
         candidate_models = [
-            "gemini-3.1-flash-lite",
-            "gemini-3.5-flash-lite",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
+            "gemini-2.5-flash",        # Primary: fast, accurate, stable
+            "gemini-2.5-flash-lite",   # Fast lightweight
+            "gemini-flash-latest",     # Latest flash alias
+            "gemini-3.1-flash-lite",   # Budget 3.1 tier
+            "gemini-2.5-pro",          # Most capable reasoning fallback
         ]
 
         # Build chat history safely, ensuring alternating user/model roles
@@ -337,15 +344,31 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
                 content = m.get("content", "")
                 if not content:
                     continue
-                # Ensure alternating roles (Gemini API requirement)
                 if chat_history and chat_history[-1]["role"] == role:
-                    # Merge consecutive same-role messages
                     chat_history[-1]["parts"][0] += "\n" + content
                 else:
                     chat_history.append({"role": role, "parts": [content]})
-        
+
         query = state["user_query"] or (state["messages"][-1]["content"] if state["messages"] else "Hello")
         sys_prompt = get_system_prompt_with_ticket(state)
+
+        # CRITICAL: Always inject real live tool data directly into the query.
+        # This ensures Gemini sees actual API responses (flights, trains, buses)
+        # and does NOT hallucinate or invent fake data.
+        if state.get("live_context"):
+            full_query = (
+                "=== REAL LIVE DATA FROM BACKEND TOOLS (USE EXACTLY — DO NOT INVENT DATA) ===\n\n"
+                f"{state['live_context']}\n\n"
+                "=== END OF LIVE DATA ===\n\n"
+                f"User's question: {query}\n\n"
+                "RULES:\n"
+                "1. Answer ONLY using the real data above. NEVER make up flight codes, train numbers, fares, times, or operator names.\n"
+                "2. Format your response in clean Markdown with tables for schedule data.\n"
+                "3. Include relevant passenger rights (DGCA/EU261/IRCTC TDR) at the end.\n"
+                "4. Be specific: use exact values from the data (flight codes, IST times, INR fares, station names)."
+            )
+        else:
+            full_query = query
 
         last_err = None
         for model_name in candidate_models:
@@ -356,12 +379,12 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
                 )
                 if chat_history:
                     chat = model.start_chat(history=chat_history)
-                    response = chat.send_message(query)
+                    response = chat.send_message(full_query)
                 else:
-                    response = model.generate_content(query)
+                    response = model.generate_content(full_query)
                 if response and response.text and response.text.strip():
                     state["response"] = response.text
-                    state["provider"] = "Voyage AI Engine"
+                    state["provider"] = f"Gemini ({model_name})"
                     return state
             except Exception as me:
                 last_err = me
@@ -373,8 +396,48 @@ def call_gemini(state: AgentState, gemini_key: str) -> AgentState:
         state["error"] = f"Gemini error: {str(e)}"
         return state
 
+def extract_all_routes_from_text(text: str) -> List[Tuple[str, str]]:
+    """
+    Intelligently extracts all origin-destination city/airport pairs from query text.
+    Recognizes all cities, airports, station codes in KNOWN_LOCATIONS and RailRadar corridors.
+    Handles 'mumbai to goa', 'from pune to solapur', 'for delhi to jaipur', etc.
+    """
+    city_map = {}
+    try:
+        for code, loc in KNOWN_LOCATIONS.items():
+            c_name = loc['city'].title()
+            city_map[c_name.lower()] = c_name
+            for a in loc.get('aliases', []):
+                city_map[a.lower()] = c_name
+    except Exception:
+        pass
+    try:
+        from .travel_retrieval import RailRadarTracker
+        for city, aliases in RailRadarTracker._CITY_ALIASES.items():
+            c_name = city.title()
+            city_map[c_name.lower()] = c_name
+            for a in aliases:
+                city_map[a.lower()] = c_name
+    except Exception:
+        pass
+
+    routes = []
+    # Pattern: (from/for/between/travel)? WORD to WORD
+    pattern = r'(?:from|for|between|travel)?\s*([a-zA-Z]+)\s*(?:to|and|-|➔)\s*([a-zA-Z]+)'
+    for m in re.finditer(pattern, text, re.I):
+        w1 = m.group(1).lower()
+        w2 = m.group(2).lower()
+        if w1 in city_map and w2 in city_map and city_map[w1] != city_map[w2]:
+            pair = (city_map[w1], city_map[w2])
+            if pair not in routes:
+                routes.append(pair)
+    return routes
+
 def extract_route_pair(q_text: str) -> tuple[str, str]:
     """Extract origin and destination city or airport names from user query."""
+    routes = extract_all_routes_from_text(q_text)
+    if routes:
+        return routes[0]
     m = re.search(r'(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
     if not m:
         m = re.search(r'([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+)', q_text, re.IGNORECASE)
@@ -384,6 +447,7 @@ def extract_route_pair(q_text: str) -> tuple[str, str]:
         clean_pattern = r'^(?:can\s+you\s+)?(?:please\s+)?(?:give|show|tell|find|search|check|get|me|info|information|details|about|tickets?|schedule|status|flights?|fights?|trains?|buses?|travels?|options?|for|the|cheap|cheapest|any)\s+'
         o_clean = re.sub(clean_pattern, '', o_raw, flags=re.IGNORECASE).strip().title()
         d_clean = re.sub(r'\s+(?:flights?|fights?|trains?|buses?|travels?|options?|details?|tickets?|today|tomorrow|now|please)$', '', d_raw, flags=re.IGNORECASE).strip().title()
+        d_clean = re.split(r'\s+(?:and|or|with|then|where|plus|also|msrtc|redbus|bus|flight|train)\s+', d_clean, flags=re.IGNORECASE)[0].strip()
         if len(o_clean) >= 2 and len(d_clean) >= 2 and o_clean.lower() != d_clean.lower():
             return o_clean, d_clean
     return "", ""
@@ -405,6 +469,22 @@ def call_expert_engine(state: AgentState) -> AgentState:
             "Please let me know if you would like help with an upcoming flight, train, or travel disruption!"
         )
         state["provider"] = "Voyage AI Engine"
+        return state
+
+    # Case 00: Real-time telemetry / schedule data was retrieved from live tools
+    if state.get("live_context") and not any(k in lower for k in ["claim", "claims", "refund claim"]):
+        state["response"] = (
+            "### 🧭 Voyage Real-Time Travel Intelligence\n\n"
+            f"{state['live_context']}\n\n"
+            "---\n\n"
+            "#### 🛡️ Statutory Passenger Rights & Protection:\n"
+            "• **Air Travel (DGCA CAR Section 3)**: Delays >2h require complimentary refreshments at departure gate. Delays >6h or cancellations qualify for 100% full cash refund with zero penalty plus statutory compensation up to ₹10,000.\n"
+            "• **Rail Travel (IRCTC TDR Rules)**: If your train is delayed by ≥3 hours at your boarding station, you can surrender your ticket via online TDR before train departure for a complete 100% full refund.\n"
+            "• **Intercity Road Transport**: State MSRTC and verified private sleeper services operate frequent direct highway departures with live tracking."
+        )
+        state["provider"] = "Voyage AI Engine (Expert Resilience Mode)"
+        return state
+
     # Case 0a: User asks about refund claims / dispute status
     if any(k in lower for k in ["claim", "claims", "refund claim", "filed claim", "claim receipt", "dispute", "claim status"]):
         db_claims = get_all_refund_claims()
@@ -1157,16 +1237,25 @@ def run_ai_chat(
             "\n\nINSTRUCTION: When asked about claims, refunds, or dispute filings, report these actual filed claims from the database with their claim IDs, amounts, and filing status."
         )
 
-    # 1. Detect train query (5-digit Indian Railways train number) or reference to active ticket train
+    # Build full conversation context text for multi-turn intent extraction
+    full_context_text = " ".join([m.get("content", "") for m in messages]) + " " + query
+    full_lower = full_context_text.lower()
+
+    # Extract all recognized origin-destination city/airport pairs from user query and context
+    query_routes = extract_all_routes_from_text(full_context_text)
+    if not query_routes:
+        single_pair = extract_route_pair(query)
+        if single_pair and single_pair[0] and single_pair[1]:
+            query_routes = [single_pair]
+
+    # 1. Detect train numbers (5-digit Indian Railways train number) or active ticket train
+    all_train_nums = re.findall(r'\b([012]\d{4})\b', query)
     act_service = str(active_ticket.get("service_number", "")) if active_ticket else ""
     act_train_match = re.search(r'\b([012]\d{4})\b', act_service)
-    target_train_num = None
-    if train_match:
-        target_train_num = train_match.group(1)
-    elif act_train_match and any(w in query.lower() for w in ["train", "status", "track", "delay", "running", "location", "where", "ticket", "trip", "journey", "my", "schedule", "info", "pnr", "summary", "give"]):
-        target_train_num = act_train_match.group(1)
+    if not all_train_nums and act_train_match and any(w in query.lower() for w in ["train", "status", "track", "delay", "running", "location", "where", "ticket", "trip", "journey", "my", "schedule", "info", "pnr", "summary", "give"]):
+        all_train_nums = [act_train_match.group(1)]
 
-    if target_train_num:
+    for target_train_num in all_train_nums:
         try:
             from .travel_retrieval import RailRadarTracker
             t_data = RailRadarTracker.get_live_train_status(target_train_num)
@@ -1174,7 +1263,6 @@ def run_ai_chat(
                 delay_val = t_data.get('delay_minutes', 0)
                 delay_str = f"+{delay_val} mins delay" if delay_val > 0 else "Running Right Time (On-Time)"
 
-                # Check if active_ticket is for this train
                 is_ticket_for_train = bool(active_ticket and (
                     (target_train_num and target_train_num in str(active_ticket.get("service_number", ""))) or
                     "train" in str(active_ticket.get("carrier", "")).lower() or
@@ -1183,7 +1271,6 @@ def run_ai_chat(
 
                 ticket_origin = active_ticket.get("origin") if (active_ticket and is_ticket_for_train) else None
                 ticket_dest = active_ticket.get("destination") if (active_ticket and is_ticket_for_train) else None
-
                 orig_disp = ticket_origin or t_data.get("origin", "Origin")
                 dest_disp = ticket_dest or t_data.get("destination", "Destination")
 
@@ -1214,50 +1301,42 @@ def run_ai_chat(
                     f"INSTRUCTION: When answering, provide these accurate real-time live telemetry details for this train.{dest_instruction}"
                 )
                 
-                ticket_pnr = active_ticket.get("pnr") if (active_ticket and is_ticket_for_train) else None
-                ticket_cost = active_ticket.get("ticket_cost") if (active_ticket and is_ticket_for_train) else None
-                pax_name = active_ticket.get("passenger_name", "Passenger") if (active_ticket and is_ticket_for_train) else "Passenger"
-                
-                extracted_train_card = {
-                    "carrier": "Indian Railways",
-                    "service_number": f"#{t_data['train_number']} {t_data['train_name']}",
-                    "origin": orig_disp,
-                    "destination": dest_disp,
-                    "delay_minutes": delay_val,
-                    "is_cancellation": False,
-                    "is_past_journey": active_ticket.get("is_past_journey", False) if (active_ticket and is_ticket_for_train) else False,
-                    "disruption_reason": f"Live location: {t_data.get('current_location', 'In transit')} • {delay_str}",
-                    "pnr": ticket_pnr or f"LIVE-ENQ-{t_data['train_number']}",
-                    "ticket_cost": ticket_cost,
-                    "currency": active_ticket.get("currency", "INR") if active_ticket else "INR",
-                    "passenger_name": pax_name,
-                    "current_location": t_data.get("current_location"),
-                    "upcoming_station": t_data.get("upcoming_station"),
-                    "status": t_data.get("status"),
-                    "train_terminus_origin": t_data.get("origin"),
-                    "train_terminus_destination": t_data.get("destination"),
-                    "source": "RailRadar Live API v1"
-                }
-        except Exception as e:
+                if not extracted_train_card:
+                    ticket_pnr = active_ticket.get("pnr") if (active_ticket and is_ticket_for_train) else None
+                    ticket_cost = active_ticket.get("ticket_cost") if (active_ticket and is_ticket_for_train) else None
+                    pax_name = active_ticket.get("passenger_name", "Passenger") if (active_ticket and is_ticket_for_train) else "Passenger"
+                    extracted_train_card = {
+                        "carrier": "Indian Railways",
+                        "service_number": f"#{t_data['train_number']} {t_data['train_name']}",
+                        "origin": orig_disp,
+                        "destination": dest_disp,
+                        "delay_minutes": delay_val,
+                        "is_cancellation": False,
+                        "is_past_journey": active_ticket.get("is_past_journey", False) if (active_ticket and is_ticket_for_train) else False,
+                        "disruption_reason": f"Live location: {t_data.get('current_location', 'In transit')} • {delay_str}",
+                        "pnr": ticket_pnr or f"LIVE-ENQ-{t_data['train_number']}",
+                        "ticket_cost": ticket_cost,
+                        "currency": active_ticket.get("currency", "INR") if active_ticket else "INR",
+                        "passenger_name": pax_name,
+                        "current_location": t_data.get("current_location"),
+                        "upcoming_station": t_data.get("upcoming_station"),
+                        "status": t_data.get("status"),
+                        "train_terminus_origin": t_data.get("origin"),
+                        "train_terminus_destination": t_data.get("destination"),
+                        "source": "RailRadar Live API v1"
+                    }
+        except Exception:
             pass
 
-    # 1b. Train Route Corridor Query (e.g. "train from Mumbai to Delhi", "trains between Delhi and Jaipur")
-    train_keywords = ["train", "trains", "rail", "railway", "irctc", "railradar", "vande bharat", "rajdhani", "shatabdi", "duronto", "tejas", "express"]
-    is_train_route = any(w in query.lower() for w in train_keywords) and not train_match
-    if is_train_route:
-        orig_t, dest_t = extract_route_pair(query)
-        if not orig_t or not dest_t:
-            if "mumbai" in query.lower() and "delhi" in query.lower():
-                orig_t, dest_t = "Mumbai", "Delhi"
-            elif "delhi" in query.lower() and "jaipur" in query.lower():
-                orig_t, dest_t = "Delhi", "Jaipur"
-            elif "mumbai" in query.lower() and "pune" in query.lower():
-                orig_t, dest_t = "Mumbai", "Pune"
-        if orig_t and dest_t and orig_t.lower() != dest_t.lower():
+    # 2. Train Route Corridor Query (e.g. "train from Pune to Solapur", "train from Mumbai to Delhi")
+    train_keywords = ["train", "trains", "rail", "railway", "irctc", "railradar", "vande bharat", "rajdhani", "shatabdi", "duronto", "tejas", "express", "travel"]
+    is_train_route = any(w in query.lower() for w in train_keywords)
+    if is_train_route and query_routes:
+        for orig_t, dest_t in query_routes:
             try:
                 from .travel_retrieval import RailRadarTracker
                 live_trains = RailRadarTracker.search_route_trains(orig_t, dest_t)
-                if live_trains:
+                if live_trains and live_trains[0].get("train_number") != "N/A":
                     tr_rows = []
                     for tr in live_trains:
                         del_val = tr.get("delay_minutes", 0)
@@ -1275,7 +1354,7 @@ def run_ai_chat(
             except Exception:
                 pass
 
-    # 2. Detect specific flight query (e.g. AI 882, 6E 521, BA 712)
+    # 3. Flight queries (Specific Flight Code OR Route Queries)
     flight_match = re.search(r'\b([A-Za-z]{2}\s?\d{3,4})\b', query)
     if flight_match and any(w in query.lower() for w in ["flight", "fight", "status", "track", "radar", "airline", "delay"]):
         flight_code = flight_match.group(1).upper()
@@ -1301,61 +1380,35 @@ def run_ai_chat(
             except Exception:
                 pass
 
-    # 2b. Multi-turn Flight Corridor & Schedule Search (e.g. "search flights from Mumbai to Delhi", "27 sep", "look schedule for morning")
-    full_context_text = " ".join([m.get("content", "") for m in messages]) + " " + query
-    full_lower = full_context_text.lower()
     flight_keywords = ["flight", "flights", "fight", "flite", "fly", "flying", "plane", "planes", "airline", "airlines", "airways", "airfare"]
     is_flight_intent = any(w in full_lower for w in flight_keywords)
+    if is_flight_intent and query_routes:
+        date_str = None
+        d_match = re.search(r'\b(\d{1,2})\s*(?:th|st|nd|rd)?\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b', full_context_text, re.IGNORECASE)
+        if d_match:
+            date_str = f"{d_match.group(2).capitalize()} {d_match.group(1)}"
+        elif "tomorrow" in full_lower:
+            date_str = "Tomorrow"
+        elif "today" in full_lower:
+            date_str = "Today"
 
-    if is_flight_intent:
-        orig_f, dest_f = "", ""
-        m_rt = re.search(r'(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', full_context_text, re.IGNORECASE)
-        if m_rt:
-            o_clean = re.sub(r'^(?:can\s+you\s+)?(?:please\s+)?(?:give|show|tell|find|search|check|get|me|info|information|details|about|tickets?|schedule|status|flights?|fights?|options?|for|the|cheap|cheapest|any)\s+', '', m_rt.group(1).strip(), flags=re.I).strip()
-            d_clean = re.sub(r'\s+(?:flights?|fights?|options?|details?|tickets?|today|tomorrow|now|please|morning|evening|night|afternoon|\d{1,2}\s+[a-zA-Z]+)$', '', m_rt.group(2).strip(), flags=re.I).strip()
-            orig_f, dest_f = o_clean, d_clean
+        time_win = None
+        if any(w in query.lower() for w in ["morning", "early", "am", "dawn"]):
+            time_win = "morning"
+        elif any(w in query.lower() for w in ["afternoon", "noon", "midday", "lunch"]):
+            time_win = "afternoon"
+        elif any(w in query.lower() for w in ["evening", "dusk"]):
+            time_win = "evening"
+        elif any(w in query.lower() for w in ["night", "late", "pm", "red eye", "overnight"]):
+            time_win = "night"
 
-        if not orig_f or not dest_f:
-            if "mumbai" in full_lower and "delhi" in full_lower:
-                orig_f, dest_f = "Mumbai", "Delhi"
-            elif "bangalore" in full_lower and "delhi" in full_lower:
-                orig_f, dest_f = "Bangalore", "Delhi"
-            elif "mumbai" in full_lower and "bangalore" in full_lower:
-                orig_f, dest_f = "Mumbai", "Bangalore"
-            elif "mumbai" in full_lower and "goa" in full_lower:
-                orig_f, dest_f = "Mumbai", "Goa"
-            elif "delhi" in full_lower and "jaipur" in full_lower:
-                orig_f, dest_f = "Delhi", "Jaipur"
-
-        if orig_f and dest_f and orig_f.lower() != dest_f.lower():
-            o_loc = lookup_location(orig_f)
-            d_loc = lookup_location(dest_f)
-            dep_code = o_loc["code"] if o_loc else orig_f[:3].upper()
-            arr_code = d_loc["code"] if d_loc else dest_f[:3].upper()
-
-            # Detect date in conversation
-            date_str = None
-            d_match = re.search(r'\b(\d{1,2})\s*(?:th|st|nd|rd)?\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b', full_context_text, re.IGNORECASE)
-            if d_match:
-                date_str = f"{d_match.group(2).capitalize()} {d_match.group(1)}"
-            elif "tomorrow" in full_lower:
-                date_str = "Tomorrow"
-            elif "today" in full_lower:
-                date_str = "Today"
-
-            # Detect time window
-            time_win = None
-            if any(w in query.lower() for w in ["morning", "early", "am", "dawn"]):
-                time_win = "morning"
-            elif any(w in query.lower() for w in ["afternoon", "noon", "midday", "lunch"]):
-                time_win = "afternoon"
-            elif any(w in query.lower() for w in ["evening", "dusk"]):
-                time_win = "evening"
-            elif any(w in query.lower() for w in ["night", "late", "pm", "red eye", "overnight"]):
-                time_win = "night"
-
+        for orig_f, dest_f in query_routes:
             try:
                 from .travel_retrieval import AviationStackTracker
+                o_loc = lookup_location(orig_f)
+                d_loc = lookup_location(dest_f)
+                dep_code = o_loc["code"] if o_loc else orig_f[:3].upper()
+                arr_code = d_loc["code"] if d_loc else dest_f[:3].upper()
                 tracker = AviationStackTracker()
                 route_flights = tracker.search_route_flights(dep_iata=dep_code, arr_iata=arr_code, flight_date=date_str, time_window=time_win)
                 if route_flights:
@@ -1364,7 +1417,6 @@ def run_ai_chat(
                         fl_rows.append(
                             f"| {rf['departure_time']} | **{rf['flight_iata']}** | {rf['airline']} | {rf['departure_iata']} ({rf['departure_terminal']}) ➔ {rf['arrival_iata']} ({rf['arrival_terminal']}) | {rf['duration']} | ₹{rf['estimated_fare_inr']:,} INR | {rf['status'].upper()} |"
                         )
-                    
                     context_header = f"VERIFIED LIVE FLIGHT SCHEDULE ({orig_f} [{dep_code}] ➔ {dest_f} [{arr_code}])"
                     if date_str:
                         context_header += f" FOR {date_str.upper()}"
@@ -1376,27 +1428,19 @@ def run_ai_chat(
                         "| Departure | Flight | Airline | Route / Terminals | Duration | Est. Fare | Status |\n"
                         "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
                         + "\n".join(fl_rows) +
-                        "\n\nINSTRUCTION: Present these concrete real flights immediately to the traveler in a clean, structured Markdown table with exact times in IST, flight codes, airlines, terminals, duration, and estimated fares in INR. Only list actual operating carriers (IndiGo, Air India, Akasa Air, Air India Express, SpiceJet; note that Vistara merged into Air India). Highlight operational resilience (early morning departures have lowest ATC congestion delay risk). Conclude with DGCA CAR Section 3 statutory passenger rights (>2h delay = complimentary meals, >6h delay/cancellation = 100% full refund). DO NOT ask open questions without presenting this structured schedule table first."
+                        "\n\nINSTRUCTION: Present these concrete real flights immediately to the traveler in a clean, structured Markdown table with exact times in IST, flight codes, airlines, terminals, duration, and estimated fares in INR. Only list actual operating carriers (IndiGo, Air India, Akasa Air, Air India Express, SpiceJet; note that Vistara merged into Air India). Conclude with DGCA CAR Section 3 statutory passenger rights (>2h delay = complimentary meals, >6h delay/cancellation = 100% full refund)."
                     )
             except Exception:
                 pass
 
-    # 3. Detect bus / travels query between two cities (STRICT: only if bus keywords present)
-    bus_keywords = ["bus", "buses", "travels", "redbus", "abhibus", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma", "zingbus", "sleeper", "volvo bus", "intercity bus"]
+    # 4. Bus / Travels query between cities
+    bus_keywords = ["bus", "buses", "travels", "redbus", "abhibus", "msrtc", "shivshahi", "shivneri", "konduskar", "sharma", "zingbus", "sleeper", "volvo bus", "intercity bus", "road"]
     has_bus_intent = any(w in query.lower() for w in bus_keywords)
-    bus_query_pattern = re.search(r'(?:travels?|buses?|bus|ride|taxi|cab|road)\s+(?:from|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)', query, re.IGNORECASE)
-    if not bus_query_pattern and has_bus_intent:
-        bus_query_pattern = re.search(r'(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:travels?|buses?|bus|route))?$', query, re.IGNORECASE)
-    
-    if bus_query_pattern and has_bus_intent:
-        orig_candidate = bus_query_pattern.group(1).strip()
-        dest_candidate = bus_query_pattern.group(2).strip()
-        orig_clean = re.sub(r'^(search|give|show|find|list|for|the)\s+', '', orig_candidate, flags=re.I).strip().title()
-        dest_clean = re.sub(r'\s+(travels?|buses?|bus|options|details)$', '', dest_candidate, flags=re.I).strip().title()
-        if len(orig_clean) >= 3 and len(dest_clean) >= 3 and orig_clean.lower() != dest_clean.lower():
+    if has_bus_intent and query_routes:
+        for orig_b, dest_b in query_routes:
             try:
                 from .travel_retrieval import GTFSAndBusRetriever
-                buses = GTFSAndBusRetriever.search_intercity_buses(orig_clean, dest_clean)
+                buses = GTFSAndBusRetriever.search_intercity_buses(orig_b, dest_b)
                 if buses:
                     buses_result = buses
                     bus_lines = []
@@ -1410,14 +1454,15 @@ def run_ai_chat(
                             f"   • Booking: {b.get('provider')} ({b.get('booking_link')})"
                         )
                     live_context_parts.append(
-                        f"VERIFIED INTERCITY BUS & TRAVEL OPERATOR SCHEDULE ({orig_clean} ➔ {dest_clean}):\n"
+                        f"VERIFIED INTERCITY BUS & TRAVEL OPERATOR SCHEDULE ({orig_b} ➔ {dest_b}):\n"
                         + "\n".join(bus_lines) +
-                        f"\n\nINSTRUCTION: The user is specifically asking for travel/bus options between {orig_clean} and {dest_clean}. "
+                        f"\n\nINSTRUCTION: The user is specifically asking for travel/bus options between {orig_b} and {dest_b}. "
                         "1. Give a comprehensive, structured breakdown featuring these departures with specific operators, departure times, boarding stands, drop points, exact fares in INR, and booking guidance. "
                         "2. IMPORTANT: At the end of your response, explicitly ask the traveler what time of day or specific hour they prefer to depart (e.g. 🌅 Morning 06:00–12:00, ☀️ Afternoon 12:00–18:00, or 🌙 Overnight Sleeper after 20:00), so you can narrow down or suggest the best schedule for them."
                     )
-            except Exception as e:
+            except Exception:
                 pass
+
 
     # 4. Detect web URL to scrape live information
     url_match = re.search(r'https?://[^\s<>"]+', query)
