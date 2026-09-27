@@ -202,13 +202,28 @@ export default function DisruptionPage({
     if (record) {
       setDisruptedTicket(record);
     }
-    if (allRecords && allRecords.length > 0) {
-      setDisruptedTickets(allRecords);
-    } else if (record) {
-      setDisruptedTickets(prev => {
-        const exists = prev.some(t => t.pnr === record.pnr && t.service_number === record.service_number);
-        return exists ? prev : [...prev, record];
+    const dedup = (list) => {
+      const m = new Map();
+      (list || []).forEach(t => {
+        if (!t) return;
+        const pnr = (t.pnr || '').trim().toUpperCase();
+        const svc = (t.service_number || '').trim().toUpperCase();
+        const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${t.origin || ''}_${t.destination || ''}_${svc}`;
+        if (!m.has(key)) {
+          m.set(key, t);
+        } else {
+          const ex = m.get(key);
+          if (!ex.booking_source && t.booking_source) {
+            m.set(key, { ...ex, ...t });
+          }
+        }
       });
+      return Array.from(m.values());
+    };
+    if (allRecords && allRecords.length > 0) {
+      setDisruptedTickets(dedup(allRecords));
+    } else if (record) {
+      setDisruptedTickets(prev => dedup([...prev, record]));
     }
     // We intentionally stay on activeTab === 'chat'!
   };
@@ -216,7 +231,17 @@ export default function DisruptionPage({
   // Explicit user action to view connection map
   const handleProceedToMap = (record, allRecords = []) => {
     if (record) setDisruptedTicket(record);
-    if (allRecords && allRecords.length > 0) setDisruptedTickets(allRecords);
+    if (allRecords && allRecords.length > 0) {
+      const m = new Map();
+      allRecords.forEach(t => {
+        if (!t) return;
+        const pnr = (t.pnr || '').trim().toUpperCase();
+        const svc = (t.service_number || '').trim().toUpperCase();
+        const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${t.origin || ''}_${t.destination || ''}_${svc}`;
+        if (!m.has(key)) m.set(key, t);
+      });
+      setDisruptedTickets(Array.from(m.values()));
+    }
     setActiveTab('map');
     setTimeout(() => {
       const mapElement = document.getElementById('connection-map-section');

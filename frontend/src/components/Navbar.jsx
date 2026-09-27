@@ -86,21 +86,8 @@ export default function Navbar({
             </button>
           </div>
 
-          {/* CENTER: NAV LINKS (Destinations, Hotels, Flights, Bookings) */}
-          <div className="hidden md:flex items-center gap-6 lg:gap-8">
-            <button
-              onClick={() => scrollTo('#destinations')}
-              className="font-googleSans font-normal text-sm lg:text-[15px] text-white/85 hover:text-white transition-colors duration-200 whitespace-nowrap cursor-pointer hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-            >
-              {t?.destinations || 'Destinations'}
-            </button>
-            <button
-              onClick={() => scrollTo('#hero')}
-              className="font-googleSans font-normal text-sm lg:text-[15px] text-white/85 hover:text-white transition-colors duration-200 whitespace-nowrap cursor-pointer hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-            >
-              {t?.flights || 'Flights'}
-            </button>
-          </div>
+          {/* CENTER: NAV SPACER */}
+          <div className="hidden md:flex flex-1" />
 
           {/* RIGHT: ALL CONTROLS IN THE SAME LINE (Buttons, Language, Profile/Auth) */}
           <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
@@ -227,18 +214,6 @@ export default function Navbar({
           </div>
 
           <div className="flex flex-col items-center gap-4 w-full">
-            <button
-              onClick={() => scrollTo('#destinations')}
-              className="text-base font-googleSans text-white/90 hover:text-white font-medium py-1"
-            >
-              {t?.destinations || 'Destinations'}
-            </button>
-            <button
-              onClick={() => scrollTo('#hero')}
-              className="text-base font-googleSans text-white/90 hover:text-white font-medium py-1"
-            >
-              {t?.flights || 'Flights'}
-            </button>
             {user && (
               <button
                 onClick={handleProfileClick}

@@ -50,6 +50,26 @@ export default function DisruptionChatbot({
   const textInputRef = useRef(null);
   const recognitionRef = useRef(null);
 
+  // Helper to deduplicate tickets array by PNR + service number
+  const dedupTicketsList = (tickets) => {
+    const m = new Map();
+    (tickets || []).forEach(t => {
+      if (!t) return;
+      const pnr = (t.pnr || '').trim().toUpperCase();
+      const svc = (t.service_number || '').trim().toUpperCase();
+      const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${t.origin || ''}_${t.destination || ''}_${svc}`;
+      if (!m.has(key)) {
+        m.set(key, t);
+      } else {
+        const ex = m.get(key);
+        if (!ex.booking_source && t.booking_source) {
+          m.set(key, { ...ex, ...t });
+        }
+      }
+    });
+    return Array.from(m.values());
+  };
+
   // Helper to reliably detect past dates across varied date formats
   const isPastDate = (dateStr) => {
     if (!dateStr) return false;
@@ -262,7 +282,7 @@ export default function DisruptionChatbot({
 
       // Synchronize uploadedTickets if backend returns authentic ledger
       if (data.all_tickets && Array.isArray(data.all_tickets) && data.all_tickets.length > 0) {
-        setUploadedTickets(data.all_tickets);
+        setUploadedTickets(dedupTicketsList(data.all_tickets));
       }
 
       // If the backend returned a real structured ticket (e.g. from RailRadar live lookup for 12134)
@@ -378,7 +398,7 @@ export default function DisruptionChatbot({
     }
 
     if (newRecords.length > 0) {
-      const combinedTickets = [...uploadedTickets, ...newRecords];
+      const combinedTickets = dedupTicketsList([...uploadedTickets, ...newRecords]);
       setUploadedTickets(combinedTickets);
       const lastRecord = newRecords[newRecords.length - 1];
       setCurrentDisruption(lastRecord);

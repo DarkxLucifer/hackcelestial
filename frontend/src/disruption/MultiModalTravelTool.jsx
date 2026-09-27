@@ -343,12 +343,33 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
           </div>
 
           {/* Render User's Authentic Uploaded Journey Details */}
-          {((extractedTickets && extractedTickets.length > 0) ? extractedTickets : (extractedTicket ? [extractedTicket] : [])).length > 0 ? (
-            <div className="space-y-3 font-poppins">
-              {((extractedTickets && extractedTickets.length > 0) ? extractedTickets : (extractedTicket ? [extractedTicket] : [])).map((ticket, idx, arr) => {
-                const isPast = isPastTicket(ticket);
-                const isTrain = ticket.carrier?.toLowerCase().includes("rail") || ticket.carrier?.toLowerCase().includes("train");
-                const isBus = ticket.carrier?.toLowerCase().includes("bus") || ticket.carrier?.toLowerCase().includes("msrtc");
+          {(() => {
+            const raw = ((extractedTickets && extractedTickets.length > 0) ? extractedTickets : (extractedTicket ? [extractedTicket] : []));
+            const dedupMap = new Map();
+            raw.forEach(t => {
+              if (!t) return;
+              const pnr = (t.pnr || '').trim().toUpperCase();
+              const svc = (t.service_number || '').trim().toUpperCase();
+              const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${t.origin || ''}_${t.destination || ''}_${svc}`;
+              if (!dedupMap.has(key)) {
+                dedupMap.set(key, t);
+              } else {
+                const ex = dedupMap.get(key);
+                if (!ex.booking_source && t.booking_source) {
+                  dedupMap.set(key, { ...ex, ...t });
+                }
+              }
+            });
+            const ticketsToRender = Array.from(dedupMap.values());
+
+            if (ticketsToRender.length === 0) return null;
+
+            return (
+              <div className="space-y-3 font-poppins">
+                {ticketsToRender.map((ticket, idx, arr) => {
+                  const isPast = isPastTicket(ticket);
+                  const isTrain = ticket.carrier?.toLowerCase().includes("rail") || ticket.carrier?.toLowerCase().includes("train");
+                  const isBus = ticket.carrier?.toLowerCase().includes("bus") || ticket.carrier?.toLowerCase().includes("msrtc");
                 return (
                   <div key={idx} className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all space-y-4 shadow-sm">
                     {/* Header: Carrier, Service & Live Status */}
@@ -428,7 +449,8 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
                 );
               })}
             </div>
-          ) : (
+            );
+          })() || (
             <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-3 shadow-2xs">
               <div className="w-12 h-12 rounded-2xl bg-slate-100 text-[#181E4B] flex items-center justify-center mx-auto">
                 <Layers className="w-6 h-6 text-slate-500" />

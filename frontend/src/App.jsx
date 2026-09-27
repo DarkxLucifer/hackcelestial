@@ -10,6 +10,7 @@ import DisruptionPage from './disruption/DisruptionPage';
 import ProfilePage from './profile/ProfilePage';
 import AuthModal from './components/AuthModal';
 import AgenticSagaModal from './components/AgenticSagaModal';
+import ErrorBoundary from './components/ErrorBoundary';
 import Footer from './components/Footer';
 import { translations } from './translations';
 
@@ -215,66 +216,55 @@ export default function App() {
         t={t}
       />
 
-      {/* 2. DEDICATED ROUTE: /booking */}
-      {currentRoute === '/booking' && (
-        <>
-          <BookingPage
-            user={user}
-            itinerary={itinerary}
-            activeDisruption={activeDisruption}
-            onNavigate={handleNavigate}
-            onSimulateAlpine={() => handleSimulateDisruption()}
-            t={t}
-          />
-          <Footer showSubscribe={false} />
-        </>
-      )}
+      <ErrorBoundary>
+        {/* 2. DEDICATED ROUTE: /booking */}
+        {currentRoute === '/booking' && (
+          <>
+            <BookingPage
+              user={user}
+              itinerary={itinerary}
+              activeDisruption={activeDisruption}
+              onNavigate={handleNavigate}
+              onSimulateAlpine={() => handleSimulateDisruption()}
+              t={t}
+            />
+            <Footer showSubscribe={false} />
+          </>
+        )}
 
-      {/* 3. DEDICATED ROUTE: /profile */}
-      {currentRoute === '/profile' && (
-        <>
-          <ProfilePage
-            user={user}
-            onNavigate={handleNavigate}
-            onLogout={() => { setUser(null); handleNavigate('/'); }}
-            t={t}
-          />
-          <Footer showSubscribe={false} />
-        </>
-      )}
+        {/* 3. DEDICATED ROUTE: /profile */}
+        {currentRoute === '/profile' && (
+          <>
+            <ProfilePage
+              user={user}
+              onNavigate={handleNavigate}
+              onLogout={() => { setUser(null); handleNavigate('/'); }}
+              t={t}
+            />
+            <Footer showSubscribe={false} />
+          </>
+        )}
 
-      {/* 4. DEDICATED ROUTE: /disruption (Disruption Resolver) */}
-      {currentRoute === '/disruption' && (
-        <>
-          <DisruptionPage
-            user={user}
-            itinerary={itinerary}
-            activeDisruption={activeDisruption}
-            onNavigate={handleNavigate}
-            onSimulateAlpine={handleSimulateDisruption}
-            onResetDisruption={handleResetItinerary}
-            onOpenSaga={handleOpenSagaModal}
-            t={t}
-          />
-          <Footer showSubscribe={false} />
-        </>
-      )}
+        {/* 4. DEDICATED ROUTE: /disruption (Disruption Resolver) */}
+        {currentRoute === '/disruption' && (
+          <>
+            <DisruptionPage
+              user={user}
+              itinerary={itinerary}
+              activeDisruption={activeDisruption}
+              onNavigate={handleNavigate}
+              onSimulateAlpine={handleSimulateDisruption}
+              onResetDisruption={handleResetItinerary}
+              onOpenSaga={handleOpenSagaModal}
+              t={t}
+            />
+            <Footer showSubscribe={false} />
+          </>
+        )}
 
-      {/* 5. MAIN ROUTE: / (Landing Page with 3D Peeled Sheet & Full Platform) */}
-      {currentRoute !== '/booking' && currentRoute !== '/profile' && currentRoute !== '/disruption' && (
-        <PeeledSheetPull
-          activeDisruption={activeDisruption}
-          onSimulateAlpine={() => handleSimulateDisruption({
-            node_id: "node_flight_1",
-            delay_minutes: 65,
-            is_cancellation: false,
-            reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
-          })}
-          t={t}
-        >
-          {/* Section 1: Hero with Demo Journey in Format of Map (Replaced div[1]) */}
-          <Hero
-            itinerary={itinerary}
+        {/* 5. MAIN ROUTE: / (Landing Page with 3D Peeled Sheet & Full Platform) */}
+        {currentRoute !== '/booking' && currentRoute !== '/profile' && currentRoute !== '/disruption' && (
+          <PeeledSheetPull
             activeDisruption={activeDisruption}
             onSimulateAlpine={() => handleSimulateDisruption({
               node_id: "node_flight_1",
@@ -282,44 +272,57 @@ export default function App() {
               is_cancellation: false,
               reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
             })}
-            onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
             t={t}
-          />
+          >
+            {/* Section 1: Hero with Demo Journey in Format of Map (Replaced div[1]) */}
+            <Hero
+              itinerary={itinerary}
+              activeDisruption={activeDisruption}
+              onSimulateAlpine={() => handleSimulateDisruption({
+                node_id: "node_flight_1",
+                delay_minutes: 65,
+                is_cancellation: false,
+                reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
+              })}
+              onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
+              t={t}
+            />
 
-          {/* Section 2: Minimal Logs Format (Low-latency Telemetry Stream) */}
-          <ResilienceLogs
-            itinerary={itinerary}
-            activeDisruption={activeDisruption}
-            t={t}
-          />
+            {/* Section 2: Minimal Logs Format (Low-latency Telemetry Stream) */}
+            <ResilienceLogs
+              itinerary={itinerary}
+              activeDisruption={activeDisruption}
+              t={t}
+            />
 
-          {/* Section 3: Travel Dispute & Disruption Plans in ALL-WHITE Format */}
-          <TravelDisputePlans
-            user={user}
-            onOpenAuth={handleOpenAuth}
-            onNavigate={handleNavigate}
-            onSelectPlan={(planKey) => handleOpenSagaModal(recoveryPlans[0])}
-            activeDisruption={activeDisruption}
-            t={t}
-          />
+            {/* Section 3: Travel Dispute & Disruption Plans in ALL-WHITE Format */}
+            <TravelDisputePlans
+              user={user}
+              onOpenAuth={handleOpenAuth}
+              onNavigate={handleNavigate}
+              onSelectPlan={(planKey) => handleOpenSagaModal(recoveryPlans[0])}
+              activeDisruption={activeDisruption}
+              t={t}
+            />
 
-          {/* Section 4: Travel Agency Sections from Figma (Services, Destinations, Testimonials) */}
-          <TravelAgencySections
-            onSimulateAlpine={() => handleSimulateDisruption({
-              node_id: "node_flight_1",
-              delay_minutes: 65,
-              is_cancellation: false,
-              reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
-            })}
-            onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
-            activeDisruption={activeDisruption}
-            t={t}
-          />
+            {/* Section 4: Travel Agency Sections from Figma (Services, Destinations, Testimonials) */}
+            <TravelAgencySections
+              onSimulateAlpine={() => handleSimulateDisruption({
+                node_id: "node_flight_1",
+                delay_minutes: 65,
+                is_cancellation: false,
+                reason: "Air Traffic Control Ground Delay Program at LHR (+65m)"
+              })}
+              onOpenSaga={() => handleOpenSagaModal(recoveryPlans[0])}
+              activeDisruption={activeDisruption}
+              t={t}
+            />
 
-          {/* Section 5: Footer */}
-          <Footer showSubscribe={true} />
-        </PeeledSheetPull>
-      )}
+            {/* Section 5: Footer */}
+            <Footer showSubscribe={true} />
+          </PeeledSheetPull>
+        )}
+      </ErrorBoundary>
 
       {/* Auth Modal (Login / Sign Up) */}
       <AuthModal

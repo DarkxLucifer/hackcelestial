@@ -144,22 +144,9 @@ export default function CartoJourneyMap({
   const hasUploaded = Boolean(disruptedTicket || (disruptedTickets && disruptedTickets.length > 0));
   const [selectedRoute, setSelectedRoute] = useState(hasUploaded ? 'uploaded' : 'empty');
 
-  // Live weather state for map overlays (disabled by default to prevent tile zoom errors)
+  // Live weather state for map overlays
+  const [waypointWeather, setWaypointWeather] = useState({}); // { hub: { condition, icon, precipitation_mm } }
   const [showWeatherRadar, setShowWeatherRadar] = useState(false);
-  const [radarPath, setRadarPath] = useState(null);
-
-  // Fetch real-time RainViewer weather radar timestamp
-  useEffect(() => {
-    fetch('https://api.rainviewer.com/public/weather-maps.json')
-      .then(r => r.json())
-      .then(data => {
-        if (data?.radar?.past?.length > 0) {
-          const latestPath = data.radar.past[data.radar.past.length - 1].path;
-          setRadarPath(latestPath);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
 
   // Synchronize when disruptedTicket or disruptedTickets change
@@ -583,20 +570,7 @@ export default function CartoJourneyMap({
       errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAAElFTkSuQmCC'
     }).addTo(map);
 
-    // Live Precipitation & Cloud Weather Radar Layer (RainViewer Global Radar)
-    // RainViewer produces raw tiles reliably up to zoom level 6.
-    // Setting maxNativeZoom: 6 instructs Leaflet to auto-scale tiles for higher zooms,
-    // completely eliminating the "Zoom level not supported" tile error!
-    if (showWeatherRadar && radarPath) {
-      L.tileLayer(`https://tilecache.rainviewer.com${radarPath}/256/{z}/{x}/{y}/2/1_1.png`, {
-        opacity: 0.65,
-        minZoom: 1,
-        maxNativeZoom: 6,
-        maxZoom: 16,
-        zIndex: 100,
-        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAAElFTkSuQmCC'
-      }).addTo(map);
-    }
+    // Atmospheric precipitation, storm rings, and cloud halos are rendered vectorially via waypoint overlays below
 
     // Google Maps Style Zoom Controls (Bottom Right)
     L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -857,7 +831,7 @@ export default function CartoJourneyMap({
         mapInstanceRef.current = null;
       }
     };
-  }, [selectedRoute, activeDisruption, mapType, cartoApiKey, uploadedRoute, waypointWeather, simulatedWeather, showWeatherRadar, radarPath]);
+  }, [selectedRoute, activeDisruption, mapType, cartoApiKey, uploadedRoute, waypointWeather, simulatedWeather, showWeatherRadar]);
 
 
   return (
@@ -873,7 +847,7 @@ export default function CartoJourneyMap({
             className={`px-2.5 py-1 rounded-lg font-sans font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 ${
               showWeatherRadar ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 bg-white'
             }`}
-            title="Toggle Live Precipitation Weather Radar & Clouds (RainViewer API)"
+            title="Toggle Live Precipitation Weather Overlays & Atmospheric Halos"
           >
             <CloudRain className="w-3.5 h-3.5" />
             <span>Weather Radar</span>

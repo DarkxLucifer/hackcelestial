@@ -270,46 +270,99 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
     journey_status = data.get("journey_status") or ("COMPLETED" if is_past_journey else ("CANCELLED" if is_cancellation else ("DELAYED" if delay_minutes > 15 else "ON_TIME")))
     reason_text = data.get("disruption_reason") or (f"Service reached {dest} at {sched_arr} (Completed Run)" if is_past_journey else "Nominal on-schedule operation")
 
-    cursor.execute("""
-    INSERT INTO external_disruptions (
-        pnr, passenger_name, booking_source, carrier, service_number,
-        origin, destination, scheduled_departure, scheduled_arrival,
-        delay_minutes, is_cancellation, disruption_reason, ticket_cost,
-        currency, refund_eligible, refund_amount, statutory_compensation,
-        total_claim, applicable_law, recommended_plan, status, created_at,
-        travel_date, is_past_journey, journey_status, origin_coords, dest_coords
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        data.get("pnr") or f"VY-{int(now.timestamp()) % 100000:05d}-IN",
-        data.get("passenger_name") or "Passenger",
-        data.get("booking_source", "External Travel Ticket"),
-        carrier,
-        service,
-        origin,
-        dest,
-        sched_dep,
-        sched_arr,
-        delay_minutes,
-        is_cancellation,
-        reason_text,
-        ticket_cost,
-        data.get("currency", "INR"),
-        1 if rights["refund_eligible"] else 0,
-        rights["refund_amount"],
-        rights["statutory_compensation"],
-        rights["total_claim"],
-        rights["applicable_law"],
-        json.dumps(recommended_plans),
-        "RESOLVING",
-        now_iso,
-        travel_date,
-        is_past_journey,
-        journey_status,
-        json.dumps(data.get("origin_coords")) if data.get("origin_coords") else None,
-        json.dumps(data.get("dest_coords")) if data.get("dest_coords") else None
-    ))
+    target_pnr = data.get("pnr") or f"VY-{int(now.timestamp()) % 100000:05d}-IN"
+    target_source = data.get("booking_source", "External Travel Ticket")
+    
+    # Check if a record with this PNR and service number already exists
+    existing_id = None
+    if target_pnr and target_pnr != "N/A":
+        cursor.execute("SELECT id, booking_source FROM external_disruptions WHERE pnr = ? AND service_number = ?", (target_pnr, service))
+        existing_row = cursor.fetchone()
+        if existing_row:
+            existing_id = existing_row["id"]
+            # Keep richer booking source if currently available
+            if "Parsed Ticket" in str(existing_row["booking_source"]) and "Parsed Ticket" not in str(target_source):
+                target_source = existing_row["booking_source"]
 
-    inserted_id = cursor.lastrowid
+    if existing_id:
+        cursor.execute("""
+        UPDATE external_disruptions SET
+            passenger_name = ?, booking_source = ?, carrier = ?,
+            origin = ?, destination = ?, scheduled_departure = ?, scheduled_arrival = ?,
+            delay_minutes = ?, is_cancellation = ?, disruption_reason = ?, ticket_cost = ?,
+            currency = ?, refund_eligible = ?, refund_amount = ?, statutory_compensation = ?,
+            total_claim = ?, applicable_law = ?, recommended_plan = ?, status = ?,
+            travel_date = ?, is_past_journey = ?, journey_status = ?, origin_coords = ?, dest_coords = ?
+        WHERE id = ?
+        """, (
+            data.get("passenger_name") or "Passenger",
+            target_source,
+            carrier,
+            origin,
+            dest,
+            sched_dep,
+            sched_arr,
+            delay_minutes,
+            is_cancellation,
+            reason_text,
+            ticket_cost,
+            data.get("currency", "INR"),
+            1 if rights["refund_eligible"] else 0,
+            rights["refund_amount"],
+            rights["statutory_compensation"],
+            rights["total_claim"],
+            rights["applicable_law"],
+            json.dumps(recommended_plans),
+            "RESOLVING",
+            travel_date,
+            is_past_journey,
+            journey_status,
+            json.dumps(data.get("origin_coords")) if data.get("origin_coords") else None,
+            json.dumps(data.get("dest_coords")) if data.get("dest_coords") else None,
+            existing_id
+        ))
+        inserted_id = existing_id
+    else:
+        cursor.execute("""
+        INSERT INTO external_disruptions (
+            pnr, passenger_name, booking_source, carrier, service_number,
+            origin, destination, scheduled_departure, scheduled_arrival,
+            delay_minutes, is_cancellation, disruption_reason, ticket_cost,
+            currency, refund_eligible, refund_amount, statutory_compensation,
+            total_claim, applicable_law, recommended_plan, status, created_at,
+            travel_date, is_past_journey, journey_status, origin_coords, dest_coords
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            target_pnr,
+            data.get("passenger_name") or "Passenger",
+            target_source,
+            carrier,
+            service,
+            origin,
+            dest,
+            sched_dep,
+            sched_arr,
+            delay_minutes,
+            is_cancellation,
+            reason_text,
+            ticket_cost,
+            data.get("currency", "INR"),
+            1 if rights["refund_eligible"] else 0,
+            rights["refund_amount"],
+            rights["statutory_compensation"],
+            rights["total_claim"],
+            rights["applicable_law"],
+            json.dumps(recommended_plans),
+            "RESOLVING",
+            now_iso,
+            travel_date,
+            is_past_journey,
+            journey_status,
+            json.dumps(data.get("origin_coords")) if data.get("origin_coords") else None,
+            json.dumps(data.get("dest_coords")) if data.get("dest_coords") else None
+        ))
+        inserted_id = cursor.lastrowid
+
     conn.commit()
     conn.close()
 

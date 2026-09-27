@@ -1172,14 +1172,38 @@ def run_ai_chat(
     if db_disruptions:
         all_tickets.extend(db_disruptions)
 
-    # Deduplicate tickets by id or (pnr + service_number)
+    # Deduplicate tickets by canonical (pnr + service_number) or route corridor
     dedup_tickets = []
     seen_keys = set()
     for t in all_tickets:
-        k = str(t.get("id")) if t.get("id") else f"{t.get('pnr')}_{t.get('service_number')}"
+        pnr_key = str(t.get("pnr") or "").strip().upper()
+        svc_key = str(t.get("service_number") or "").strip().upper()
+        orig_key = str(t.get("origin") or "").strip().upper()
+        dest_key = str(t.get("destination") or "").strip().upper()
+        
+        if pnr_key and pnr_key not in ["N/A", "NONE", ""]:
+            k = f"{pnr_key}_{svc_key}"
+        elif orig_key and dest_key:
+            k = f"{orig_key}_{dest_key}_{svc_key}"
+        elif t.get("id"):
+            k = f"id_{t.get('id')}"
+        else:
+            k = f"raw_{len(seen_keys)}"
+
         if k not in seen_keys:
             seen_keys.add(k)
             dedup_tickets.append(t)
+        else:
+            # Merge richer attributes such as detailed booking_source if available
+            for existing in dedup_tickets:
+                ex_pnr = str(existing.get("pnr") or "").strip().upper()
+                ex_svc = str(existing.get("service_number") or "").strip().upper()
+                if (pnr_key and ex_pnr == pnr_key) or (existing.get("id") and existing.get("id") == t.get("id")):
+                    if t.get("booking_source") and "Parsed Ticket" in str(t.get("booking_source")):
+                        existing["booking_source"] = t["booking_source"]
+                    if not existing.get("id") and t.get("id"):
+                        existing["id"] = t.get("id")
+                    break
     all_tickets = dedup_tickets
 
     # Default active ticket to latest record if not provided
