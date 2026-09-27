@@ -46,7 +46,7 @@ Travelers currently must manually identify affected downstream bookings, deciphe
 
 ### 6. Google OR-Tools CP-SAT Combinatorial Multi-Objective Solver
 - Explores the 4-dimensional Pareto frontier:
-  $$\min \mathbf{F}(\mathbf{x}) = [w_{\text{cost}} f_{\text{cost}}, w_{\text{time}} f_{\text{time}}, w_{\text{intent}} f_{\text{intent\_drift}}, -w_{\text{comfort}} f_{\text{comfort}}]^T$$
+  $$\min \mathbf{F}(\mathbf{x}) = [w_{\text{cost}} f_{\text{cost}}, w_{\text{time}} f_{\text{time}}, w_{\text{intent}} f_{\text{drift}}, -w_{\text{comfort}} f_{\text{comfort}}]^T$$
 - Synthesizes distinct actionable alternatives:
   - **Cheapest Plan**: Budget intermodal relay via confirmed state road/rail corridors, minimizing out-of-pocket expenses.
   - **Medium Plan (Balanced)**: Next-carrier bank protection, synchronized hotel check-in extension, and zero cancellation penalties.
