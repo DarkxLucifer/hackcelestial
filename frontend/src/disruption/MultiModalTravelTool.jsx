@@ -348,9 +348,11 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
             const dedupMap = new Map();
             raw.forEach(t => {
               if (!t) return;
-              const pnr = (t.pnr || '').trim().toUpperCase();
-              const svc = (t.service_number || '').trim().toUpperCase();
-              const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${t.origin || ''}_${t.destination || ''}_${svc}`;
+              const pnr = String(t.pnr ?? '').trim().toUpperCase();
+              const svc = String(t.service_number ?? '').trim().toUpperCase();
+              const orig = String(t.origin ?? '').trim().toUpperCase();
+              const dest = String(t.destination ?? '').trim().toUpperCase();
+              const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
               if (!dedupMap.has(key)) {
                 dedupMap.set(key, t);
               } else {

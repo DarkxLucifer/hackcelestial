@@ -55,9 +55,11 @@ export default function DisruptionChatbot({
     const m = new Map();
     (tickets || []).forEach(t => {
       if (!t) return;
-      const pnr = (t.pnr || '').trim().toUpperCase();
-      const svc = (t.service_number || '').trim().toUpperCase();
-      const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${t.origin || ''}_${t.destination || ''}_${svc}`;
+      const pnr = String(t.pnr ?? '').trim().toUpperCase();
+      const svc = String(t.service_number ?? '').trim().toUpperCase();
+      const orig = String(t.origin ?? '').trim().toUpperCase();
+      const dest = String(t.destination ?? '').trim().toUpperCase();
+      const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
       if (!m.has(key)) {
         m.set(key, t);
       } else {
@@ -498,7 +500,7 @@ export default function DisruptionChatbot({
           id: Date.now() + 1,
           sender: 'bot',
           provider: 'Voyage AI Engine',
-          text: `⚠️ **Upload Exception**\nAn unexpected client-side error occurred while processing the document. Please try again.`,
+          text: `⚠️ **Upload Exception**\nAn unexpected client-side error occurred while processing the document: ${unexpectedErr?.message || unexpectedErr}. Please try again.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
