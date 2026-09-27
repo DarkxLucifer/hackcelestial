@@ -1,9 +1,9 @@
 import React from 'react';
 import { Mail, Send, Compass } from 'lucide-react';
 
-export default function Footer() {
+export default function Footer({ showSubscribe = true }) {
   return (
-    <footer id="footer" className="relative pt-12 pb-16 bg-white overflow-hidden border-t border-slate-100">
+    <footer id="footer" className={`relative bg-white overflow-hidden border-t border-slate-100 ${showSubscribe ? 'pt-12 pb-16' : 'pt-16 pb-16'}`}>
       
       {/* Decorative ambient blur orbs from Figma Ellipse 8 */}
       <div className="absolute -bottom-20 right-0 w-[480px] h-[496px] rounded-full bg-[#D5AEE4]/40 filter blur-[75px] pointer-events-none" />
@@ -12,9 +12,10 @@ export default function Footer() {
         
         {/* ========================================================================= */}
         {/* SUBSCRIBE SECTION (Figma: Group 78 & Group 77)                            */}
-        {/* Rectangle 164: background #DFD7F9, opacity 0.2, radius 20px 129px 20px 20px */}
+        {/* Shown only when showSubscribe is true (e.g. on home page)                */}
         {/* ========================================================================= */}
-        <div className="relative rounded-[20px] rounded-tr-[90px] sm:rounded-tr-[129px] bg-[#DFD7F9]/30 p-8 sm:p-14 lg:p-16 mb-24 overflow-hidden border border-purple-100/60 shadow-sm">
+        {showSubscribe && (
+          <div className="relative rounded-[20px] rounded-tr-[90px] sm:rounded-tr-[129px] bg-[#DFD7F9]/30 p-8 sm:p-14 lg:p-16 mb-24 overflow-hidden border border-purple-100/60 shadow-sm">
           
           {/* Decorative concentric ellipses in top-right */}
           <div className="absolute -top-10 -right-10 w-72 h-72 pointer-events-none opacity-20">
@@ -55,6 +56,7 @@ export default function Footer() {
             </div>
           </div>
         </div>
+        )}
 
 
         {/* ========================================================================= */}

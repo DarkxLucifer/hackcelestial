@@ -226,7 +226,7 @@ export default function App() {
             onSimulateAlpine={() => handleSimulateDisruption()}
             t={t}
           />
-          <Footer />
+          <Footer showSubscribe={false} />
         </>
       )}
 
@@ -239,7 +239,7 @@ export default function App() {
             onLogout={() => { setUser(null); handleNavigate('/'); }}
             t={t}
           />
-          <Footer />
+          <Footer showSubscribe={false} />
         </>
       )}
 
@@ -256,7 +256,7 @@ export default function App() {
             onOpenSaga={handleOpenSagaModal}
             t={t}
           />
-          <Footer />
+          <Footer showSubscribe={false} />
         </>
       )}
 
@@ -317,7 +317,7 @@ export default function App() {
           />
 
           {/* Section 5: Footer */}
-          <Footer />
+          <Footer showSubscribe={true} />
         </PeeledSheetPull>
       )}
 
