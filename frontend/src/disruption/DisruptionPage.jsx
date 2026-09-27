@@ -11,7 +11,6 @@ import DemoJourneyGraph from '../components/DemoJourneyGraph';
 import DisruptionChatbot from './DisruptionChatbot';
 import RefundPolicyModal from './RefundPolicyModal';
 import MultiModalTravelTool from './MultiModalTravelTool';
-import RecoveryPlanCards from './RecoveryPlanCards';
 import WeatherDigitalTwin from './WeatherDigitalTwin';
 import DisruptionScenarioSimulator from './DisruptionScenarioSimulator';
 import { fetchLiveWeather, getApiUrl } from '../api';
@@ -207,17 +206,33 @@ export default function DisruptionPage({
       (list || []).forEach(t => {
         if (!t) return;
         const pnr = String(t.pnr ?? '').trim().toUpperCase();
-        const svc = String(t.service_number ?? '').trim().toUpperCase();
-        const orig = String(t.origin ?? '').trim().toUpperCase();
-        const dest = String(t.destination ?? '').trim().toUpperCase();
-        const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
+        let key = '';
+        if (pnr && pnr !== 'N/A' && pnr !== 'UNKNOWN' && !pnr.startsWith('SIM-')) {
+          key = `PNR_${pnr}`;
+        } else {
+          const orig = String(t.origin ?? '').trim().toUpperCase().replace(/\s*\([A-Z0-9\s]+\)/gi, '');
+          const dest = String(t.destination ?? '').trim().toUpperCase().replace(/\s*\([A-Z0-9\s]+\)/gi, '');
+          const svc = String(t.service_number ?? '').trim().toUpperCase();
+          key = (orig && dest) ? `ROUTE_${orig}_${dest}_${svc}` : `T_${t.id || svc || orig}`;
+        }
         if (!dict[key]) {
-          dict[key] = t;
+          dict[key] = { ...t };
         } else {
           const ex = dict[key];
-          if (!ex.booking_source && t.booking_source) {
-            dict[key] = { ...ex, ...t };
-          }
+          dict[key] = {
+            ...ex,
+            ...t,
+            booking_source: ex.booking_source || t.booking_source,
+            pnr: (ex.pnr && ex.pnr !== 'N/A') ? ex.pnr : t.pnr,
+            service_number: ex.service_number || t.service_number,
+            carrier: ex.carrier || t.carrier,
+            origin: ex.origin || t.origin,
+            destination: ex.destination || t.destination,
+            scheduled_departure: ex.scheduled_departure || t.scheduled_departure,
+            scheduled_arrival: ex.scheduled_arrival || t.scheduled_arrival,
+            travel_date: ex.travel_date || t.travel_date,
+            ticket_fare: ex.ticket_fare || t.ticket_fare
+          };
         }
       });
       return Object.values(dict);
@@ -238,11 +253,34 @@ export default function DisruptionPage({
       allRecords.forEach(t => {
         if (!t) return;
         const pnr = String(t.pnr ?? '').trim().toUpperCase();
-        const svc = String(t.service_number ?? '').trim().toUpperCase();
-        const orig = String(t.origin ?? '').trim().toUpperCase();
-        const dest = String(t.destination ?? '').trim().toUpperCase();
-        const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
-        if (!dict[key]) dict[key] = t;
+        let key = '';
+        if (pnr && pnr !== 'N/A' && pnr !== 'UNKNOWN' && !pnr.startsWith('SIM-')) {
+          key = `PNR_${pnr}`;
+        } else {
+          const orig = String(t.origin ?? '').trim().toUpperCase().replace(/\s*\([A-Z0-9\s]+\)/gi, '');
+          const dest = String(t.destination ?? '').trim().toUpperCase().replace(/\s*\([A-Z0-9\s]+\)/gi, '');
+          const svc = String(t.service_number ?? '').trim().toUpperCase();
+          key = (orig && dest) ? `ROUTE_${orig}_${dest}_${svc}` : `T_${t.id || svc || orig}`;
+        }
+        if (!dict[key]) {
+          dict[key] = { ...t };
+        } else {
+          const ex = dict[key];
+          dict[key] = {
+            ...ex,
+            ...t,
+            booking_source: ex.booking_source || t.booking_source,
+            pnr: (ex.pnr && ex.pnr !== 'N/A') ? ex.pnr : t.pnr,
+            service_number: ex.service_number || t.service_number,
+            carrier: ex.carrier || t.carrier,
+            origin: ex.origin || t.origin,
+            destination: ex.destination || t.destination,
+            scheduled_departure: ex.scheduled_departure || t.scheduled_departure,
+            scheduled_arrival: ex.scheduled_arrival || t.scheduled_arrival,
+            travel_date: ex.travel_date || t.travel_date,
+            ticket_fare: ex.ticket_fare || t.ticket_fare
+          };
+        }
       });
       setDisruptedTickets(Object.values(dict));
     }
@@ -839,34 +877,6 @@ export default function DisruptionPage({
             />
           </div>
 
-          {/* SECTION 2: RECOVERY PLANS (Render ONLY if active disruption occurred and NOT a completed/past journey) */}
-          {isDisrupted && !isPast && (
-            <div id="recovery-plans-section" className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-volkhov font-bold text-2xl text-[#181E4B]">
-                    Recovery Plans
-                  </h3>
-                  <p className="text-xs text-[#5E6282]">
-                    Intelligent multi-modal alternatives synthesized across rail, road, and air transit using XGBoost delay prediction.
-                  </p>
-                </div>
-                <span className="text-xs font-mono font-bold text-[#A35645] bg-[#A35645]/10 px-3 py-1 rounded-full">
-                  3 Recovery Plans
-                </span>
-              </div>
-
-              {/* 3 Recovery Plan Cards with dynamic route corridor, live weather & XGBoost delay */}
-              <RecoveryPlanCards 
-                onSelectPlan={handleExecutePlan}
-                routeCorridor={computedRouteCorridor}
-                disruptedTicket={disruptedTicket}
-                xgboostPrediction={disruptedTicket?.xgboost_prediction}
-                liveWeather={liveWeather || simulatedWeather}
-              />
-            </div>
-          )}
-
           {/* Travel Engine */}
           <div className="pt-4">
             <MultiModalTravelTool 
@@ -876,16 +886,16 @@ export default function DisruptionPage({
             />
           </div>
 
-          {/* Disruption Scenario Simulator (Shown when no dispute occurs or when simulation is actively tested) */}
-          {(!isDisrupted || disruptedTicket?.isSimulated) && (
-            <div className="pt-4">
-              <DisruptionScenarioSimulator 
-                onSimulateScenario={handleSimulateDisruptionScenario}
-                onClearScenario={handleClearSimulatedScenario}
-                isSimulatingActive={Boolean(disruptedTicket?.isSimulated)}
-              />
-            </div>
-          )}
+          {/* Disruption Scenario & Recovery Alternatives Simulator */}
+          <div className="pt-4">
+            <DisruptionScenarioSimulator 
+              onSimulateScenario={handleSimulateDisruptionScenario}
+              onClearScenario={handleClearSimulatedScenario}
+              isSimulatingActive={Boolean(disruptedTicket?.isSimulated)}
+              activeTicket={disruptedTicket}
+              liveWeather={liveWeather || simulatedWeather}
+            />
+          </div>
 
         </div>
       )}

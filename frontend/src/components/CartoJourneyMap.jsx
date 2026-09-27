@@ -498,7 +498,9 @@ export default function CartoJourneyMap({
     legs: []
   };
 
-  const currentRouteData = uploadedRoute || (hasUploaded ? (routes[selectedRoute] || emptyRoute) : emptyRoute);
+  // CRITICAL REQUIREMENT: UNTIL user uploads a document or runs a simulation,
+  // there MUST NOT be any marks/pins/legs on the map.
+  const currentRouteData = (hasUploaded && uploadedRoute) ? uploadedRoute : emptyRoute;
 
   // Tile layer generator matching user's requested Google Maps look
   const getTileConfig = (type) => {
@@ -838,7 +840,7 @@ export default function CartoJourneyMap({
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
       
       {/* Top Google Maps Bar: Map Layer Controls */}
-      <div className="absolute top-3 right-3 z-[400] flex items-center gap-2 pointer-events-none">
+      <div className="absolute top-3 right-3 z-[20] flex items-center gap-2 pointer-events-none">
 
         {/* Live Weather Radar Toggle Button */}
         <div className="pointer-events-auto flex items-center bg-white shadow-md border border-slate-200 rounded-xl px-1 py-1 text-xs">
@@ -896,7 +898,7 @@ export default function CartoJourneyMap({
 
       {/* Bottom Google Maps Legend Bar / Cleared Status Indicator */}
       {currentRouteData.waypoints && currentRouteData.waypoints.length > 0 ? (
-        <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-700 flex flex-wrap items-center gap-3">
+        <div className="absolute bottom-3 left-3 z-[20] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-700 flex flex-wrap items-center gap-3">
           <span className="flex items-center gap-1.5">
             <span className="w-3.5 h-1.5 bg-[#34a853] rounded-full inline-block" />
             <span className="font-medium text-[11px]">Flight Leg</span>
@@ -919,7 +921,7 @@ export default function CartoJourneyMap({
           </span>
         </div>
       ) : (
-        <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-600 flex items-center gap-2">
+        <div className="absolute bottom-3 left-3 z-[20] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-sans text-slate-600 flex items-center gap-2">
           <MapPin className="w-3.5 h-3.5 text-slate-400" />
           <span className="font-medium text-[11px]">Map Ready • No active ticket markings</span>
         </div>

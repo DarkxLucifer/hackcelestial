@@ -46,109 +46,147 @@ const TRANSIT_CORRIDORS = [
 export default function DisruptionScenarioSimulator({ 
   onSimulateScenario, 
   onClearScenario, 
-  isSimulatingActive = false 
+  isSimulatingActive = false,
+  activeTicket = null,
+  liveWeather = null
 }) {
-  const [selectedCorridorId, setSelectedCorridorId] = useState("bom_del");
+  const hasActiveTicket = Boolean(activeTicket?.origin && activeTicket?.destination);
+
+  const availableCorridors = React.useMemo(() => {
+    if (!hasActiveTicket) return TRANSIT_CORRIDORS;
+    const isTrain = (activeTicket.carrier?.toLowerCase().includes("rail") || activeTicket.carrier?.toLowerCase().includes("train"));
+    const customCorridor = {
+      id: "active_ticket_corridor",
+      label: `${activeTicket.origin} ➔ ${activeTicket.destination} (Active Ticket)`,
+      origin: activeTicket.origin,
+      originCity: activeTicket.origin.split(' ')[0],
+      destination: activeTicket.destination,
+      destinationCity: activeTicket.destination.split(' ')[0],
+      icon: isTrain ? Train : Plane,
+      isUserTicket: true
+    };
+    return [customCorridor, ...TRANSIT_CORRIDORS];
+  }, [activeTicket, hasActiveTicket]);
+
+  const [selectedCorridorId, setSelectedCorridorId] = useState(hasActiveTicket ? "active_ticket_corridor" : "bom_del");
   const [activeSimulatedPlan, setActiveSimulatedPlan] = useState(null);
 
-  const currentCorridor = TRANSIT_CORRIDORS.find(c => c.id === selectedCorridorId) || TRANSIT_CORRIDORS[0];
-
-  // The 3 Plan Cards: Cheapest, Medium, Fastest (Pure Black & White Theme)
-  const SIMULATION_PLANS = [
-    {
-      id: "cheapest",
-      categoryBadge: "🟢 CHEAPEST PLAN",
-      categoryTitle: "Budget / Value-First Alternative",
-      categoryTheme: {
-        border: "border-black hover:border-neutral-800",
-        badgeBg: "bg-black text-white",
-        badgeDot: "bg-white",
-        priceColor: "text-black",
-        cardBg: "bg-white",
-        buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
-      },
-      title: "State Bus / Regional Tatkal Rail",
-      operator: "MSRTC Shivshahi / Intercity Express",
-      serviceNumber: "12810 Express",
-      netFare: "₹385",
-      fareSubtext: "Lowest extra out-of-pocket",
-      delayMins: 45,
-      weatherCondition: "Torrential Rain & Track Waterlogging",
-      weatherIcon: CloudRain,
-      weatherStats: "42mm Rain • 26°C • Wind 38km/h",
-      reason: `Waterlogging on slow tracks between Kalyan & Thane; +45m speed restriction. Recovery via scheduled state bus/tatkal rail connection.`,
-      highlights: [
-        "Reserved AC sleeper on weather-hardened state road corridor",
-        "Full statutory IRCTC TDR & refund filing assistance",
-        "Lowest extra expense — zero airline surge fare pricing"
-      ],
-      estimatedDuration: "Tonight (Guaranteed)",
-      costRating: "Lowest Cost Profile",
-      xgboostDelay: 45
-    },
-    {
-      id: "medium",
-      categoryBadge: "⚖️ MEDIUM PLAN",
-      categoryTitle: "Balanced Comfort & Reliability",
-      categoryTheme: {
-        border: "border-black hover:border-neutral-800",
-        badgeBg: "bg-black text-white",
-        badgeDot: "bg-white",
-        priceColor: "text-black",
-        cardBg: "bg-white",
-        buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
-      },
-      title: "3-Tier AC Superfast / AC Intercity",
-      operator: "Indian Railways Superfast (Tatkal Guard)",
-      serviceNumber: "12952 Rajdhani Relay",
-      netFare: "₹1,250",
-      fareSubtext: "Optimal price-to-comfort ratio",
-      delayMins: 65,
-      weatherCondition: "Dense Winter Fog & Reduced Visibility",
-      weatherIcon: CloudFog,
-      weatherStats: "Dense Fog • 12°C • RVR 200m",
-      reason: `Dense radiation fog causing CAT-III B speed holds (+65m delay). Recovery via reserved 3AC berth with synchronized connection buffer.`,
-      highlights: [
-        "Guaranteed 3AC / premium coach seat with meal buffer",
-        "Hotel check-in hold coordinated with partner property",
-        "Optimal balance between transit cost and rest comfort"
-      ],
-      estimatedDuration: "Evening Buffer + Rest",
-      costRating: "Moderate & Re-protected",
-      xgboostDelay: 65
-    },
-    {
-      id: "fastest",
-      categoryBadge: "⚡ FASTEST PLAN",
-      categoryTitle: "Speed Priority & Earliest Arrival",
-      categoryTheme: {
-        border: "border-black hover:border-neutral-800",
-        badgeBg: "bg-black text-white",
-        badgeDot: "bg-white",
-        priceColor: "text-black",
-        cardBg: "bg-white",
-        buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
-      },
-      title: "Vande Bharat Express / Air Shuttle Bypass",
-      operator: "Priority Air Shuttle / Vande Bharat Executive",
-      serviceNumber: "20978 Vande Bharat / AI 887",
-      netFare: "₹3,400",
-      fareSubtext: "Fastest route bypass (saves 4h 30m)",
-      delayMins: 90,
-      weatherCondition: "Severe Convective Storm & Track Obstruction",
-      weatherIcon: CloudLightning,
-      weatherStats: "Severe Storm • 28°C • Wind 58km/h",
-      reason: `Primary transit corridor blocked (+90m delay). Direct bypass via high-speed Vande Bharat or express flight to reach destination on schedule.`,
-      highlights: [
-        "Bypasses congested bottleneck — saves 4 to 6 hours",
-        "Instant priority boarding & terminal fast-track transit",
-        "Guaranteed earliest arrival at destination before business hours"
-      ],
-      estimatedDuration: "Earliest Arrival (Saves 4h+)",
-      costRating: "Speed Priority",
-      xgboostDelay: 90
+  // Synchronize corridor when activeTicket changes
+  React.useEffect(() => {
+    if (hasActiveTicket) {
+      setSelectedCorridorId("active_ticket_corridor");
     }
-  ];
+  }, [hasActiveTicket, activeTicket?.origin, activeTicket?.destination]);
+
+  const currentCorridor = availableCorridors.find(c => c.id === selectedCorridorId) || availableCorridors[0];
+
+  // Dynamic Weather telemetry
+  const tempC = liveWeather?.temperature_c ?? 26;
+  const windKmh = liveWeather?.wind_speed_kmh ?? 22;
+  const weatherLabel = liveWeather?.condition || "Live Meteorological Telemetry";
+
+  // The 3 Plan Cards: Cheapest, Medium, Fastest (Filled with real data suggestions)
+  const SIMULATION_PLANS = React.useMemo(() => {
+    const isRail = currentCorridor.icon === Train || (activeTicket?.carrier?.toLowerCase().includes("rail"));
+    const orig = currentCorridor.originCity || currentCorridor.origin;
+    const dest = currentCorridor.destinationCity || currentCorridor.destination;
+
+    return [
+      {
+        id: "cheapest",
+        categoryBadge: "🟢 CHEAPEST PLAN",
+        categoryTitle: "Budget / Value-First Alternative",
+        categoryTheme: {
+          border: "border-black hover:border-neutral-800",
+          badgeBg: "bg-black text-white",
+          badgeDot: "bg-white",
+          priceColor: "text-black",
+          cardBg: "bg-white",
+          buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
+        },
+        title: isRail ? "Regional Tatkal Rail / State Intercity Bus" : "State Bus / Regional Tatkal Rail",
+        operator: isRail ? (activeTicket?.carrier || "Indian Railways / MSRTC Link") : "MSRTC Shivshahi / Intercity Express",
+        serviceNumber: activeTicket?.service_number ? `${activeTicket.service_number} Relay` : "12810 Express",
+        netFare: "₹385",
+        fareSubtext: "Lowest extra out-of-pocket",
+        delayMins: 45,
+        weatherCondition: `${weatherLabel} & Speed Restriction`,
+        weatherIcon: CloudRain,
+        weatherStats: `${tempC}°C • Wind ${windKmh}km/h • ${weatherLabel}`,
+        reason: `Signal bottleneck near ${orig}; +45m speed restriction. Recovery via confirmed unreserved coach or scheduled state road connection.`,
+        highlights: [
+          `Reserved AC sleeper/coach on weather-hardened ${orig} ➔ ${dest} corridor`,
+          "Full statutory IRCTC TDR & refund filing assistance",
+          "Lowest extra expense — zero surge fare pricing"
+        ],
+        estimatedDuration: "Tonight (Guaranteed)",
+        costRating: "Lowest Cost Profile",
+        xgboostDelay: 45
+      },
+      {
+        id: "medium",
+        categoryBadge: "⚖️ MEDIUM PLAN",
+        categoryTitle: "Balanced Comfort & Reliability",
+        categoryTheme: {
+          border: "border-black hover:border-neutral-800",
+          badgeBg: "bg-black text-white",
+          badgeDot: "bg-white",
+          priceColor: "text-black",
+          cardBg: "bg-white",
+          buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
+        },
+        title: isRail ? "3-Tier AC Superfast / Main Line Link" : "3-Tier AC Superfast / AC Intercity",
+        operator: "Indian Railways Superfast (Tatkal Guard)",
+        serviceNumber: "12952 Rajdhani Relay",
+        netFare: "₹1,250",
+        fareSubtext: "Optimal price-to-comfort ratio",
+        delayMins: 65,
+        weatherCondition: `${weatherLabel} & Reduced Visibility`,
+        weatherIcon: CloudFog,
+        weatherStats: `Dense Fog • 14°C • RVR 250m`,
+        reason: `Low visibility causing cautionary holds (+65m delay). Recovery via reserved 3AC berth with synchronized connection buffer.`,
+        highlights: [
+          "Guaranteed 3AC / premium coach seat with meal buffer",
+          "Hotel check-in hold coordinated with partner property",
+          "Optimal balance between transit cost and rest comfort"
+        ],
+        estimatedDuration: "Evening Buffer + Rest",
+        costRating: "Moderate & Re-protected",
+        xgboostDelay: 65
+      },
+      {
+        id: "fastest",
+        categoryBadge: "⚡ FASTEST PLAN",
+        categoryTitle: "Speed Priority & Earliest Arrival",
+        categoryTheme: {
+          border: "border-black hover:border-neutral-800",
+          badgeBg: "bg-black text-white",
+          badgeDot: "bg-white",
+          priceColor: "text-black",
+          cardBg: "bg-white",
+          buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
+        },
+        title: isRail ? "Vande Bharat Express / Highway Express Shuttle" : "Vande Bharat Express / Air Shuttle Bypass",
+        operator: "Priority Air Shuttle / Vande Bharat Executive",
+        serviceNumber: "20978 Vande Bharat / AI 887",
+        netFare: "₹3,400",
+        fareSubtext: "Fastest route bypass (saves 4h 30m)",
+        delayMins: 90,
+        weatherCondition: "Severe Weather & Corridor Congestion",
+        weatherIcon: CloudLightning,
+        weatherStats: `Severe Storm • 28°C • Wind ${Math.max(48, windKmh + 20)}km/h`,
+        reason: `Primary transit corridor blocked near ${orig} (+90m delay). Direct bypass via high-speed Vande Bharat or express flight to reach ${dest} on schedule.`,
+        highlights: [
+          "Bypasses congested bottleneck — saves 4 to 6 hours",
+          "Instant priority boarding & terminal fast-track transit",
+          "Guaranteed earliest arrival at destination before business hours"
+        ],
+        estimatedDuration: "Earliest Arrival (Saves 4h+)",
+        costRating: "Speed Priority",
+        xgboostDelay: 90
+      }
+    ];
+  }, [currentCorridor, activeTicket, weatherLabel, tempC, windKmh]);
 
   const handleTriggerPlan = (plan) => {
     setActiveSimulatedPlan(plan.id);

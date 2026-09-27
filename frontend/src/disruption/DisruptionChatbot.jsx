@@ -57,17 +57,33 @@ export default function DisruptionChatbot({
     tickets.forEach(t => {
       if (!t) return;
       const pnr = String(t.pnr ?? '').trim().toUpperCase();
-      const svc = String(t.service_number ?? '').trim().toUpperCase();
-      const orig = String(t.origin ?? '').trim().toUpperCase();
-      const dest = String(t.destination ?? '').trim().toUpperCase();
-      const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
+      let key = '';
+      if (pnr && pnr !== 'N/A' && pnr !== 'UNKNOWN' && !pnr.startsWith('SIM-')) {
+        key = `PNR_${pnr}`;
+      } else {
+        const orig = String(t.origin ?? '').trim().toUpperCase().replace(/\s*\([A-Z0-9\s]+\)/gi, '');
+        const dest = String(t.destination ?? '').trim().toUpperCase().replace(/\s*\([A-Z0-9\s]+\)/gi, '');
+        const svc = String(t.service_number ?? '').trim().toUpperCase();
+        key = (orig && dest) ? `ROUTE_${orig}_${dest}_${svc}` : `T_${t.id || svc || orig}`;
+      }
       if (!dict[key]) {
-        dict[key] = t;
+        dict[key] = { ...t };
       } else {
         const ex = dict[key];
-        if (!ex.booking_source && t.booking_source) {
-          dict[key] = { ...ex, ...t };
-        }
+        dict[key] = {
+          ...ex,
+          ...t,
+          booking_source: ex.booking_source || t.booking_source,
+          pnr: (ex.pnr && ex.pnr !== 'N/A') ? ex.pnr : t.pnr,
+          service_number: ex.service_number || t.service_number,
+          carrier: ex.carrier || t.carrier,
+          origin: ex.origin || t.origin,
+          destination: ex.destination || t.destination,
+          scheduled_departure: ex.scheduled_departure || t.scheduled_departure,
+          scheduled_arrival: ex.scheduled_arrival || t.scheduled_arrival,
+          travel_date: ex.travel_date || t.travel_date,
+          ticket_fare: ex.ticket_fare || t.ticket_fare
+        };
       }
     });
     return Object.values(dict);
