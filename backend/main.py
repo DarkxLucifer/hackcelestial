@@ -58,10 +58,20 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration
+# CORS configuration - Allow all local origins, Vercel deployments, and Render domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://frontend-eight-beta-dvinkob29r.vercel.app",
+        "https://frontend-fvd0rtqsr-smoker2.vercel.app",
+        "https://frontend-n6rw2xumr-smoker2.vercel.app",
+        "https://hackcelestial-dm4q.onrender.com"
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

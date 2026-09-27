@@ -1,16 +1,29 @@
 // Dynamic Base API URL for seamless local dev and cloud production deployments (Vercel, Render, Railway, etc.)
+const LIVE_RENDER_BACKEND = "https://hackcelestial-dm4q.onrender.com";
+
+const isLocalhost = typeof window !== "undefined" && 
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "");
+
+const isRenderHosted = typeof window !== "undefined" && 
+  window.location.hostname.includes("onrender.com");
+
 const ENV_BACKEND = (
-  (typeof import.meta !== "undefined" && import.meta.env && (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE)) || ""
+  (typeof import.meta !== "undefined" && import.meta.env && (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE)) ||
+  (!isLocalhost && !isRenderHosted ? LIVE_RENDER_BACKEND : "")
 ).replace(/\/$/, "");
 
-export const API_BASE = ENV_BACKEND 
-  ? (ENV_BACKEND.endsWith("/api") ? ENV_BACKEND : `${ENV_BACKEND}/api`)
-  : (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
-      ? "/api"
-      : "http://127.0.0.1:8000/api");
+export const API_BASE = isLocalhost
+  ? "http://127.0.0.1:8000/api"
+  : (ENV_BACKEND ? (ENV_BACKEND.endsWith("/api") ? ENV_BACKEND : `${ENV_BACKEND}/api`) : "/api");
 
 export function getApiUrl(path) {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  if (isLocalhost) {
+    if (cleanPath.startsWith("/api")) {
+      return `http://127.0.0.1:8000${cleanPath}`;
+    }
+    return `http://127.0.0.1:8000/api${cleanPath}`;
+  }
   if (ENV_BACKEND) {
     if (cleanPath.startsWith("/api")) {
       return `${ENV_BACKEND}${cleanPath}`;

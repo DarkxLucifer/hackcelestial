@@ -236,7 +236,8 @@ export default function DisruptionChatbot({
         content: m.text
       }));
 
-      const res = await fetch(getApiUrl('/api/ai/chat'), {
+      const targetUrl = getApiUrl('/api/ai/chat');
+      const res = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -248,6 +249,11 @@ export default function DisruptionChatbot({
           uploaded_tickets: uploadedTickets.length > 0 ? uploadedTickets : undefined
         })
       });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Server status ${res.status}: ${errBody.slice(0, 200)}`);
+      }
 
       const data = await res.json();
       const replyText = data.reply || "I have received your request and evaluated the disruption.";
@@ -295,13 +301,14 @@ export default function DisruptionChatbot({
 
     } catch (err) {
       console.error("AI Chat Error:", err);
+      const targetUrl = getApiUrl('/api/ai/chat');
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 1,
           sender: 'bot',
           provider: 'Voyage System Alert',
-          text: "⚠️ **Connection Notice**\nCould not reach the Voyage AI backend server at `/api/ai/chat`.\n\nPlease verify that the backend server is running (e.g. `uvicorn backend.main:app --port 8000`).",
+          text: `⚠️ **Connection Notice**\nCould not reach the Voyage AI backend server at \`${targetUrl}\`.\n\n*Error details: ${err.message || 'Network error or server unreachable'}*`,
           structuredCard: null,
           allTickets: uploadedTickets,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
