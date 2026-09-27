@@ -4,6 +4,7 @@ import {
   Search, ArrowRight, ExternalLink, RefreshCw, Radio, CheckCircle2,
   AlertTriangle, MapPin, Gauge, Layers, Sparkles, Check
 } from 'lucide-react';
+import { getApiUrl } from '../api';
 
 export default function MultiModalTravelTool({ extractedTicket, extractedTickets = [] }) {
   // Tabs: 'all' | 'flight' | 'train' | 'bus' | 'metro'
@@ -105,19 +106,19 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
     setIsSearching(true);
     try {
       if (activeTab === 'flight') {
-        const res = await fetch(`/api/travel/flight-status?flight=${encodeURIComponent(q || 'AI 882')}`);
+        const res = await fetch(getApiUrl(`/api/travel/flight-status?flight=${encodeURIComponent(q || 'AI 882')}`));
         const data = await res.json();
         setSearchResult({ type: 'flight', data });
       } else if (activeTab === 'train') {
-        const res = await fetch(`/api/travel/train-status?train=${encodeURIComponent(q || '11026')}`);
+        const res = await fetch(getApiUrl(`/api/travel/train-status?train=${encodeURIComponent(q || '11026')}`));
         const data = await res.json();
         setSearchResult({ type: 'train', data });
       } else if (activeTab === 'metro') {
-        const res = await fetch(`/api/travel/gtfs-metro`);
+        const res = await fetch(getApiUrl(`/api/travel/gtfs-metro`));
         const data = await res.json();
         setSearchResult({ type: 'metro', data });
       } else if (activeTab === 'bus' || activeTab === 'all') {
-        const res = await fetch(`/api/travel/bus-options?origin=${encodeURIComponent(busOrigin)}&destination=${encodeURIComponent(busDestination)}`);
+        const res = await fetch(getApiUrl(`/api/travel/bus-options?origin=${encodeURIComponent(busOrigin)}&destination=${encodeURIComponent(busDestination)}`));
         const data = await res.json();
         setSearchResult({ type: 'bus', data: data.buses });
       }
@@ -131,7 +132,7 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
   const handleLoadMetro = async () => {
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/travel/gtfs-metro`);
+      const res = await fetch(getApiUrl(`/api/travel/gtfs-metro`));
       const data = await res.json();
       setSearchResult({ type: 'metro', data });
     } catch (err) {
@@ -145,7 +146,7 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
     if (e) e.preventDefault();
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/travel/bus-options?origin=${encodeURIComponent(busOrigin)}&destination=${encodeURIComponent(busDestination)}`);
+      const res = await fetch(getApiUrl(`/api/travel/bus-options?origin=${encodeURIComponent(busOrigin)}&destination=${encodeURIComponent(busDestination)}`));
       const data = await res.json();
       setSearchResult({ type: 'bus', data: data.buses });
     } catch (err) {

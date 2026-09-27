@@ -24,7 +24,7 @@ NUGEN_BASE_URL = "https://api.nugen.in"
 DEFAULT_BASE_MODEL = "llama-v3p2-3b-reasoning"
 DEFAULT_BENCHMARK_ID = "benchmark_01m3g2mzj51mpepb"
 
-BASE_DIR = Path("D:/project/aiml prime/project/hackcelestial")
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "nugen"
 STATE_FILE = DATA_DIR / "alignment_state.json"
 

@@ -7,6 +7,7 @@ import {
   MessageSquare, Map, ExternalLink, Compass, Layers, Train, Plane,
   Bus, Sun, Moon, Sunrise, Sunset, Calendar
 } from 'lucide-react';
+import { getApiUrl } from '../api';
 
 export default function DisruptionChatbot({
   isOpen,
@@ -100,7 +101,7 @@ export default function DisruptionChatbot({
   useEffect(() => {
     const loadRealTickets = async () => {
       try {
-        const res = await fetch('/api/disruptions/external');
+        const res = await fetch(getApiUrl('/api/disruptions/external'));
         if (res.ok) {
           const data = await res.json();
           if (data.disruptions && data.disruptions.length > 0) {
@@ -235,7 +236,7 @@ export default function DisruptionChatbot({
         content: m.text
       }));
 
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch(getApiUrl('/api/ai/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,7 +352,7 @@ export default function DisruptionChatbot({
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch('/api/ai/upload-document', {
+        const response = await fetch(getApiUrl('/api/ai/upload-document'), {
           method: 'POST',
           body: formData
         });

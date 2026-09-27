@@ -14,7 +14,7 @@ import MultiModalTravelTool from './MultiModalTravelTool';
 import RecoveryPlanCards from './RecoveryPlanCards';
 import WeatherDigitalTwin from './WeatherDigitalTwin';
 import DisruptionScenarioSimulator from './DisruptionScenarioSimulator';
-import { fetchLiveWeather } from '../api';
+import { fetchLiveWeather, getApiUrl } from '../api';
 
 export default function DisruptionPage({
   user,
@@ -98,7 +98,7 @@ export default function DisruptionPage({
   useEffect(() => {
     const checkSavedDisruptions = async () => {
       try {
-        const res = await fetch('/api/disruptions/external');
+        const res = await fetch(getApiUrl('/api/disruptions/external'));
         if (res.ok) {
           const data = await res.json();
           if (data.disruptions && data.disruptions.length > 0) {
@@ -234,7 +234,7 @@ export default function DisruptionPage({
     try {
       const formData = new FormData();
       files.forEach(f => formData.append('files', f));
-      const response = await fetch('/api/ai/upload-documents', {
+      const response = await fetch(getApiUrl('/api/ai/upload-documents'), {
         method: 'POST',
         body: formData
       });

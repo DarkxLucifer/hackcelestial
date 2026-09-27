@@ -1457,7 +1457,7 @@ def get_nugen_corpus_endpoint():
     generated for manual or automated upload to Nugen Intelligence.
     """
     from pathlib import Path
-    base_dir = Path("D:/project/aiml prime/project/hackcelestial")
+    base_dir = Path(__file__).resolve().parent.parent
     pack_dir = base_dir / "data" / "nugen_upload_pack"
     if not pack_dir.exists():
         pack_dir = base_dir / "data" / "nugen"
@@ -1519,7 +1519,7 @@ def download_nugen_file_endpoint(filename: str):
     """
     from pathlib import Path
     from fastapi.responses import FileResponse
-    base_dir = Path("D:/project/aiml prime/project/hackcelestial")
+    base_dir = Path(__file__).resolve().parent.parent
     target_file = base_dir / "data" / "nugen_upload_pack" / filename
     if not target_file.exists():
         target_file = base_dir / "data" / "nugen" / filename
@@ -1533,5 +1533,7 @@ def download_nugen_file_endpoint(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    uvicorn.run("backend.main:app", host=host, port=port, reload=False)
 

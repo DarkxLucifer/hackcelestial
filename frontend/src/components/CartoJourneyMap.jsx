@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Plane, Train, Building2, MapPin, Layers, Navigation, AlertTriangle, CheckCircle2, CloudRain, Cloud, Sun } from 'lucide-react';
+import { getApiUrl } from '../api';
 
 const KNOWN_AIRPORT_COORDS = {
   // Indian Railway Hubs & Junctions
@@ -188,7 +189,7 @@ export default function CartoJourneyMap({
       const results = {};
       for (const hub of Array.from(hubs).slice(0, 6)) {
         try {
-          const res = await fetch(`/api/weather/live?location=${encodeURIComponent(hub)}`);
+          const res = await fetch(getApiUrl(`/api/weather/live?location=${encodeURIComponent(hub)}`));
           if (res.ok) {
             const data = await res.json();
             results[hub] = data;

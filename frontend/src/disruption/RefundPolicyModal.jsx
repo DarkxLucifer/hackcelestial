@@ -3,6 +3,7 @@ import {
   ShieldCheck, AlertTriangle, FileText, CheckCircle2, 
   ArrowRight, X, ExternalLink, Sparkles, Building2, Clock, Landmark
 } from 'lucide-react';
+import { getApiUrl } from '../api';
 
 export default function RefundPolicyModal({ 
   isOpen, 
@@ -57,7 +58,7 @@ export default function RefundPolicyModal({
   const handleFileClaim = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/disruptions/claim-refund', {
+      const response = await fetch(getApiUrl('/api/disruptions/claim-refund'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
