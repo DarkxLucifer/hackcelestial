@@ -21,9 +21,14 @@ try:
 except ImportError:
     pypdf = None
 
-# LangGraph & LangChain imports
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+# LangGraph & LangChain optional imports (graceful fallback)
+try:
+    from langgraph.graph import StateGraph, END
+    from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+except ImportError:
+    StateGraph = None
+    END = None
+    BaseMessage = HumanMessage = AIMessage = SystemMessage = None
 
 from .database import (
     save_external_disruption, 
