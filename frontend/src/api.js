@@ -276,3 +276,73 @@ export async function fetchNugenCorpus() {
   }
 }
 
+// ==============================================================================
+// REAL MULTI-MODAL BOOKING & RESERVATIONS API
+// ==============================================================================
+
+export async function searchBookingInventory({ origin = "Mumbai (BOM)", destination = "Delhi (DEL)", date, mode = "all" } = {}) {
+  try {
+    const params = new URLSearchParams({ origin, destination, mode });
+    if (date) params.append("date", date);
+    const res = await fetch(`${API_BASE}/booking/search?${params.toString()}`);
+    if (!res.ok) throw new Error("Booking search failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Using offline fallback for searchBookingInventory:", err);
+    return null;
+  }
+}
+
+export async function createBooking(payload) {
+  try {
+    const res = await fetch(`${API_BASE}/booking/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error("Booking creation failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Offline createBooking error:", err);
+    return null;
+  }
+}
+
+export async function fetchBookingsList() {
+  try {
+    const res = await fetch(`${API_BASE}/booking/list`);
+    if (!res.ok) throw new Error("Failed to fetch bookings");
+    return await res.json();
+  } catch (err) {
+    console.warn("Using offline fallback for fetchBookingsList:", err);
+    return null;
+  }
+}
+
+export async function fetchBookingDetails(bookingRef) {
+  try {
+    const res = await fetch(`${API_BASE}/booking/${encodeURIComponent(bookingRef)}`);
+    if (!res.ok) throw new Error("Failed to fetch booking details");
+    return await res.json();
+  } catch (err) {
+    console.warn("Offline fetchBookingDetails error:", err);
+    return null;
+  }
+}
+
+export async function cancelBooking(bookingRef) {
+  try {
+    const res = await fetch(`${API_BASE}/booking/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ booking_ref: bookingRef })
+    });
+    if (!res.ok) throw new Error("Cancellation failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Offline cancelBooking error:", err);
+    return null;
+  }
+}
+
+
