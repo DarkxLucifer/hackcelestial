@@ -1,6 +1,11 @@
 # Voyage AI — Free Cloud Deployment Guide
 
-This project is completely production-ready and configured to deploy **100% free** on modern cloud hosting providers.
+This project is completely production-ready and deployed on modern cloud hosting providers.
+
+## 🟢 Live Production Deployments
+
+- **Frontend (Live on Vercel)**: **[https://frontend-eight-beta-dvinkob29r.vercel.app](https://frontend-eight-beta-dvinkob29r.vercel.app)**
+- **GitHub Repository**: **[https://github.com/DarkxLucifer/hackcelestial](https://github.com/DarkxLucifer/hackcelestial)**
 
 ---
 
