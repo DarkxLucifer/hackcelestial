@@ -5,6 +5,8 @@ This project is completely production-ready and deployed on modern cloud hosting
 ## 🟢 Live Production Deployments
 
 - **Frontend (Live on Vercel)**: **[https://frontend-eight-beta-dvinkob29r.vercel.app](https://frontend-eight-beta-dvinkob29r.vercel.app)**
+- **Backend API (Live on Render)**: **[https://hackcelestial-dm4q.onrender.com](https://hackcelestial-dm4q.onrender.com)**
+- **Interactive Swagger API Docs**: **[https://hackcelestial-dm4q.onrender.com/docs](https://hackcelestial-dm4q.onrender.com/docs)**
 - **GitHub Repository**: **[https://github.com/DarkxLucifer/hackcelestial](https://github.com/DarkxLucifer/hackcelestial)**
 
 ---
