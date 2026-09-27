@@ -6,14 +6,27 @@ from .models import (
     DisruptionEvent, DownstreamImpact
 )
 
+import re
+
 def time_to_minutes(time_str: str) -> int:
-    """Converts HH:MM or ISO timestamp to integer minutes from start of day."""
-    if "T" in time_str:
-        dt = datetime.fromisoformat(time_str)
-        return dt.hour * 60 + dt.minute
-    elif ":" in time_str:
-        parts = time_str.split(":")
-        return int(parts[0]) * 60 + int(parts[1])
+    """Converts HH:MM, HH:MM IST, or ISO timestamp to integer minutes from start of day."""
+    if not time_str or not isinstance(time_str, str):
+        return 0
+    clean_str = time_str.strip()
+    # Check for ISO timestamp with date like 2026-09-27T15:30:00
+    if "T" in clean_str and "-" in clean_str:
+        try:
+            dt = datetime.fromisoformat(clean_str.replace("Z", "+00:00"))
+            return dt.hour * 60 + dt.minute
+        except Exception:
+            pass
+    # Extract HH:MM using regex
+    m = re.search(r'(\d{1,2}):(\d{2})', clean_str)
+    if m:
+        try:
+            return int(m.group(1)) * 60 + int(m.group(2))
+        except Exception:
+            pass
     return 0
 
 def minutes_to_time(minutes: int) -> str:

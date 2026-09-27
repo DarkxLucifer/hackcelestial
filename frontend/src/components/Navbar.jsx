@@ -95,12 +95,6 @@ export default function Navbar({
               {t?.destinations || 'Destinations'}
             </button>
             <button
-              onClick={() => scrollTo('#easy-steps')}
-              className="font-googleSans font-normal text-sm lg:text-[15px] text-white/85 hover:text-white transition-colors duration-200 whitespace-nowrap cursor-pointer hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-            >
-              {t?.hotels || 'Hotels'}
-            </button>
-            <button
               onClick={() => scrollTo('#hero')}
               className="font-googleSans font-normal text-sm lg:text-[15px] text-white/85 hover:text-white transition-colors duration-200 whitespace-nowrap cursor-pointer hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
             >
@@ -238,12 +232,6 @@ export default function Navbar({
               className="text-base font-googleSans text-white/90 hover:text-white font-medium py-1"
             >
               {t?.destinations || 'Destinations'}
-            </button>
-            <button
-              onClick={() => scrollTo('#easy-steps')}
-              className="text-base font-googleSans text-white/90 hover:text-white font-medium py-1"
-            >
-              {t?.hotels || 'Hotels'}
             </button>
             <button
               onClick={() => scrollTo('#hero')}

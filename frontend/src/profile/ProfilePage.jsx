@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Camera, Mail, Phone, ChevronRight, User, Users, 
-  LogOut, KeyRound, Check, Plus, Trash2, Wallet
+  LogOut, KeyRound, Check, Plus, Trash2
 } from 'lucide-react';
 
 export default function ProfilePage({ user, onNavigate, onLogout, t }) {
@@ -122,17 +122,8 @@ export default function ProfilePage({ user, onNavigate, onLogout, t }) {
 
             </div>
 
-            {/* Right Side Wallet & Bookings Chips */}
+            {/* Right Side Bookings Chip */}
             <div className="flex items-center gap-3">
-              <button 
-                onClick={() => onNavigate('/booking')}
-                className="px-4 py-2 rounded-full bg-[#072422]/90 hover:bg-[#072422] text-white text-xs font-medium border border-white/20 transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
-              >
-                <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Voyage Wallet ₹ 18,450</span>
-                <ChevronRight className="w-3.5 h-3.5 text-white/60" />
-              </button>
-
               <button 
                 onClick={() => onNavigate('/booking')}
                 className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/20 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
