@@ -1,0 +1,20 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #5
+TITLE: Multi-Modal Interconnection Slack Rules (Air -> Rail -> Road Transit)
+SOURCE CORPUS: Multi-Modal Graph Telemetry & Transfer CPM
+================================================================================
+
+1. NOMINAL MINIMUM CONNECTION TIMES (MCT):
+  - Air to High-Speed Rail (e.g. ZRH to SBB, BOM/DEL to Express Rail): Nominal MCT is 45 minutes.
+  - Station-to-Station Transfer (e.g. Metro / Shuttle Link): Nominal MCT is 20-30 minutes.
+  - Long-Distance Train to Regional Coach: Nominal MCT is 15-20 minutes.
+
+2. DYNAMIC WEATHER BUFFER EXPANSION:
+When adverse meteorological telemetry is detected along the corridor:
+  - Rainfall 15-30 mm/h: Expand required MCT by +25 minutes.
+  - Rainfall >35 mm/h: Expand required MCT by +50 minutes (Track waterlogging and cautious signaling).
+  - Dense Fog / Visibility <800m: Expand MCT by +30 minutes (Air-rail shuttle crawling speeds).
+
+3. RAIL SPEED RESTRICTIONS UNDER PRECIPITATION:
+  - Indian Railways: Track waterlogging above 75mm above rail top imposes mandatory 10-15 km/h speed restrictions.
+  - European Mountain Rail (SBB / MGB): Heavy snowfall and avalanche risk triggers track speed caps at 40 km/h.

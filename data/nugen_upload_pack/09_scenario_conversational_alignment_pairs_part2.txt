@@ -1,0 +1,17 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #9
+TITLE: Scenario Instruction Q&A Alignment Pairs - Part 2 (Digital Twin & What-If)
+SOURCE CORPUS: Digital Twin Simulation & What-If Parametric Telemetry
+================================================================================
+
+SCENARIO 1:
+Question: When a user increases the rainfall intensity slider in the Digital Twin to 45 mm/h for a Mumbai to Nagpur corridor, what calculations does the twin execute?
+Answer: Rainfall of 45 mm/h indicates severe monsoon conditions. The digital twin applies the non-linear delay curve: base delay increases to +94 minutes. Sustained duration adds 48.7% cascading turnaround delay (+46m), resulting in +140m total projected delay. Net intermodal slack against nominal 45m MCT drops to -95m, driving missed transfer risk to 99% (CRITICAL). Projected arrival shifts past 22:00, triggering an automated Hotel Check-in Alert and reserving provisional seats on an alternate express service.
+
+SCENARIO 2:
+Question: Under what rainfall and wind speed thresholds does airport ground handling transition from DEGRADED to HALTED in the Digital Twin simulation?
+Answer: The Digital Twin implements safety threshold rules: Ground handling transitions to HALTED when either rainfall intensity exceeds 35 mm/h (aquaplaning and waterlogged ramps) OR wind velocity exceeds 65 km/h (severe convective gusts exceeding baggage loader and jetbridge safety ratings). At these levels, runway acceptance rates degrade below 40% and ground stops take effect.
+
+SCENARIO 3:
+Question: What duty of care must an autonomous travel resilience agent trigger under DGCA regulations when a flight is delayed by 3.5 hours due to waterlogging at Mumbai airport?
+Answer: Under DGCA CAR Section 3 Series M Part IV, weather delays are considered extraordinary circumstances exempting airlines from cash penalties. However, the airline is legally obligated to provide free refreshments and meals for delays exceeding 2 hours, and free hotel accommodation if the delay extends overnight. The Voyage agent immediately prepares statutory duty of care vouchers and files a pre-formatted compensation claim packet.

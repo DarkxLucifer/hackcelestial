@@ -31,6 +31,7 @@ from .database import (
     init_db,
     save_external_disruption,
     get_all_external_disruptions,
+    get_all_refund_claims,
     file_refund_claim,
     evaluate_disruption_rights
 )
@@ -433,7 +434,7 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
         current_itinerary = Itinerary(
             id=f"itinerary_{primary_record.get('pnr', 'multi')}",
             title=title,
-            traveler_name=primary_record.get("passenger_name", "Elena Vance"),
+            traveler_name=primary_record.get("passenger_name") or "Passenger",
             total_cost=cumulative_cost,
             currency="INR",
             nodes=nodes,
@@ -448,11 +449,11 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
         )
     else:
         # Single ticket flow with genuine origin and destination coordinates
-        carrier = primary_record.get("carrier", "Air India")
-        service = primary_record.get("service_number", "AI 882")
-        origin = primary_record.get("origin", "Bangalore (BLR)")
-        dest = primary_record.get("destination", "Hyderabad (HYD)")
-        delay_m = int(primary_record.get("delay_minutes", 45))
+        carrier = primary_record.get("carrier") or "Carrier"
+        service = primary_record.get("service_number") or "Transit"
+        origin = primary_record.get("origin") or "Origin"
+        dest = primary_record.get("destination") or "Destination"
+        delay_m = int(primary_record.get("delay_minutes", 0))
         is_canc = bool(primary_record.get("is_cancellation", False))
         is_train = "rail" in carrier.lower() or "train" in carrier.lower() or "#" in service or "vande" in service.lower()
 
@@ -463,6 +464,8 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
 
         orig_lat, orig_lng = _parse_coords(primary_record.get("origin_coords"), default_orig_lat, default_orig_lng)
         dest_lat, dest_lng = _parse_coords(primary_record.get("dest_coords"), default_dest_lat, default_dest_lng)
+
+        fare_cost = float(primary_record.get("ticket_cost") or 0.0)
 
         node_main = ItineraryNode(
             id="node_main_1",
@@ -475,10 +478,10 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
             destination=dest,
             origin_coords=Coordinates(lat=orig_lat, lng=orig_lng),
             dest_coords=Coordinates(lat=dest_lat, lng=dest_lng),
-            start_time="14:30",
-            end_time="16:45",
+            start_time=primary_record.get("scheduled_departure", "14:30"),
+            end_time=primary_record.get("scheduled_arrival", "16:45"),
             duration_minutes=135,
-            cost=float(primary_record.get("ticket_cost", 5500.0)),
+            cost=fare_cost,
             currency="INR",
             status=NodeStatus.DELAYED if delay_m > 0 else NodeStatus.CONFIRMED,
             slack_minutes=max(0.0, 45.0 - delay_m),
@@ -524,7 +527,7 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
             start_time="18:30",
             end_time="23:59",
             duration_minutes=329,
-            cost=3200.0,
+            cost=0.0,
             currency="INR",
             status=NodeStatus.CONFIRMED,
             slack_minutes=0.0,
@@ -541,8 +544,8 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
         current_itinerary = Itinerary(
             id=f"itinerary_{primary_record.get('pnr', 'live')}",
             title=title,
-            traveler_name=primary_record.get("passenger_name", "Elena Vance"),
-            total_cost=float(primary_record.get("ticket_cost", 5500.0)),
+            traveler_name=primary_record.get("passenger_name") or "Passenger",
+            total_cost=fare_cost,
             currency="INR",
             nodes=[node_main, node_transfer, node_destination],
             edges=edges,
@@ -561,6 +564,14 @@ def sync_itinerary_from_disruption(record: Dict[str, Any], all_records: Optional
     risk_info = calculate_domino_risk_index(current_itinerary)
     current_itinerary.domino_risk_index = risk_info["domino_risk_index"]
     return current_itinerary
+
+# Sync authentic itinerary from SQLite database on startup if records exist
+try:
+    _initial_stored = get_all_external_disruptions()
+    if _initial_stored:
+        sync_itinerary_from_disruption(_initial_stored[0])
+except Exception as _e:
+    pass
 
 @app.post("/api/disruptions/external")
 def create_external_disruption(payload: Dict[str, Any] = Body(...)):
@@ -599,14 +610,24 @@ def submit_refund_claim(payload: Dict[str, Any] = Body(...)):
     Files an automated statutory refund claim for a disruption record.
     """
     disruption_id = payload.get("disruption_id", 1)
-    pnr = payload.get("pnr", "VY-EXT-8820")
-    passenger_name = payload.get("passenger_name", "Elena Vance")
-    airline = payload.get("airline", "Air India")
-    amount = float(payload.get("amount", 5000.0))
+    pnr = payload.get("pnr") or "N/A"
+    passenger_name = payload.get("passenger_name") or "Passenger"
+    airline = payload.get("airline") or "Carrier"
+    amount = float(payload.get("amount", 0.0))
     policy = payload.get("policy", "DGCA CAR Section 3 Series M Part IV")
 
     claim_result = file_refund_claim(disruption_id, pnr, passenger_name, airline, amount, policy)
     return claim_result
+
+@app.get("/api/disruptions/refund-claims")
+def list_refund_claims():
+    """Returns all filed statutory refund claims stored in SQLite database."""
+    claims = get_all_refund_claims()
+    return {
+        "status": "SUCCESS",
+        "total": len(claims),
+        "claims": claims
+    }
 
 @app.get("/api/disruptions/refund-policies")
 def get_refund_policies():
@@ -647,6 +668,13 @@ def ai_chat(payload: Dict[str, Any] = Body(...)):
     gemini_key = payload.get("gemini_key")
     active_ticket = payload.get("active_ticket")
     uploaded_tickets = payload.get("uploaded_tickets")
+
+    # If tickets not passed from client state, query authentic database records
+    db_tickets = get_all_external_disruptions()
+    if not active_ticket and db_tickets:
+        active_ticket = db_tickets[0]
+    if not uploaded_tickets and db_tickets:
+        uploaded_tickets = db_tickets
 
     result = run_ai_chat(
         messages, 
@@ -747,20 +775,21 @@ async def ai_upload_multiple_documents(request: Request):
     return await ai_upload_document(request)
 
 @app.post("/api/disruptions/sync-train")
-def sync_train_disruption_endpoint(train_number: str = "20978", delay_minutes: int = 45):
+def sync_train_disruption_endpoint(train_number: str = "20978", delay_minutes: Optional[int] = None):
     """
     Directly pulls real telemetry from RailRadar and builds a live Connection Graph for this train.
     """
     t_data = RailRadarTracker.get_live_train_status(train_number)
+    actual_delay = delay_minutes if delay_minutes is not None else int(t_data.get("delay_minutes", 0))
     record = {
         "carrier": "Indian Railways",
         "service_number": f"#{t_data.get('train_number', train_number)} {t_data.get('train_name', 'Express')}",
         "origin": t_data.get("origin", "New Delhi (NDLS)"),
         "destination": t_data.get("destination", "Jaipur Junction (JP)"),
-        "delay_minutes": delay_minutes or t_data.get("delay_minutes", 45),
+        "delay_minutes": actual_delay,
         "is_cancellation": False,
-        "disruption_reason": f"Signal Clearance Delay on #{t_data.get('train_number', train_number)}",
-        "ticket_cost": 1850.0,
+        "disruption_reason": f"Signal Clearance Delay on #{t_data.get('train_number', train_number)}" if actual_delay > 0 else "Nominal on-schedule operation",
+        "ticket_cost": None,
         "currency": "INR",
         "pnr": f"VY-RR-{t_data.get('train_number', train_number)}"
     }
@@ -897,6 +926,260 @@ async def web_scrape_endpoint(request: Request, url: Optional[str] = None):
         target_url = "https://gtfs.org"
     return AgentWebScraper.scrape_url(target_url)
 
+# ==============================================================================
+# HACKCELESTIAL 3.0: WEATHER-DRIVEN DIGITAL TWIN & NUGEN ALIGNMENT ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/weather/live")
+async def get_live_weather_endpoint(
+    location: str = "BOM",
+    lat: Optional[float] = None,
+    lon: Optional[float] = None
+):
+    """
+    Live Weather Integration via Open-Meteo API.
+    Supports GPS latitude/longitude directly, airport codes (BOM, DEL, BLR, ORD, JFK, LHR, ZRH) and cities.
+    """
+    from .weather_twin import fetch_live_weather
+    return await fetch_live_weather(location_key=location, lat=lat, lon=lon)
+
+@app.get("/api/weather/live-corridor")
+async def get_live_corridor_weather_endpoint(
+    origin: str = "NGP",
+    destination: str = "BOM",
+    carrier: str = "IndiGo Airlines",
+    service: str = "6E 534",
+    is_rail: int = 0
+):
+    """
+    Fetches real-time weather for origin and destination cities and runs XGBoost inference.
+    """
+    from .weather_twin import fetch_live_weather
+    from .xgboost_inference import predict_xgboost_scenario
+    from datetime import datetime
+    
+    orig_weather = await fetch_live_weather(location_key=origin)
+    dest_weather = await fetch_live_weather(location_key=destination)
+    
+    # Run XGBoost inference directly using origin's real live telemetry
+    xgb_result = predict_xgboost_scenario(
+        rainfall_mm=float(orig_weather.get("precipitation_mm", 0.0) or orig_weather.get("rain_mm", 0.0) or 0.0),
+        wind_speed_kmh=float(orig_weather.get("wind_speed_kmh", 12.0) or 12.0),
+        visibility_km=float(orig_weather.get("visibility_km", 10.0) or 10.0),
+        temperature_c=float(orig_weather.get("temperature_c", 26.0) or 26.0),
+        dep_hour=datetime.now().hour,
+        is_rail=is_rail,
+        carrier_name=carrier,
+        service_number=service,
+        origin_code=origin,
+        dest_code=destination
+    )
+    
+    return {
+        "status": "success",
+        "origin_weather": orig_weather,
+        "destination_weather": dest_weather,
+        "xgboost_prediction": xgb_result
+    }
+
+@app.get("/api/weather/xgboost-presets")
+def get_xgboost_presets_endpoint():
+    """
+    Returns realistic scenario presets and XGBoost model metadata
+    trained on 100k flight records and meteorological features.
+    """
+    from .xgboost_inference import REAL_SCENARIO_PRESETS, get_models
+    _, _, meta = get_models()
+    return {
+        "presets": REAL_SCENARIO_PRESETS,
+        "metadata": meta
+    }
+
+@app.post("/api/weather/xgboost-simulate")
+def simulate_xgboost_weather_endpoint(payload: Dict[str, Any] = Body(...)):
+    """
+    High-Fidelity Real Scenario Simulator powered by trained XGBoost Regressor & Classifier.
+    Predicts multi-modal arrival delay, cancellation risk, and runway capacity impact.
+    """
+    from .xgboost_inference import predict_xgboost_scenario
+    return predict_xgboost_scenario(
+        rainfall_mm=float(payload.get("rainfall_mm", 0.0)),
+        wind_speed_kmh=float(payload.get("wind_speed_kmh", 15.0)),
+        visibility_km=float(payload.get("visibility_km", 10.0)),
+        temperature_c=float(payload.get("temperature_c", 25.0)),
+        dep_hour=int(payload.get("dep_hour", 14)),
+        distance_km=float(payload.get("distance_km", 850.0)),
+        scheduled_buffer_mins=int(payload.get("scheduled_buffer_mins", 45)),
+        is_rail=int(payload.get("is_rail", 0)),
+        carrier_name=str(payload.get("carrier_name", "IndiGo Airlines")),
+        service_number=str(payload.get("service_number", "6E 534")),
+        origin_code=str(payload.get("origin_code", "NGP")),
+        dest_code=str(payload.get("dest_code", "BOM"))
+    )
+
+@app.post("/api/digital-twin/simulate")
+def simulate_weather_digital_twin_endpoint(payload: Dict[str, Any] = Body(...)):
+    """
+    Digital Twin Scenario Simulator backed by XGBoost machine learning model.
+    """
+    from .xgboost_inference import predict_xgboost_scenario
+    rainfall = float(payload.get("rainfall_intensity_mm_h", payload.get("rainfall_mm", 28.0)))
+    wind = float(payload.get("wind_speed_kmh", 42.0))
+    temp = float(payload.get("temperature_c", 27.0))
+    
+    return predict_xgboost_scenario(
+        rainfall_mm=rainfall,
+        wind_speed_kmh=wind,
+        visibility_km=max(0.5, 10.0 - (rainfall * 0.1)),
+        temperature_c=temp,
+        carrier_name=payload.get("carrier", "IndiGo / Indian Railways"),
+        service_number=payload.get("service_number", "6E 534"),
+        origin_code=payload.get("origin", "NGP"),
+        dest_code=payload.get("destination", "BOM")
+    )
+
+@app.get("/api/social-signals/live")
+def get_live_social_signals_endpoint(corridor: str = "Nagpur ➔ Mumbai CSMT"):
+    """
+    Midnight Task: Live Social Signal Stream.
+    Returns real-time traveler reports, crowd congestion, and official MET advisories.
+    """
+    from .weather_twin import get_live_social_signals
+    return {
+        "corridor": corridor,
+        "signals": get_live_social_signals(corridor)
+    }
+
+@app.get("/api/nugen/status")
+def get_nugen_status_endpoint():
+    """
+    Mandatory Task 2: Retrieves Nugen Intelligence alignment project lifecycle status.
+    """
+    from .nugen_client import load_alignment_state
+    return load_alignment_state()
+
+@app.get("/api/nugen/alignment/{alignment_id}/details")
+async def get_nugen_alignment_details_endpoint(alignment_id: str, api_key: Optional[str] = None):
+    """
+    Mandatory Task 2: Fetches full failure and stage execution details
+    from Nugen via GET /api/v3/alignment-projects/{alignment_id}.
+    Returns error, stage_failures, degraded status, and stage logs.
+    """
+    from .nugen_client import get_alignment_details_from_nugen, get_nugen_api_key
+    key = api_key or get_nugen_api_key()
+    if not key:
+        return {"error": "No Nugen API key configured", "hint": "Provide NUGEN_API_KEY in .env or pass as query param ?api_key=..."}
+    try:
+        return await get_alignment_details_from_nugen(key, alignment_id)
+    except Exception as e:
+        return {"error": str(e), "alignment_id": alignment_id}
+
+
+@app.post("/api/nugen/trigger-alignment")
+async def trigger_nugen_alignment_endpoint(payload: Dict[str, Any] = Body(default={})):
+    """
+    Mandatory Task 2: Triggers the 7-step Nugen alignment pipeline:
+    Uploads documents, initiates project with qwen-v2p5-0p5b-instruct, and polls status.
+    """
+    from .nugen_client import trigger_alignment_pipeline
+    key = payload.get("api_key")
+    return await trigger_alignment_pipeline(key)
+
+@app.post("/api/nugen/chat")
+async def nugen_chat_endpoint(payload: Dict[str, Any] = Body(...)):
+    """
+    Mandatory Task 2: Domain-Aligned Inference Chat Completions with Confidence Score.
+    Queries the aligned model or provides flights.csv domain-grounded intelligence.
+    """
+    from .nugen_client import query_nugen_chat
+    messages = payload.get("messages", [])
+    if not messages and "query" in payload:
+        messages = [{"role": "user", "content": payload["query"]}]
+    model_id = payload.get("model")
+    return await query_nugen_chat(messages, model_id)
+
+@app.get("/api/nugen/corpus")
+def get_nugen_corpus_endpoint():
+    """
+    Mandatory Task 2: Returns the manifest and 10 plain-text training documents
+    generated for manual or automated upload to Nugen Intelligence.
+    """
+    from pathlib import Path
+    base_dir = Path("D:/project/aiml prime/project/hackcelestial")
+    pack_dir = base_dir / "data" / "nugen_upload_pack"
+    if not pack_dir.exists():
+        pack_dir = base_dir / "data" / "nugen"
+
+    manifest_file = pack_dir / "manifest.json"
+    manifest = {}
+    if manifest_file.exists():
+        import json
+        try:
+            manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    files_list = []
+    # Collect all txt files, prioritizing the golden all-in-one file, then the 8-9MB high-density files
+    all_files = sorted(pack_dir.glob("*.txt"), key=lambda p: (0 if "voyage_all_in_one" in p.name else (1 if "_8mb" in p.name else 2), p.name))
+    for f in all_files:
+        sz = f.stat().st_size
+        mb = round(sz / (1024 * 1024), 2)
+        # Read snippet efficiently without loading 8.5MB into RAM
+        snippet_lines = []
+        title = f.name
+        try:
+            with open(f, "r", encoding="utf-8", errors="replace") as sf:
+                for _ in range(16):
+                    line = sf.readline()
+                    if not line:
+                        break
+                    snippet_lines.append(line.rstrip())
+            for line in snippet_lines:
+                if "TITLE:" in line or "CORPUS:" in line:
+                    title = line.replace("TITLE:", "").replace("CORPUS:", "").replace("NUGEN INTELLIGENCE DOMAIN KNOWLEDGE", "").strip()
+                    break
+        except Exception:
+            pass
+
+        files_list.append({
+            "filename": f.name,
+            "title": title or f.name,
+            "size_bytes": sz,
+            "size_mb": mb,
+            "size_kb": round(sz / 1024, 1),
+            "is_large_8mb": "_8mb" in f.name,
+            "snippet": "\n".join(snippet_lines[:12]),
+            "download_url": f"/api/nugen/download/{f.name}"
+        })
+
+    return {
+        "pack_name": "Nugen Intelligence Domain Alignment Pack (8-9 MB Files)",
+        "total_files": len(files_list),
+        "folder_path": str(pack_dir),
+        "files": files_list
+    }
+
+@app.get("/api/nugen/download/{filename}")
+def download_nugen_file_endpoint(filename: str):
+    """
+    Allows downloading any of the 10 plain-text documents directly for manual upload to Nugen platform.
+    """
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    base_dir = Path("D:/project/aiml prime/project/hackcelestial")
+    target_file = base_dir / "data" / "nugen_upload_pack" / filename
+    if not target_file.exists():
+        target_file = base_dir / "data" / "nugen" / filename
+    if not target_file.exists() or not target_file.is_file():
+        raise HTTPException(status_code=404, detail=f"File {filename} not found in Nugen pack.")
+    return FileResponse(
+        path=str(target_file),
+        filename=filename,
+        media_type="text/plain; charset=utf-8"
+    )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+

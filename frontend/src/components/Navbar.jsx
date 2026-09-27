@@ -37,15 +37,6 @@ export default function Navbar({
     }
   };
 
-  const handleBookingsClick = () => {
-    setMobileMenuOpen(false);
-    onNavigate('/booking');
-  };
-
-  const handleBookNow = () => {
-    setMobileMenuOpen(false);
-    onNavigate('/booking');
-  };
 
   const handleProfileClick = () => {
     setMobileMenuOpen(false);
@@ -116,13 +107,6 @@ export default function Navbar({
           {/* RIGHT: ALL CONTROLS IN THE SAME LINE (Buttons, Language, Profile/Auth) */}
           <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
             
-            {/* Book Now (clean dark outlined pill) */}
-            <button
-              onClick={handleBookNow}
-              className="hidden sm:inline-flex px-3.5 sm:px-4 py-1.5 rounded-full border border-white/35 bg-white/10 hover:bg-white/20 text-white font-medium text-xs active:scale-95 transition-all whitespace-nowrap cursor-pointer"
-            >
-              {t?.bookNow || 'Book Now'}
-            </button>
 
             {/* Resolve Disruption (terracotta filled pill #A35645) */}
             <button
@@ -267,12 +251,6 @@ export default function Navbar({
           </div>
 
           <div className="w-full pt-4 border-t border-white/10 flex flex-col gap-2.5">
-            <button
-              onClick={handleBookNow}
-              className="w-full py-2.5 rounded-xl border border-white/35 text-white font-medium text-xs"
-            >
-              {t?.bookNow || 'Book Now'}
-            </button>
             <button
               onClick={handleDisruptionSolving}
               className="w-full py-2.5 rounded-xl bg-[#A35645] text-white font-bold text-xs"

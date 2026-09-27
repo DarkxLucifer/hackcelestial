@@ -1,0 +1,59 @@
+{
+  "pack_name": "Nugen Intelligence High-Density Alignment Pack (10 Files x ~8.5 MB)",
+  "source": "flights.csv (5.33M IATA flights)",
+  "format": "Plain-Text (.txt) - UTF-8",
+  "total_files": 10,
+  "total_pack_size_mb": 83.47,
+  "files": [
+    {
+      "filename": "01_chicago_ord_weather_delay_telemetry_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8765949
+    },
+    {
+      "filename": "02_atlanta_and_dallas_thunderstorm_telemetry_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8766553
+    },
+    {
+      "filename": "03_new_york_metro_and_denver_blizzard_telemetry_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8765482
+    },
+    {
+      "filename": "04_west_coast_marine_fog_and_pacific_telemetry_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8767131
+    },
+    {
+      "filename": "05_seasonal_winter_blizzard_nationwide_corpus_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8762752
+    },
+    {
+      "filename": "06_seasonal_summer_convective_thunderstorm_corpus_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8763063
+    },
+    {
+      "filename": "07_compounding_late_aircraft_turnaround_domino_8mb.txt",
+      "size_mb": 8.36,
+      "size_bytes": 8762868
+    },
+    {
+      "filename": "08_weather_cancellations_and_diversions_corpus_8mb.txt",
+      "size_mb": 8.37,
+      "size_bytes": 8771453
+    },
+    {
+      "filename": "09_multimodal_rail_and_hotel_checkin_cutoffs_8mb.txt",
+      "size_mb": 8.33,
+      "size_bytes": 8735133
+    },
+    {
+      "filename": "10_conversational_alignment_scenario_reasoning_8mb.txt",
+      "size_mb": 8.26,
+      "size_bytes": 8662620
+    }
+  ]
+}

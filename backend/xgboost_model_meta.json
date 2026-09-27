@@ -1,0 +1,35 @@
+{
+  "model_name": "XGBoost Multi-Modal Delay & Disruption Engine",
+  "training_samples": 80000,
+  "test_samples": 20000,
+  "metrics": {
+    "mae_mins": 26.31,
+    "rmse_mins": 42.35,
+    "r2_score": 0.1466
+  },
+  "feature_importance": {
+    "rainfall_mm": 0.1806347519159317,
+    "wind_speed_kmh": 0.12343214452266693,
+    "visibility_km": 0.06423284113407135,
+    "temperature_c": 0.05607520043849945,
+    "dep_hour": 0.156406968832016,
+    "distance_km": 0.073459692299366,
+    "scheduled_buffer_mins": 0.05309007689356804,
+    "month": 0.0,
+    "day_of_week": 0.23889242112636566,
+    "is_rail": 0.05377590283751488
+  },
+  "features": [
+    "rainfall_mm",
+    "wind_speed_kmh",
+    "visibility_km",
+    "temperature_c",
+    "dep_hour",
+    "distance_km",
+    "scheduled_buffer_mins",
+    "month",
+    "day_of_week",
+    "is_rail"
+  ],
+  "trained_at": "2026-09-27T06:50:12.191171"
+}

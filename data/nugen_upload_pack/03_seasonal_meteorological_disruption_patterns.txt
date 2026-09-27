@@ -1,0 +1,55 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #3
+TITLE: Seasonal Meteorological Disruption Patterns & Atmospheric Failure Modes
+SOURCE CORPUS: flights.csv (Macro Seasonal Breakdown)
+================================================================================
+
+1. EMPIRICAL SEASONAL COMPARISON TABLE:
+
+Season: Winter (Dec-Feb)
+  - Total Evaluated Flights: 1,378,389
+  - Weather Delay Frequency: 1.54%
+  - Average Weather Delay: 47.1 minutes
+  - Upstream Turnaround Delay Rate: 11.15%
+  - Weather Groundings / Cancellations: 28,080 flights
+
+Season: Summer (Jun-Aug)
+  - Total Evaluated Flights: 1,535,151
+  - Weather Delay Frequency: 1.23%
+  - Average Weather Delay: 46.4 minutes
+  - Upstream Turnaround Delay Rate: 11.34%
+  - Weather Groundings / Cancellations: 5,517 flights
+
+Season: Spring (Mar-May)
+  - Total Evaluated Flights: 1,486,456
+  - Weather Delay Frequency: 1.06%
+  - Average Weather Delay: 50.0 minutes
+  - Upstream Turnaround Delay Rate: 9.35%
+  - Weather Groundings / Cancellations: 11,433 flights
+
+Season: Autumn (Sep-Nov)
+  - Total Evaluated Flights: 932,918
+  - Weather Delay Frequency: 0.72%
+  - Average Weather Delay: 48.3 minutes
+  - Upstream Turnaround Delay Rate: 6.7%
+  - Weather Groundings / Cancellations: 2,844 flights
+
+2. METEOROLOGICAL FAILURE MODES BY SEASON:
+
+WINTER (December to February):
+  - Primary Hazards: De-icing queues, runway snow accumulation, blizzards, freezing fog.
+  - Critical Hubs: ORD, DEN, DTW, BOS, JFK, EWR, LGA.
+  - Operational Physics: Type I and Type IV de-icing fluid holdover times force aircraft to return
+    to de-icing pads if taxi queues exceed 25-35 minutes, escalating minor taxi delays into 60-120m gate blocks.
+
+SUMMER (June to August):
+  - Primary Hazards: Convective afternoon thunderstorms, microbursts, en-route airspace reroutes.
+  - Critical Hubs: ATL, DFW, ORD, MIA, MCO.
+  - Operational Physics: Lightning proximity alerts within 5 miles mandate immediate ramp stops,
+    halting fueling, baggage handling, and pushback tug operations for 45 to 90 minutes.
+
+AUTUMN & SPRING TRANSITIONS:
+  - Primary Hazards: Coastal marine layer fog advection, jetstream crosswinds.
+  - Critical Hubs: SFO, SEA, ORD.
+  - Operational Physics: SFO parallel runways (separated by 750ft) cannot operate simultaneous instrument
+    approaches under IMC fog, cutting airport arrival rate (AAR) from 60 to 30 aircraft per hour.

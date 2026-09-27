@@ -17,15 +17,15 @@ export default function RefundPolicyModal({
   if (!isOpen) return null;
 
   const data = ticketData || {
-    pnr: "VY-EXT-8820",
-    carrier: "IndiGo",
-    service_number: "6E 521",
-    origin: "Mumbai (BOM)",
-    destination: "Delhi (DEL)",
-    delay_minutes: 210,
-    ticket_cost: 6450,
+    pnr: "N/A",
+    carrier: "Carrier",
+    service_number: "Service",
+    origin: "Origin",
+    destination: "Destination",
+    delay_minutes: 0,
+    ticket_cost: 0,
     is_cancellation: false,
-    disruption_reason: "ATC Ground Delay Program & Airline Aircraft Rotation"
+    disruption_reason: "Operational disruption"
   };
 
   const delayHrs = (data.delay_minutes / 60).toFixed(1);
@@ -34,13 +34,13 @@ export default function RefundPolicyModal({
   // Determine policy evaluation
   let policyName = "DGCA Civil Aviation Requirements (CAR Section 3, Series M, Part IV)";
   let isEligible = data.delay_minutes >= 180 || data.is_cancellation;
-  let refundFare = isEligible ? (data.ticket_cost || 6450) : 0;
+  let refundFare = isEligible ? (Number(data.ticket_cost) || 0) : 0;
   let statutoryComp = 0;
 
   if (isRail) {
     policyName = "Indian Railways (IRCTC) TDR Regulation 2024 (Clause 14)";
     isEligible = data.delay_minutes >= 180;
-    refundFare = isEligible ? (data.ticket_cost || 1850) : 0;
+    refundFare = isEligible ? (Number(data.ticket_cost) || 0) : 0;
     statutoryComp = 0;
   } else {
     if (data.is_cancellation) {
@@ -62,9 +62,9 @@ export default function RefundPolicyModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           disruption_id: data.id || 1,
-          pnr: data.pnr || "VY-EXT-8820",
-          passenger_name: data.passenger_name || "Elena Vance",
-          airline: data.carrier || "IndiGo",
+          pnr: data.pnr || "N/A",
+          passenger_name: data.passenger_name || "Passenger",
+          airline: data.carrier || "Carrier",
           amount: totalClaim,
           policy: policyName
         })

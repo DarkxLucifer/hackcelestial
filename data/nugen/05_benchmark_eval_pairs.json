@@ -1,0 +1,20 @@
+[
+  {
+    "id": "bench_01",
+    "prompt": "What is the historical weather delay rate and average duration for flights departing Chicago O'Hare (ORD)?",
+    "reference": "ORD has a historical weather delay rate of approximately 1.9-2.1% across all departures, with an average delay of 61-64 minutes when weather-impacted, frequently cascading into late aircraft turnaround delays.",
+    "category": "airport_statistics"
+  },
+  {
+    "id": "bench_02",
+    "prompt": "If Leg 1 of an itinerary is delayed by 65 minutes due to weather, what happens to an intermodal train connection scheduled with 30 minutes of slack?",
+    "reference": "The 30-minute slack is completely exhausted, resulting in a net missed connection of -35 minutes. The autonomous engine must trigger a Ghost Hold on the subsequent train departure and notify hotel reception.",
+    "category": "domino_propagation"
+  },
+  {
+    "id": "bench_03",
+    "prompt": "Under what circumstances does DGCA CAR Section 3 or EU261 mandate duty of care during weather disruptions?",
+    "reference": "While extraordinary meteorological conditions exempt airlines from fixed statutory cash compensation, airlines are strictly mandated to provide duty of care (meals, refreshments, hotel accommodation, and free rebooking) for delays exceeding statutory thresholds.",
+    "category": "passenger_rights"
+  }
+]

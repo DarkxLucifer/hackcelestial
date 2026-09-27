@@ -58,3 +58,7 @@ desktop.ini
 *.db
 *.sqlite3
 
+# Large dataset files (exceeds GitHub 100MB limit)
+flights.csv
+
+

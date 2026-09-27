@@ -140,3 +140,139 @@ export async function fetchTelemetryFeed() {
     };
   }
 }
+
+// ==============================================================================
+// WEATHER DIGITAL TWIN & NUGEN INTELLIGENCE API CLIENTS
+// ==============================================================================
+
+export async function fetchLiveWeather(location = "BOM", lat = null, lon = null) {
+  try {
+    let url = `${API_BASE}/weather/live?location=${encodeURIComponent(location)}`;
+    if (lat !== null && lon !== null && typeof lat === 'number' && typeof lon === 'number') {
+      url += `&lat=${lat}&lon=${lon}`;
+    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Weather API failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Weather API fallback:", err);
+    return null;
+  }
+}
+
+export async function fetchLiveCorridor(origin = "NGP", destination = "BOM", carrier = "IndiGo Airlines", service = "6E 534", isRail = 0) {
+  try {
+    const url = `${API_BASE}/weather/live-corridor?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&carrier=${encodeURIComponent(carrier)}&service=${encodeURIComponent(service)}&is_rail=${isRail}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Live corridor weather API failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Live corridor fallback:", err);
+    return null;
+  }
+}
+
+export async function simulateDigitalTwin(params) {
+  try {
+    const res = await fetch(`${API_BASE}/digital-twin/simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw new Error("Digital Twin simulation failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Digital Twin fallback:", err);
+    return null;
+  }
+}
+
+export async function fetchXGBoostPresets() {
+  try {
+    const res = await fetch(`${API_BASE}/weather/xgboost-presets`);
+    if (!res.ok) throw new Error("Failed to fetch XGBoost presets");
+    return await res.json();
+  } catch (err) {
+    console.warn("XGBoost presets fallback:", err);
+    return null;
+  }
+}
+
+export async function simulateXGBoostScenario(params) {
+  try {
+    const res = await fetch(`${API_BASE}/weather/xgboost-simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw new Error("XGBoost simulation failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("XGBoost simulation fallback:", err);
+    return null;
+  }
+}
+
+export async function fetchSocialSignals(corridor = "Nagpur ➔ Mumbai CSMT") {
+  try {
+    const res = await fetch(`${API_BASE}/social-signals/live?corridor=${encodeURIComponent(corridor)}`);
+    if (!res.ok) throw new Error("Social signals API failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Social signals fallback:", err);
+    return { signals: [] };
+  }
+}
+
+export async function fetchNugenStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/nugen/status`);
+    if (!res.ok) throw new Error("Nugen status failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Nugen status fallback:", err);
+    return null;
+  }
+}
+
+export async function triggerNugenAlignment(apiKey) {
+  try {
+    const res = await fetch(`${API_BASE}/nugen/trigger-alignment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: apiKey })
+    });
+    if (!res.ok) throw new Error("Nugen trigger alignment failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Nugen alignment fallback:", err);
+    return null;
+  }
+}
+
+export async function queryNugenChat(query, model) {
+  try {
+    const res = await fetch(`${API_BASE}/nugen/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, model })
+    });
+    if (!res.ok) throw new Error("Nugen chat failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Nugen chat fallback:", err);
+    return null;
+  }
+}
+
+export async function fetchNugenCorpus() {
+  try {
+    const res = await fetch(`${API_BASE}/nugen/corpus`);
+    if (!res.ok) throw new Error("Nugen corpus failed");
+    return await res.json();
+  } catch (err) {
+    console.warn("Nugen corpus fallback:", err);
+    return null;
+  }
+}
+

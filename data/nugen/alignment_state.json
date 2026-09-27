@@ -1,0 +1,24 @@
+{
+  "status": "PROCESSING",
+  "has_api_key": true,
+  "base_model_id": "qwen-v2p5-0p5b-instruct",
+  "alignment_id": "alignment_01m3fzrg1r3dpg1z",
+  "aligned_model_id": null,
+  "is_deployed": false,
+  "document_ids": [
+    "document_01m3fzrfr7pev3za",
+    "document_01m3fzrfre4647sf",
+    "document_01m3fzrfrm19fg56",
+    "document_01m3fzrfrtkbxsyz"
+  ],
+  "last_updated": "2026-09-26T23:10:43.817170",
+  "step": 7,
+  "step_name": "Alignment in progress on Nugen cluster. Polling status...",
+  "documents": [
+    "01_corridor_weather_delay_profiles.md",
+    "02_seasonal_weather_vulnerability_matrix.md",
+    "03_domino_turnaround_propagation_rules.md",
+    "04_alignment_scenario_qa_pairs.md",
+    "05_benchmark_eval_pairs.json"
+  ]
+}

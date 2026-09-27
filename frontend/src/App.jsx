@@ -76,6 +76,9 @@ export default function App() {
       if (data && data.itinerary) {
         setItinerary(data.itinerary);
         setRiskAnalysis(data.risk_analysis);
+        if (data.itinerary.traveler_name && data.itinerary.traveler_name !== "Elena Vance (Corporate / Leisure)" && data.itinerary.traveler_name !== "Passenger") {
+          setUser(prev => ({ ...prev, name: data.itinerary.traveler_name }));
+        }
       } else {
         setItinerary({
           id: "itinerary_alpine_cascade",

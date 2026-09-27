@@ -76,7 +76,7 @@ export default function BookingModal({ isOpen, onClose, user, itinerary, activeD
                   PASSENGER RECORD
                 </span>
                 <h4 className="font-poppins font-bold text-base text-white">
-                  {user ? user.name : "Elena Vance"}
+                  {user?.name || "Traveler"}
                 </h4>
                 <p className="text-xs text-emerald-400 font-mono mt-0.5">
                   Booking Ref: VY-8842-ALPINE • Tier: Plus

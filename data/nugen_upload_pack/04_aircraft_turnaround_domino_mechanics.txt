@@ -1,0 +1,22 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #4
+TITLE: Aircraft Turnaround Domino Mechanics & Tail Scheduling Propagation
+SOURCE CORPUS: Empirical Turnaround Analysis of 5.33M Flights
+================================================================================
+
+1. THE TAIL ROUTING MULTIPLIER:
+Empirical telemetry confirms that 48.7% of primary weather delays propagate directly into
+Late Aircraft Delay on subsequent scheduled legs for the same airframe tail number.
+
+2. DELAY ABSORPTION DYNAMICS:
+  - Turnaround Buffer Window: Domestic airline schedules typically build in 40 to 55 minutes of gate buffer.
+  - Absorbed Delay (<30 minutes): Turnaround operations can compress cleaning, refueling, and boarding to absorb up to 20-25m.
+  - Critical Threshold (>45 minutes): When upstream weather delay exceeds 45 minutes, buffer capacity is 100% exhausted.
+    Every subsequent minute of arrival delay translates 1:1 into delayed departure on the next leg.
+
+3. CREW DUTY LIMITATIONS (FAR PART 117 / DGCA CAR SERIES J):
+  - Cumulative Duty Limits: Flight crew and cabin attendants operate under strict legal flight duty periods (FDP).
+  - The 90-Minute Expiry Cliff: When an airframe is delayed beyond 90 minutes, there is a 34% probability that
+    flight crews reach their maximum allowable duty limit ('timeout').
+  - Structural Cancellation: Once crew times out at an outstation without reserve crews, the flight converts
+    from a temporary delay into a full overnight cancellation.

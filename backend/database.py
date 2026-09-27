@@ -220,8 +220,8 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
         travel_date, is_past_journey, journey_status, origin_coords, dest_coords
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        data.get("pnr", "VY-EXT-8820"),
-        data.get("passenger_name", "Elena Vance"),
+        data.get("pnr") or f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN",
+        data.get("passenger_name") or "Passenger",
         data.get("booking_source", "External Travel Ticket"),
         carrier,
         service,
@@ -255,8 +255,8 @@ def save_external_disruption(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "id": inserted_id,
-        "pnr": data.get("pnr", "VY-EXT-8820"),
-        "passenger_name": data.get("passenger_name", "Elena Vance"),
+        "pnr": data.get("pnr") or f"VY-{int(datetime.now().timestamp()) % 100000:05d}-IN",
+        "passenger_name": data.get("passenger_name") or "Passenger",
         "carrier": carrier,
         "service_number": service,
         "origin": origin,
@@ -350,3 +350,13 @@ def file_refund_claim(disruption_id: int, pnr: str, passenger_name: str, airline
         "timestamp": now_iso,
         "message": "Refund claim successfully lodged with carrier and recorded in Voyage Disruption Ledger."
     }
+
+def get_all_refund_claims() -> List[Dict[str, Any]]:
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM refund_claims ORDER BY rowid DESC")
+    rows = cursor.fetchall()
+    result = [dict(r) for r in rows]
+    conn.close()
+    return result

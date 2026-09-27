@@ -78,10 +78,10 @@ export default function BookingPage({ user, itinerary, activeDisruption, onNavig
                 PASSENGER MANIFEST &amp; RESILIENCE CONTRACT
               </span>
               <h3 className="font-volkhov font-bold text-2xl text-white mt-1">
-                {user ? user.name : "Elena Vance"}
+                {itinerary?.traveler_name || user?.name || "Traveler"}
               </h3>
               <p className="text-xs text-emerald-300 font-mono mt-0.5">
-                Ticket Ref: VY-9904-IN • Air India AI 882 • Vande Bharat Express
+                {itinerary?.title ? `Itinerary: ${itinerary.title}` : `Ticket Ref: ${itinerary?.id || 'VY-RESILIENT'}`}
               </p>
             </div>
 

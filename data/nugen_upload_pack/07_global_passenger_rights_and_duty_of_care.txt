@@ -1,0 +1,21 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #7
+TITLE: Global Passenger Rights, Statutory Duty of Care & Refund Mandates
+SOURCE CORPUS: DGCA CAR, EU261/UK261, US DOT 2024, IRCTC TDR Rules
+================================================================================
+
+1. INDIA: DGCA CAR SECTION 3 SERIES M PART IV:
+  - Refreshments / Meals: Mandatory for flight delays exceeding 2 hours (block time <= 2.5 hrs) or 3 hours (block time 2.5-5 hrs).
+  - Statutory Cash Compensation: Up to INR 5,000 to INR 10,000 for cancellations without 24 hours notice or missed connections under carrier fault.
+  - Hotel Accommodation: Mandatory for overnight delays or delays exceeding 6 hours between 20:00 and 03:00.
+
+2. EUROPEAN UNION: REGULATION (EC) NO 261/2004 & UK261:
+  - Compensation Tiers: EUR 250 (flights <= 1,500 km), EUR 400 (intra-EU > 1,500 km), EUR 600 (> 3,500 km).
+  - Extraordinary Circumstances: Severe meteorological events exempt airlines from cash compensation, BUT duty of care
+    (meals, drinks, communications, hotel accommodation) is an UNCONDITIONAL obligation.
+
+3. UNITED STATES: 2024 U.S. DOT AUTOMATIC CASH REFUND MANDATE:
+  - Delays Exceeding 3 Hours Domestic / 6 Hours International entitle passengers to full automatic cash refund in original payment format.
+
+4. INDIAN RAILWAYS (IRCTC) TDR RULES:
+  - Full 100% ticket refund (minus nominal clerkage) if train is delayed by >3 hours at boarding point and passenger does not travel.

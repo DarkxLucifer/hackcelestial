@@ -96,6 +96,32 @@ export default function DisruptionChatbot({
            isPastDate(ticket.travel_date);
   };
 
+  // Load authentic tickets and disruptions from SQLite database on mount
+  useEffect(() => {
+    const loadRealTickets = async () => {
+      try {
+        const res = await fetch('/api/disruptions/external');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.disruptions && data.disruptions.length > 0) {
+            const valid = data.disruptions.filter(d => 
+              d.origin !== 'Origin' && 
+              !(d.carrier === 'IndiGo' && (d.service_number === '6E 412' || d.service_number === '6E 441'))
+            );
+            if (valid.length > 0) {
+              const latest = valid[0];
+              setUploadedTickets([latest]);
+              setCurrentDisruption(latest);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load real tickets from database:", err);
+      }
+    };
+    loadRealTickets();
+  }, []);
+
   // Auto-scroll inside chat container strictly without scrolling the browser window
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -227,6 +253,11 @@ export default function DisruptionChatbot({
       const provider = data.provider || "Voyage AI Engine";
       setActiveProvider(provider);
 
+      // Synchronize uploadedTickets if backend returns authentic ledger
+      if (data.all_tickets && Array.isArray(data.all_tickets) && data.all_tickets.length > 0) {
+        setUploadedTickets(data.all_tickets);
+      }
+
       // If the backend returned a real structured ticket (e.g. from RailRadar live lookup for 12134)
       const lower = query.toLowerCase();
       let cardToShow = null;
@@ -256,38 +287,21 @@ export default function DisruptionChatbot({
           text: replyText,
           structuredCard: cardToShow,
           buses: data.buses || null,
-          allTickets: uploadedTickets,
+          allTickets: data.all_tickets || uploadedTickets,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
 
     } catch (err) {
       console.error("AI Chat Error:", err);
-      let fallbackText = "";
-      if (activeTicketContext) {
-        const c = activeTicketContext;
-        const delayMins = c.delay_minutes || 0;
-        const isPast = c.is_past_journey === true;
-        const statusText = isPast
-          ? '**Travel Status**: ✅ Historical Journey — Service Already Completed'
-          : c.is_cancellation
-            ? '**Travel Status**: ❌ Service Cancelled'
-            : delayMins > 0
-              ? `**Reported Disruption**: ⚠️ +${delayMins} mins delay`
-              : '**Travel Status**: ✅ On Schedule (Running Right Time)';
-        fallbackText = `### ✈️ Trip Details & Resilience Status\n\nHere are the details for your journey on **${c.carrier} ${c.service_number}**:\n• **Route Corridor**: **${c.origin} ➔ ${c.destination}**\n• **PNR / Booking Reference**: \`${c.pnr}\`\n• ${statusText}${!isPast && delayMins === 0 && !c.is_cancellation ? ' (+0m delay)' : ''}\n• **Disruption Reason**: ${c.disruption_reason || 'Nominal on-schedule operation'}\n• **Total Ticket Fare**: ₹${c.ticket_cost || 6450} ${c.currency || 'INR'}\n\n#### 🛡️ Statutory Passenger Rights & Protection:\n• **Governing Framework**: ${isPast ? 'IRCTC TDR Policy (historical journey)' : 'DGCA CAR Section 3 & EU261 active'}\n• **Full Fare Refund**: ${isPast ? 'File TDR on IRCTC portal if missed train' : delayMins >= 180 ? 'Eligible (100% refund)' : 'Standard policy applies'}\n• **Duty of Care**: Mandatory refreshments and meals at departure terminal.\n\nChoose an action below to upload another ticket, ask questions, or proceed to the travel map:`;
-      } else {
-        fallbackText = "I have recorded your disruption query and evaluated your statutory passenger rights under DGCA CAR Section 3 and IRCTC guidelines. Please upload your ticket or share your PNR to see your exact connection map.";
-      }
-
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 1,
           sender: 'bot',
-          provider: 'Voyage AI Engine',
-          text: fallbackText,
-          structuredCard: activeTicketContext,
+          provider: 'Voyage System Alert',
+          text: "⚠️ **Connection Notice**\nCould not reach the Voyage AI backend server at `/api/ai/chat`.\n\nPlease verify that the backend server is running (e.g. `uvicorn backend.main:app --port 8000`).",
+          structuredCard: null,
           allTickets: uploadedTickets,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -347,31 +361,7 @@ export default function DisruptionChatbot({
           parsedRecord = resData.structured_data;
         }
       } catch (err) {
-        console.warn("Server upload attempt error, falling back to local extractor:", err);
-      }
-
-      // Safe heuristic fallback for client-side resilience if backend is unreachable
-      if (!parsedRecord) {
-        const cleanName = fileName.replace(/\.[^/.]+$/, "");
-        const isTrain = fileName.toLowerCase().includes("train") || fileName.toLowerCase().includes("rail") || fileName.toLowerCase().includes("irctc") || fileName.toLowerCase().includes("vande");
-        parsedRecord = {
-          id: Math.floor(1000 + Math.random() * 9000),
-          pnr: `VY-${Math.floor(10000 + Math.random() * 90000)}-IN`,
-          passenger_name: "Passenger",
-          booking_source: `Parsed Ticket (${fileName})`,
-          carrier: isTrain ? "Indian Railways" : "IndiGo",
-          service_number: isTrain ? "Express Service" : "6E 412",
-          origin: "Origin",
-          destination: "Destination",
-          origin_coords: { lat: 20.9374, lng: 77.7796 },
-          dest_coords: { lat: 18.9401, lng: 72.8351 },
-          delay_minutes: 0,
-          is_cancellation: false,
-          is_past_journey: false,
-          disruption_reason: "Nominal on-schedule operation",
-          ticket_cost: null,
-          currency: "INR"
-        };
+        console.warn("Server upload attempt error:", err);
       }
 
       if (parsedRecord) {
@@ -399,7 +389,9 @@ export default function DisruptionChatbot({
         const delay = typeof parsedRecord?.delay_minutes === 'number' ? parsedRecord.delay_minutes : 0;
         const isPast = parsedRecord?.is_past_journey === true;
         const pnr = parsedRecord?.pnr || 'N/A';
-        const fare = parsedRecord?.ticket_cost ? `${parsedRecord?.currency || 'INR'} ${parsedRecord?.ticket_cost}` : '₹6,450 INR';
+        const fare = (parsedRecord?.ticket_cost && Number(parsedRecord.ticket_cost) > 0)
+          ? `₹${Number(parsedRecord.ticket_cost).toLocaleString()} ${parsedRecord?.currency || 'INR'}`
+          : 'Standard Fare';
 
         const statusLine = isPast
           ? '**Travel Status**: ✅ Historical Journey — Service Already Completed'
@@ -445,6 +437,17 @@ export default function DisruptionChatbot({
           }
         ]);
       }
+    } else {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: 'bot',
+          provider: 'Voyage AI Engine',
+          text: `⚠️ **Document Extraction Notice**\nCould not extract travel details from the uploaded document(s). Please verify that the file contains readable ticket details (such as PNR, train/flight number, passenger name, and route) and that the backend server is reachable.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
     }
 
     setIsUploading(false);

@@ -1,0 +1,311 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #1
+TITLE: Commercial Aviation Airport Hub Weather Delay Atlas
+SOURCE CORPUS: 5.33 Million Flights Empirical Telemetry (flights.csv)
+================================================================================
+
+OVERVIEW:
+This document codifies empirical weather disruption distributions across 30 major
+commercial airport hubs. Based on 5,332,914 flights, direct weather events totaled 62,610.
+
+AIRPORT HUB PROFILES (SORTED BY WEATHER DELAY VOLUME):
+
+Airport Hub: ORD
+  - Total Scheduled Departures: 285,884
+  - Weather Delay Frequency: 3.26% of all departures
+  - Average Weather Delay Duration: 45.4 minutes
+  - Peak Recorded Weather Delay: 991 minutes
+  - Inbound Late Turnaround Delay Rate: 11.22% (avg 48.1m)
+  - Total Weather Cancellations: 4,769 flights (1.67%)
+  - Vulnerability Classification: CRITICAL
+  - Operational Guideline: Ground delay programs (GDP) average 45.0m during adverse fronts.
+
+Airport Hub: ATL
+  - Total Scheduled Departures: 346,836
+  - Weather Delay Frequency: 1.98% of all departures
+  - Average Weather Delay Duration: 45.7 minutes
+  - Peak Recorded Weather Delay: 1068 minutes
+  - Inbound Late Turnaround Delay Rate: 7.5% (avg 40.5m)
+  - Total Weather Cancellations: 1,707 flights (0.49%)
+  - Vulnerability Classification: CRITICAL
+  - Operational Guideline: Ground delay programs (GDP) average 46.0m during adverse fronts.
+
+Airport Hub: DFW
+  - Total Scheduled Departures: 239,551
+  - Weather Delay Frequency: 2.37% of all departures
+  - Average Weather Delay Duration: 45.1 minutes
+  - Peak Recorded Weather Delay: 862 minutes
+  - Inbound Late Turnaround Delay Rate: 10.08% (avg 43.2m)
+  - Total Weather Cancellations: 4,664 flights (1.95%)
+  - Vulnerability Classification: CRITICAL
+  - Operational Guideline: Ground delay programs (GDP) average 45.0m during adverse fronts.
+
+Airport Hub: DEN
+  - Total Scheduled Departures: 196,055
+  - Weather Delay Frequency: 1.3% of all departures
+  - Average Weather Delay Duration: 36.4 minutes
+  - Peak Recorded Weather Delay: 331 minutes
+  - Inbound Late Turnaround Delay Rate: 12.14% (avg 43.1m)
+  - Total Weather Cancellations: 1,383 flights (0.71%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 36.0m during adverse fronts.
+
+Airport Hub: MCO
+  - Total Scheduled Departures: 110,982
+  - Weather Delay Frequency: 1.98% of all departures
+  - Average Weather Delay Duration: 46.7 minutes
+  - Peak Recorded Weather Delay: 819 minutes
+  - Inbound Late Turnaround Delay Rate: 11.11% (avg 47.6m)
+  - Total Weather Cancellations: 657 flights (0.59%)
+  - Vulnerability Classification: CRITICAL
+  - Operational Guideline: Ground delay programs (GDP) average 47.0m during adverse fronts.
+
+Airport Hub: JFK
+  - Total Scheduled Departures: 93,811
+  - Weather Delay Frequency: 1.79% of all departures
+  - Average Weather Delay Duration: 55.4 minutes
+  - Peak Recorded Weather Delay: 1052 minutes
+  - Inbound Late Turnaround Delay Rate: 8.16% (avg 52.2m)
+  - Total Weather Cancellations: 1,103 flights (1.18%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 55.0m during adverse fronts.
+
+Airport Hub: IAH
+  - Total Scheduled Departures: 146,622
+  - Weather Delay Frequency: 1.11% of all departures
+  - Average Weather Delay Duration: 52.4 minutes
+  - Peak Recorded Weather Delay: 460 minutes
+  - Inbound Late Turnaround Delay Rate: 9.31% (avg 47.2m)
+  - Total Weather Cancellations: 1,200 flights (0.82%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 52.0m during adverse fronts.
+
+Airport Hub: LGA
+  - Total Scheduled Departures: 99,605
+  - Weather Delay Frequency: 1.43% of all departures
+  - Average Weather Delay Duration: 40.2 minutes
+  - Peak Recorded Weather Delay: 1118 minutes
+  - Inbound Late Turnaround Delay Rate: 12.86% (avg 54.9m)
+  - Total Weather Cancellations: 2,191 flights (2.2%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 40.0m during adverse fronts.
+
+Airport Hub: BOS
+  - Total Scheduled Departures: 107,847
+  - Weather Delay Frequency: 1.3% of all departures
+  - Average Weather Delay Duration: 51.3 minutes
+  - Peak Recorded Weather Delay: 1116 minutes
+  - Inbound Late Turnaround Delay Rate: 8.67% (avg 44.8m)
+  - Total Weather Cancellations: 1,882 flights (1.75%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 51.0m during adverse fronts.
+
+Airport Hub: MIA
+  - Total Scheduled Departures: 69,341
+  - Weather Delay Frequency: 1.88% of all departures
+  - Average Weather Delay Duration: 40.8 minutes
+  - Peak Recorded Weather Delay: 403 minutes
+  - Inbound Late Turnaround Delay Rate: 10.26% (avg 42.8m)
+  - Total Weather Cancellations: 463 flights (0.67%)
+  - Vulnerability Classification: CRITICAL
+  - Operational Guideline: Ground delay programs (GDP) average 41.0m during adverse fronts.
+
+Airport Hub: MDW
+  - Total Scheduled Departures: 80,886
+  - Weather Delay Frequency: 1.4% of all departures
+  - Average Weather Delay Duration: 50.3 minutes
+  - Peak Recorded Weather Delay: 436 minutes
+  - Inbound Late Turnaround Delay Rate: 12.99% (avg 38.3m)
+  - Total Weather Cancellations: 1,448 flights (1.79%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 50.0m during adverse fronts.
+
+Airport Hub: DAL
+  - Total Scheduled Departures: 59,699
+  - Weather Delay Frequency: 1.78% of all departures
+  - Average Weather Delay Duration: 40.1 minutes
+  - Peak Recorded Weather Delay: 468 minutes
+  - Inbound Late Turnaround Delay Rate: 13.7% (avg 35.4m)
+  - Total Weather Cancellations: 464 flights (0.78%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 40.0m during adverse fronts.
+
+Airport Hub: EWR
+  - Total Scheduled Departures: 101,772
+  - Weather Delay Frequency: 1.0% of all departures
+  - Average Weather Delay Duration: 56.7 minutes
+  - Peak Recorded Weather Delay: 529 minutes
+  - Inbound Late Turnaround Delay Rate: 10.11% (avg 50.7m)
+  - Total Weather Cancellations: 1,144 flights (1.12%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 57.0m during adverse fronts.
+
+Airport Hub: DCA
+  - Total Scheduled Departures: 73,794
+  - Weather Delay Frequency: 1.36% of all departures
+  - Average Weather Delay Duration: 52.5 minutes
+  - Peak Recorded Weather Delay: 1002 minutes
+  - Inbound Late Turnaround Delay Rate: 9.21% (avg 48.9m)
+  - Total Weather Cancellations: 1,076 flights (1.46%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 52.0m during adverse fronts.
+
+Airport Hub: TPA
+  - Total Scheduled Departures: 63,906
+  - Weather Delay Frequency: 1.52% of all departures
+  - Average Weather Delay Duration: 43.3 minutes
+  - Peak Recorded Weather Delay: 313 minutes
+  - Inbound Late Turnaround Delay Rate: 11.08% (avg 47.8m)
+  - Total Weather Cancellations: 357 flights (0.56%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 43.0m during adverse fronts.
+
+Airport Hub: CLT
+  - Total Scheduled Departures: 100,324
+  - Weather Delay Frequency: 0.93% of all departures
+  - Average Weather Delay Duration: 46.1 minutes
+  - Peak Recorded Weather Delay: 432 minutes
+  - Inbound Late Turnaround Delay Rate: 8.22% (avg 36.3m)
+  - Total Weather Cancellations: 690 flights (0.69%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 46.0m during adverse fronts.
+
+Airport Hub: DTW
+  - Total Scheduled Departures: 108,500
+  - Weather Delay Frequency: 0.84% of all departures
+  - Average Weather Delay Duration: 47.5 minutes
+  - Peak Recorded Weather Delay: 720 minutes
+  - Inbound Late Turnaround Delay Rate: 7.0% (avg 46.0m)
+  - Total Weather Cancellations: 678 flights (0.62%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 47.0m during adverse fronts.
+
+Airport Hub: LAX
+  - Total Scheduled Departures: 194,673
+  - Weather Delay Frequency: 0.47% of all departures
+  - Average Weather Delay Duration: 35.4 minutes
+  - Peak Recorded Weather Delay: 760 minutes
+  - Inbound Late Turnaround Delay Rate: 11.98% (avg 42.9m)
+  - Total Weather Cancellations: 609 flights (0.31%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 35.0m during adverse fronts.
+
+Airport Hub: BWI
+  - Total Scheduled Departures: 86,079
+  - Weather Delay Frequency: 1.04% of all departures
+  - Average Weather Delay Duration: 69.9 minutes
+  - Peak Recorded Weather Delay: 1152 minutes
+  - Inbound Late Turnaround Delay Rate: 12.63% (avg 38.0m)
+  - Total Weather Cancellations: 1,035 flights (1.2%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 70.0m during adverse fronts.
+
+Airport Hub: SFO
+  - Total Scheduled Departures: 148,008
+  - Weather Delay Frequency: 0.57% of all departures
+  - Average Weather Delay Duration: 31.5 minutes
+  - Peak Recorded Weather Delay: 767 minutes
+  - Inbound Late Turnaround Delay Rate: 11.46% (avg 50.7m)
+  - Total Weather Cancellations: 900 flights (0.61%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 31.0m during adverse fronts.
+
+Airport Hub: MSP
+  - Total Scheduled Departures: 112,117
+  - Weather Delay Frequency: 0.67% of all departures
+  - Average Weather Delay Duration: 46.4 minutes
+  - Peak Recorded Weather Delay: 797 minutes
+  - Inbound Late Turnaround Delay Rate: 6.95% (avg 41.4m)
+  - Total Weather Cancellations: 399 flights (0.36%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 46.0m during adverse fronts.
+
+Airport Hub: PHL
+  - Total Scheduled Departures: 66,021
+  - Weather Delay Frequency: 1.05% of all departures
+  - Average Weather Delay Duration: 37.3 minutes
+  - Peak Recorded Weather Delay: 357 minutes
+  - Inbound Late Turnaround Delay Rate: 9.14% (avg 47.4m)
+  - Total Weather Cancellations: 759 flights (1.15%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 37.0m during adverse fronts.
+
+Airport Hub: LAS
+  - Total Scheduled Departures: 133,181
+  - Weather Delay Frequency: 0.52% of all departures
+  - Average Weather Delay Duration: 45.4 minutes
+  - Peak Recorded Weather Delay: 604 minutes
+  - Inbound Late Turnaround Delay Rate: 12.36% (avg 41.7m)
+  - Total Weather Cancellations: 365 flights (0.27%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 45.0m during adverse fronts.
+
+Airport Hub: FLL
+  - Total Scheduled Departures: 73,624
+  - Weather Delay Frequency: 0.81% of all departures
+  - Average Weather Delay Duration: 40.1 minutes
+  - Peak Recorded Weather Delay: 335 minutes
+  - Inbound Late Turnaround Delay Rate: 9.42% (avg 44.6m)
+  - Total Weather Cancellations: 485 flights (0.66%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 40.0m during adverse fronts.
+
+Airport Hub: PHX
+  - Total Scheduled Departures: 146,815
+  - Weather Delay Frequency: 0.4% of all departures
+  - Average Weather Delay Duration: 55.0 minutes
+  - Peak Recorded Weather Delay: 521 minutes
+  - Inbound Late Turnaround Delay Rate: 9.8% (avg 36.9m)
+  - Total Weather Cancellations: 376 flights (0.26%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 55.0m during adverse fronts.
+
+Airport Hub: SLC
+  - Total Scheduled Departures: 97,210
+  - Weather Delay Frequency: 0.56% of all departures
+  - Average Weather Delay Duration: 48.8 minutes
+  - Peak Recorded Weather Delay: 771 minutes
+  - Inbound Late Turnaround Delay Rate: 6.12% (avg 39.6m)
+  - Total Weather Cancellations: 224 flights (0.23%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 49.0m during adverse fronts.
+
+Airport Hub: HOU
+  - Total Scheduled Departures: 52,042
+  - Weather Delay Frequency: 1.03% of all departures
+  - Average Weather Delay Duration: 52.9 minutes
+  - Peak Recorded Weather Delay: 425 minutes
+  - Inbound Late Turnaround Delay Rate: 13.56% (avg 37.1m)
+  - Total Weather Cancellations: 418 flights (0.8%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 53.0m during adverse fronts.
+
+Airport Hub: SEA
+  - Total Scheduled Departures: 110,899
+  - Weather Delay Frequency: 0.48% of all departures
+  - Average Weather Delay Duration: 37.1 minutes
+  - Peak Recorded Weather Delay: 816 minutes
+  - Inbound Late Turnaround Delay Rate: 6.83% (avg 39.2m)
+  - Total Weather Cancellations: 185 flights (0.17%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 37.0m during adverse fronts.
+
+Airport Hub: IAD
+  - Total Scheduled Departures: 34,305
+  - Weather Delay Frequency: 1.39% of all departures
+  - Average Weather Delay Duration: 48.1 minutes
+  - Peak Recorded Weather Delay: 402 minutes
+  - Inbound Late Turnaround Delay Rate: 8.52% (avg 53.1m)
+  - Total Weather Cancellations: 206 flights (0.6%)
+  - Vulnerability Classification: ELEVATED
+  - Operational Guideline: Ground delay programs (GDP) average 48.0m during adverse fronts.
+
+Airport Hub: BNA
+  - Total Scheduled Departures: 47,580
+  - Weather Delay Frequency: 0.96% of all departures
+  - Average Weather Delay Duration: 57.2 minutes
+  - Peak Recorded Weather Delay: 667 minutes
+  - Inbound Late Turnaround Delay Rate: 10.89% (avg 44.9m)
+  - Total Weather Cancellations: 682 flights (1.43%)
+  - Vulnerability Classification: MODERATE
+  - Operational Guideline: Ground delay programs (GDP) average 57.0m during adverse fronts.

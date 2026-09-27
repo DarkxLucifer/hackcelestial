@@ -12,6 +12,7 @@ export default function DemoJourneyGraph({
   disruptedTickets = [],
   onSimulateAlpine, 
   onOpenSaga,
+  simulatedWeather = null,
   t 
 }) {
   const [selectedNodeId, setSelectedNodeId] = useState('node_flight_1');
@@ -161,6 +162,7 @@ export default function DemoJourneyGraph({
             disruptedTicket={disruptedTicket} 
             disruptedTickets={disruptedTickets}
             itinerary={itinerary} 
+            simulatedWeather={simulatedWeather}
           />
         </div>
       ) : (!hasTickets || nodes.length === 0) ? (

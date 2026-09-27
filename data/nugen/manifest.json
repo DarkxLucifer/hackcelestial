@@ -1,0 +1,14 @@
+{
+  "dataset_name": "Voyage Nugen Weather Alignment Corpus",
+  "source_file": "flights.csv",
+  "total_records_analyzed": 5332914,
+  "direct_weather_events": 62610,
+  "turnaround_cascade_rate_pct": 48.7,
+  "generated_files": [
+    "01_corridor_weather_delay_profiles.md",
+    "02_seasonal_weather_vulnerability_matrix.md",
+    "03_domino_turnaround_propagation_rules.md",
+    "04_alignment_scenario_qa_pairs.md",
+    "05_benchmark_eval_pairs.json"
+  ]
+}

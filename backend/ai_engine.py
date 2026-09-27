@@ -25,7 +25,12 @@ except ImportError:
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 
-from .database import save_external_disruption, evaluate_disruption_rights
+from .database import (
+    save_external_disruption, 
+    evaluate_disruption_rights,
+    get_all_external_disruptions,
+    get_all_refund_claims
+)
 from .travel_retrieval import (
     AviationStackTracker,
     RailRadarTracker,
@@ -197,7 +202,22 @@ def get_system_prompt_with_ticket(state: AgentState) -> str:
         is_past = bool(st.get("is_past_journey", False))
         travel_dt = st.get("travel_date", "")
         delay_m = st.get("delay_minutes", 0)
-        prompt += f"\n\nCURRENT PASSENGER TICKET CONTEXT:\n- Carrier & Service: {st.get('carrier')} {st.get('service_number')}\n- Route: {st.get('origin')} to {st.get('destination')}\n- Travel Date: {travel_dt or 'Recent'}\n- Journey Historical Status: {'PAST DOCUMENT (COMPLETED)' if is_past else 'ACTIVE/UPCOMING'}\n- Delay: +{delay_m} mins\n- Status: {'Cancelled' if st.get('is_cancellation') else ('Completed Run' if is_past else ('Delayed' if delay_m > 0 else 'On Schedule'))}\n- PNR: {st.get('pnr')}\n- Fare: ₹{st.get('ticket_cost', 6450)} {st.get('currency', 'INR')}\n- Reason: {st.get('disruption_reason')}"
+        pax_name = st.get("passenger_name") or "Passenger"
+        cost_val = st.get("ticket_cost")
+        fare_str = f"₹{float(cost_val):,.2f} {st.get('currency', 'INR')}" if (cost_val is not None and float(cost_val) > 0) else "Standard Fare"
+        prompt += (
+            f"\n\nCURRENT PASSENGER TICKET CONTEXT:\n"
+            f"- Passenger Name: {pax_name}\n"
+            f"- Carrier & Service: {st.get('carrier')} {st.get('service_number')}\n"
+            f"- Route: {st.get('origin')} to {st.get('destination')}\n"
+            f"- Travel Date: {travel_dt or 'Recent'}\n"
+            f"- Journey Historical Status: {'PAST DOCUMENT (COMPLETED)' if is_past else 'ACTIVE/UPCOMING'}\n"
+            f"- Delay: +{delay_m} mins\n"
+            f"- Status: {'Cancelled' if st.get('is_cancellation') else ('Completed Run' if is_past else ('Delayed' if delay_m > 0 else 'On Schedule'))}\n"
+            f"- PNR: {st.get('pnr')}\n"
+            f"- Fare: {fare_str}\n"
+            f"- Reason: {st.get('disruption_reason')}"
+        )
         if is_past:
             prompt += "\nIMPORTANT: The user uploaded a past travel document. This service has ALREADY COMPLETED its scheduled run. It is not currently running. Clearly explain that the service is completed. Ask the user if they caught the train or missed it, and explain retrospective IRCTC TDR filing rules and refund deadlines if they did not travel or if it was delayed."
         else:
@@ -344,32 +364,135 @@ def call_expert_engine(state: AgentState) -> AgentState:
             "Please let me know if you would like help with an upcoming flight, train, or travel disruption!"
         )
         state["provider"] = "Voyage AI Engine"
-    # Case 0: Active passenger ticket context exists and query asks about trip/details
+    # Case 0a: User asks about refund claims / dispute status
+    if any(k in lower for k in ["claim", "claims", "refund claim", "filed claim", "claim receipt", "dispute", "claim status"]):
+        db_claims = get_all_refund_claims()
+        if db_claims:
+            claim_rows = []
+            for c in db_claims:
+                c_amt = float(c.get('claimed_amount', 0) or 0)
+                claim_rows.append(
+                    f"| **{c.get('claim_id')}** | `{c.get('pnr')}` | {c.get('passenger_name')} | {c.get('airline')} | ₹{c_amt:,.2f} INR | **{c.get('claim_status')}** | {str(c.get('filing_timestamp', ''))[:16]} |"
+                )
+            reply = f"""### 🛡️ Verified Refund & Dispute Claims Ledger
+
+Here are your authentic statutory refund claims recorded in the Voyage Disruption Ledger:
+
+| Claim ID | PNR | Passenger | Carrier | Claimed Amount | Status | Filed Date |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+""" + "\n".join(claim_rows) + """
+
+---
+#### 📋 Next Steps:
+• All claims are digitally filed under statutory frameworks (DGCA CAR Section 3 / IRCTC TDR Regulations).
+• Carriers are legally mandated to process cash refunds within 7 business days directly to the original payment mode.
+"""
+            state["response"] = reply
+            state["provider"] = "voyage_claims_ledger"
+            return state
+        else:
+            reply = """### 🛡️ Statutory Refund Claims Status
+
+No refund claims have been filed yet for your itinerary. 
+
+If your train is delayed by **>3 hours** at your boarding station or your flight is delayed by **>6 hours / cancelled**, you are entitled to a **100% full statutory refund**. Click **"File Claim"** or upload your ticket to begin."""
+            state["response"] = reply
+            state["provider"] = "voyage_claims_ledger"
+            return state
+
+    # Case 0b: Explicit trip summary / itinerary query
+    explicit_trip_summary_keywords = [
+        "my trip", "my journey", "my ticket", "my tickets", "my itinerary",
+        "trip summary", "journey summary", "trip details", "itinerary summary",
+        "show my ticket", "show my tickets", "show my booking", "view my booking",
+        "what is my itinerary", "what are my trip details", "summary of my trip",
+        "show itinerary", "view itinerary", "itinerary details", "my travel details"
+    ]
+    is_trip_summary_query = any(phrase in lower for phrase in explicit_trip_summary_keywords) or query.lower().strip() in ["my trip", "itinerary", "my tickets", "trip details", "trip summary", "show trip"]
+
     active_t = state.get("structured_ticket")
-    if active_t and any(k in lower for k in ["trip", "detail", "flight", "train", "status", "ticket", "pnr", "my", "delay", "booking", "schedule", "summary", "give", "caught", "running", "completed", "yesterday", "old", "miss"]):
-        carrier = active_t.get("carrier", "Carrier")
-        service = active_t.get("service_number", "Transit Link")
-        orig = active_t.get("origin", "Origin")
-        dest = active_t.get("destination", "Destination")
-        delay_m = int(active_t.get("delay_minutes", 0) or 0)
-        pnr = active_t.get("pnr", "VY-XXXXX-IN")
-        fare = float(active_t.get("ticket_cost", 6450.0) or 6450.0)
-        curr = active_t.get("currency", "INR")
-        reason = active_t.get("disruption_reason", "Operational schedule change")
-        is_canc = bool(active_t.get("is_cancellation", False))
-        is_past = bool(active_t.get("is_past_journey", False))
-        travel_dt = active_t.get("travel_date", "")
+    all_ext_tickets = get_all_external_disruptions()
+    if not active_t and all_ext_tickets:
+        active_t = all_ext_tickets[0]
+        state["structured_ticket"] = active_t
 
-        rights = evaluate_disruption_rights(carrier, delay_m, is_canc, fare)
+    if is_trip_summary_query and (active_t or all_ext_tickets):
+        # Deduplicate tickets by PNR and service_number
+        unique_tickets = []
+        seen_keys = set()
+        for t in all_ext_tickets:
+            k = f"{t.get('pnr', '')}_{t.get('service_number', '')}"
+            if k not in seen_keys:
+                seen_keys.add(k)
+                unique_tickets.append(t)
 
-        if is_past:
-            reply = f"""### 🚆 Historical Journey Record (Completed Service)
+        is_specific_single = active_t and any(str(active_t.get("service_number", "")).lower() in lower or str(active_t.get("pnr", "")).lower() in lower)
+        if len(unique_tickets) > 1 and not is_specific_single:
+            leg_items = []
+            for idx, t in enumerate(unique_tickets, 1):
+                del_m = int(t.get("delay_minutes", 0) or 0)
+                del_txt = f"+{del_m}m delay" if del_m > 0 else "Running Right Time (On-Time)"
+                t_fare = float(t.get("ticket_cost", 0) or 0)
+                fare_txt = f"₹{t_fare:,.2f} INR" if t_fare > 0 else "Standard Fare"
+                pax_n = t.get("passenger_name") or "Passenger"
+                is_past_leg = bool(t.get("is_past_journey"))
+                leg_items.append(
+                    f"• **Leg {idx}**: **{t.get('carrier')} #{t.get('service_number')}**\n"
+                    f"  - Route: **{t.get('origin')} ➔ {t.get('destination')}** (PNR: `{t.get('pnr')}`)\n"
+                    f"  - Travel Date: {t.get('travel_date', 'Recent')} | Status: **{del_txt}**{' (Completed Run)' if is_past_leg else ''}\n"
+                    f"  - Passenger: {pax_n} | Fare: {fare_txt}"
+                )
+            
+            c_orig = unique_tickets[0].get("origin", "Origin")
+            c_dest = unique_tickets[-1].get("destination", "Destination")
+            reply = f"""### 🗺️ Multi-Modal Connected Journey Itinerary
+
+You have **{len(unique_tickets)} connected travel documents** recorded in your Voyage ledger:
+
+""" + "\n\n".join(leg_items) + f"""
+
+---
+
+#### 🛡️ Critical Path & Passenger Rights:
+• **Full Corridor**: **{c_orig} ➔ ... ➔ {c_dest}**
+• **Interchange Protection**: Topological connection slack calculated via Critical Path Method (CPM).
+• **Statutory Protection**: IRCTC TDR Regulations active across rail segments; DGCA CAR Section 3 active across air legs.
+
+Choose an action below to view the interactive connection map, chat about specific legs, or upload additional vouchers."""
+            state["response"] = reply
+            state["provider"] = "voyage_trip_expert"
+            return state
+
+        # Single active ticket summary
+        if active_t:
+            carrier = active_t.get("carrier", "Carrier")
+            service = active_t.get("service_number", "Transit Link")
+            orig = active_t.get("origin", "Origin")
+            dest = active_t.get("destination", "Destination")
+            delay_m = int(active_t.get("delay_minutes", 0) or 0)
+            pnr = active_t.get("pnr", "N/A")
+            raw_cost = active_t.get("ticket_cost")
+            fare = float(raw_cost) if (raw_cost is not None and float(raw_cost) > 0) else 0.0
+            curr = active_t.get("currency", "INR")
+            reason = active_t.get("disruption_reason", "Nominal on-schedule operation")
+            is_canc = bool(active_t.get("is_cancellation", False))
+            is_past = bool(active_t.get("is_past_journey", False))
+            travel_dt = active_t.get("travel_date", "")
+            pax = active_t.get("passenger_name") or "Passenger"
+            fare_display = f"₹{fare:,.2f} {curr}" if fare > 0 else "Standard Fare"
+
+            rights = evaluate_disruption_rights(carrier, delay_m, is_canc, fare)
+
+            if is_past:
+                reply = f"""### 🚆 Historical Journey Record (Completed Service)
 
 This travel document is for **{carrier} {service}** ({orig} ➔ {dest}) scheduled on **{travel_dt or 'a previous date'}**.
 
+• **Passenger**: **{pax}**
 • **Service Run Status**: **ALREADY COMPLETED**. This train/service has completed its scheduled journey and is **no longer currently running**.
 • **Route Corridor**: **{orig} ➔ {dest}** (PNR: `{pnr}`)
 • **Scheduled Departure**: Completed as scheduled.
+• **Recorded Fare**: {fare_display}
 
 ---
 
@@ -384,16 +507,17 @@ This travel document is for **{carrier} {service}** ({orig} ➔ {dest}) schedule
   3. If eligible, IRCTC will process a statutory refund after verification by the train ticket examiner (TTE) charting system.
 
 Feel free to ask any specific questions about your rights or refund options!"""
-        else:
-            reply = f"""### ✈️ Trip Details & Resilience Status
+            else:
+                reply = f"""### ✈️ Trip Details & Resilience Status
 
-Here is the complete summary of your trip for **{carrier} {service}**:
+Here is the authentic summary of your trip for **{carrier} {service}**:
 
+• **Passenger**: **{pax}**
 • **Route Corridor**: **{orig} ➔ {dest}**
 • **Booking Reference / PNR**: `{pnr}`
-• **Current Status**: **{"+ " + str(delay_m) + " minutes delay" if delay_m > 0 else "On Schedule"}** {"(Flight Cancelled)" if is_canc else ""}
+• **Current Status**: **{"+ " + str(delay_m) + " minutes delay" if delay_m > 0 else "On Schedule (Running Right Time)"}** {"(Service Cancelled)" if is_canc else ""}
 • **Disruption Reason**: {reason}
-• **Total Ticket Fare**: ₹{fare:,.2f} {curr}
+• **Total Ticket Fare**: {fare_display}
 
 ---
 
@@ -406,9 +530,9 @@ Here is the complete summary of your trip for **{carrier} {service}**:
 #### 🗺️ Next Steps & Recovery:
 - Click **Upload Another** if you have a connecting flight, train, or hotel voucher to analyze.
 - Click **Done (View Map)** to inspect your trip on the Google Maps visualizer and view recovery plans."""
-        state["response"] = reply
-        state["provider"] = "voyage_trip_expert"
-        return state
+            state["response"] = reply
+            state["provider"] = "voyage_trip_expert"
+            return state
 
     # Case 1: User asks to write code
     if any(k in lower for k in ["write code", "code for", "create a website", "react component", "html", "javascript", "python", "fastapi"]):
@@ -709,47 +833,87 @@ Here are verified daily departures across premier state and private transport fl
         state["provider"] = "gtfs_redbus_aggregator"
         return state
 
-    # Case 5: Flight / Train delay or cancellation dispute
-    if any(k in lower for k in ["delay", "cancel", "refund", "flight", "train", "pnr", "indigo", "air india", "vande bharat", "dgca"]):
-        # Extract carrier
-        carrier = "Air India"
-        if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
-        elif "spicejet" in lower: carrier = "SpiceJet"
-        elif "vande bharat" in lower or "train" in lower or "rail" in lower: carrier = "Indian Railways"
-        elif "vistara" in lower: carrier = "Vistara"
-
-        delay_m = 210
-        if "45" in lower: delay_m = 45
-        elif "4 hour" in lower or "4hr" in lower: delay_m = 240
-        elif "6 hour" in lower: delay_m = 360
-        elif "3 hour" in lower or "3.5" in lower or "3hr" in lower: delay_m = 210
-
-        is_canc = "cancel" in lower
-
-        rights = evaluate_disruption_rights(carrier, delay_m, is_canc, 6450.0)
+    # Case 5: Disruption Evaluation & Statutory Passenger Rights
+    if any(k in lower for k in ["delay", "cancel", "refund", "flight", "train", "pnr", "indigo", "air india", "vande bharat", "dgca", "rights", "compensation"]):
+        db_disruptions = get_all_external_disruptions()
+        candidate_ticket = state.get("structured_ticket") or (db_disruptions[0] if db_disruptions else None)
         
-        reply = f"""### 🛡️ Disruption Assessment & Statutory Rights Analysis
+        if candidate_ticket:
+            carrier = candidate_ticket.get("carrier", "Carrier")
+            service = candidate_ticket.get("service_number", "Service")
+            orig = candidate_ticket.get("origin", "Origin")
+            dest = candidate_ticket.get("destination", "Destination")
+            pnr = candidate_ticket.get("pnr", "N/A")
+            pax = candidate_ticket.get("passenger_name", "Passenger")
+            delay_m = int(candidate_ticket.get("delay_minutes", 0) or 0)
+            is_canc = bool(candidate_ticket.get("is_cancellation", False))
+            cost_val = candidate_ticket.get("ticket_cost")
+            fare = float(cost_val) if (cost_val is not None and float(cost_val) > 0) else 0.0
+            fare_str = f"₹{fare:,.2f} INR" if fare > 0 else "Standard Fare"
+            
+            rights = evaluate_disruption_rights(carrier, delay_m, is_canc, fare)
+            is_rail = "rail" in carrier.lower() or "train" in carrier.lower() or "irctc" in carrier.lower()
+            
+            if is_rail:
+                tdr_eligible = delay_m >= 180 or is_canc
+                reply = f"""### 🛡️ Statutory Disruption & IRCTC TDR Evaluation :: {carrier} {service}
 
-I have evaluated your trip details for **{carrier}**:
+I have evaluated your booked travel document from the Voyage Disruption Ledger:
 
-1. **Disruption Severity**:
-   - Status: **{"+ " + str(delay_m) + " minutes delay" if not is_canc else "Flight Cancelled"}**
-   - Cascading Impact: Downstream slack buffers are completely breached. High probability of missed connections.
+• **Passenger**: **{pax}** (PNR: `{pnr}`)
+• **Service**: **{carrier} {service}** ({orig} ➔ {dest})
+• **Recorded Delay**: **{"+ " + str(delay_m) + " minutes delay" if delay_m > 0 else "On Schedule / Right Time"}**
+• **Ticket Fare**: {fare_str}
 
-2. **Legal Rights & Statutory Refund Eligibility**:
-   - **Governing Law**: {rights['applicable_law']}
-   - **Full Fare Refund**: {"Eligible (100% refund without cancellation deductions)" if rights['refund_eligible'] else "Not triggered"}
-   - **Statutory Cash Compensation**: **₹{rights['statutory_compensation']:,.2f} INR** (Direct compensation under DGCA CAR Section 3)
-   - **Duty of Care**: Mandatory free refreshments and meals at the departure terminal, plus complimentary rescheduling.
+---
 
-3. **Recommended Multi-Modal Recovery**:
-   - **Plan B (Fastest Recovery)**: Secure immediate alternative departure + Vande Bharat connection to arrive tonight with ~9h 25m saved.
-   - **Plan A (Minimum Cost)**: Rebook on next morning carrier flight at ₹0 additional expense.
+#### ⚖️ Statutory Passenger Rights & Refund Rules:
+• **Governing Framework**: {rights['applicable_law']}
+• **TDR Refund Eligibility**: **{"100% Full Fare Refund Eligible (Zero Cancellation Deductions)" if tdr_eligible else "Nominal Schedule (No delay deduction triggered)"}**
+• **IRCTC Rule Clause**: Under Indian Railways TDR regulations, if your train is delayed by **more than 3 hours** at your boarding station, you can surrender your ticket via online TDR before train departure for a complete 100% full refund with zero cancellation charges.
+• **Duty of Care**: Station amenities, waiting halls, and charting priority are guaranteed under the Indian Railways Citizen Charter.
 
-I have structured and stored this disruption in your local Voyage Disruption Database. You can now execute recovery or file your 1-click refund dispute!"""
-        state["response"] = reply
-        state["provider"] = "voyage_legal_expert"
-        return state
+Feel free to ask for live GPS tracking or assistance in lodging a refund claim!"""
+            else:
+                reply = f"""### 🛡️ Statutory Disruption & DGCA Evaluation :: {carrier} {service}
+
+I have evaluated your booked travel document from the Voyage Disruption Ledger:
+
+• **Passenger**: **{pax}** (PNR: `{pnr}`)
+• **Flight**: **{carrier} {service}** ({orig} ➔ {dest})
+• **Operational Status**: **{"+ " + str(delay_m) + " minutes delay" if not is_canc else "Flight Cancelled"}**
+• **Ticket Fare**: {fare_str}
+
+---
+
+#### ⚖️ Statutory Passenger Rights & Compensation:
+• **Governing Framework**: {rights['applicable_law']}
+• **Full Fare Refund**: {"Eligible (100% refund without cancellation deductions)" if rights['refund_eligible'] else "Standard carrier refund policy"}
+• **Direct Statutory Compensation**: **₹{rights['statutory_compensation']:,.2f} INR** (Direct compensation under DGCA CAR Section 3)
+• **Duty of Care**: Mandatory refreshments/meals at departure terminal during delays exceeding 2 hours.
+
+You can click **"File Claim"** to lodge this statutory refund claim directly into the Voyage Disruption Ledger!"""
+            state["response"] = reply
+            state["provider"] = "voyage_legal_expert"
+            return state
+        else:
+            reply = """### 🛡️ Statutory Passenger Rights & Delay Compensation Guide
+
+Here are the active statutory protections for travel disruptions:
+
+#### ✈️ Aviation Protections (DGCA CAR Section 3, India):
+• **Delays > 2 Hours**: Mandatory complimentary meals and refreshments at the departure terminal.
+• **Delays > 6 Hours or Cancellations**: Choice between full 100% cash refund within 7 days OR immediate alternative flight rebooking, plus statutory cash compensation up to ₹5,000–₹10,000.
+• **Denied Boarding**: Up to 400% of booked one-way basic fare plus airline fuel charge.
+
+#### 🚆 Indian Railways (IRCTC TDR Regulations):
+• **Delays > 3 Hours at Boarding Station**: 100% full refund with zero cancellation fee by filing an online TDR before actual train departure.
+• **Train Cancellation by Railways**: 100% automatic full refund directly credited to original bank/card account.
+
+Please upload your ticket (PDF, image, or text) to automatically calculate your exact refund and compensation amount!"""
+            state["response"] = reply
+            state["provider"] = "voyage_legal_expert"
+            return state
 
     # Case 3: General knowledge / fallback
     state["response"] = f"""Hello! I am your Voyage Disruption & Travel Resilience Assistant.
@@ -798,8 +962,82 @@ def run_ai_chat(
     extracted_train_card = None
     buses_result = None
 
-    # 1. Detect train query (5-digit Indian Railways train number) or reference to active ticket train
+    # Ingest real passenger disruption records and refund claims from SQLite database
+    db_disruptions = get_all_external_disruptions()
+    db_claims = get_all_refund_claims()
+
+    all_tickets = []
+    if uploaded_tickets:
+        all_tickets.extend(uploaded_tickets)
+    if db_disruptions:
+        all_tickets.extend(db_disruptions)
+
+    # Deduplicate tickets by id or (pnr + service_number)
+    dedup_tickets = []
+    seen_keys = set()
+    for t in all_tickets:
+        k = str(t.get("id")) if t.get("id") else f"{t.get('pnr')}_{t.get('service_number')}"
+        if k not in seen_keys:
+            seen_keys.add(k)
+            dedup_tickets.append(t)
+    all_tickets = dedup_tickets
+
+    # Default active ticket to latest record if not provided
+    if not active_ticket and all_tickets:
+        active_ticket = all_tickets[0]
+
+    # Find matching ticket if user query mentions a specific train number, PNR, or route
     train_match = re.search(r'\b([012]\d{4})\b', query)
+    matched_ticket = None
+    for t in all_tickets:
+        svc = str(t.get("service_number", ""))
+        pnr_val = str(t.get("pnr", ""))
+        m_num = re.search(r'\b([012]\d{4})\b', svc)
+        num_in_ticket = m_num.group(1) if m_num else ""
+        if train_match and num_in_ticket == train_match.group(1):
+            matched_ticket = t
+            break
+        elif pnr_val and pnr_val.lower() in query.lower():
+            matched_ticket = t
+            break
+
+    if matched_ticket:
+        active_ticket = matched_ticket
+
+    # Inject real database passenger ledger into AI context
+    if all_tickets:
+        legs_info = []
+        for idx, t in enumerate(all_tickets, 1):
+            is_past_str = " (COMPLETED RUN)" if t.get("is_past_journey") else ""
+            del_m = int(t.get('delay_minutes', 0) or 0)
+            delay_str = f"+{del_m}m delay" if del_m > 0 else "Running Right Time (On-Time)"
+            pname = t.get('passenger_name') or 'Passenger'
+            cost_val = t.get('ticket_cost')
+            fare_val = f"₹{float(cost_val):,.2f} {t.get('currency', 'INR')}" if (cost_val is not None and float(cost_val) > 0) else "Standard Fare"
+            legs_info.append(
+                f"- Leg {idx}: PNR: `{t.get('pnr')}` | Passenger: {pname} | Carrier: {t.get('carrier')} {t.get('service_number')} | Corridor: {t.get('origin')} ➔ {t.get('destination')} | Travel Date: {t.get('travel_date', 'Recent')}{is_past_str} | Status: {t.get('journey_status', 'ON_TIME')} ({delay_str}) | Fare: {fare_val} | Disruption: {t.get('disruption_reason', 'None')}"
+            )
+        live_context_parts.append(
+            "INGESTED PASSENGER BOOKING & DISRUPTION LEDGER (REAL RECORDS FROM SQLITE DATABASE):\n"
+            + "\n".join(legs_info) +
+            "\n\nINSTRUCTION: Always refer to these authentic passenger tickets. Do not make up or invent mock carriers, flights, trains, fares, or passenger names."
+        )
+
+    # Inject filed refund claims ledger if available
+    if db_claims:
+        claims_info = []
+        for c in db_claims:
+            c_amt = float(c.get('claimed_amount', 0) or 0)
+            claims_info.append(
+                f"- Claim ID: {c.get('claim_id')} | PNR: `{c.get('pnr')}` | Passenger: {c.get('passenger_name')} | Carrier: {c.get('airline')} | Claimed: ₹{c_amt:,.2f} {c.get('currency', 'INR')} | Status: {c.get('claim_status')} | Policy: {c.get('applicable_policy')} | Filed: {c.get('filing_timestamp')}"
+            )
+        live_context_parts.append(
+            "FILED STATUTORY REFUND CLAIMS LEDGER (REAL RECORDS FROM SQLITE DATABASE):\n"
+            + "\n".join(claims_info) +
+            "\n\nINSTRUCTION: When asked about claims, refunds, or dispute filings, report these actual filed claims from the database with their claim IDs, amounts, and filing status."
+        )
+
+    # 1. Detect train query (5-digit Indian Railways train number) or reference to active ticket train
     act_service = str(active_ticket.get("service_number", "")) if active_ticket else ""
     act_train_match = re.search(r'\b([012]\d{4})\b', act_service)
     target_train_num = None
@@ -855,6 +1093,11 @@ def run_ai_chat(
                     f"- IRCTC TDR Refund: {'Eligible (100% refund, delay >= 3 hrs)' if t_data.get('tdr_refund_eligible') else 'Nominal (delay < 3 hrs)'}\n"
                     f"INSTRUCTION: When answering, provide these accurate real-time live telemetry details for this train.{dest_instruction}"
                 )
+                
+                ticket_pnr = active_ticket.get("pnr") if (active_ticket and is_ticket_for_train) else None
+                ticket_cost = active_ticket.get("ticket_cost") if (active_ticket and is_ticket_for_train) else None
+                pax_name = active_ticket.get("passenger_name", "Passenger") if (active_ticket and is_ticket_for_train) else "Passenger"
+                
                 extracted_train_card = {
                     "carrier": "Indian Railways",
                     "service_number": f"#{t_data['train_number']} {t_data['train_name']}",
@@ -864,9 +1107,10 @@ def run_ai_chat(
                     "is_cancellation": False,
                     "is_past_journey": active_ticket.get("is_past_journey", False) if (active_ticket and is_ticket_for_train) else False,
                     "disruption_reason": f"Live location: {t_data.get('current_location', 'In transit')} • {delay_str}",
-                    "pnr": active_ticket.get("pnr") if (active_ticket and is_ticket_for_train) else f"VY-LIVE-{t_data['train_number']}",
-                    "ticket_cost": active_ticket.get("ticket_cost", 1250.0) if (active_ticket and is_ticket_for_train) else 1250.0,
+                    "pnr": ticket_pnr or f"LIVE-ENQ-{t_data['train_number']}",
+                    "ticket_cost": ticket_cost,
                     "currency": active_ticket.get("currency", "INR") if active_ticket else "INR",
+                    "passenger_name": pax_name,
                     "current_location": t_data.get("current_location"),
                     "upcoming_station": t_data.get("upcoming_station"),
                     "status": t_data.get("status"),
@@ -1113,7 +1357,8 @@ def run_ai_chat(
                     res = {
                         "reply": state["response"],
                         "provider": "Voyage AI Engine (Gemini)",
-                        "success": True
+                        "success": True,
+                        "all_tickets": all_tickets
                     }
                     if final_ticket and (extracted_train_card or any(k in query.lower() for k in ["trip", "ticket", "train", "flight", "status", "detail", "pnr", "my", "delay", "summary"])):
                         res["structured_ticket"] = final_ticket
@@ -1133,7 +1378,8 @@ def run_ai_chat(
                     res = {
                         "reply": state["response"],
                         "provider": "Voyage AI Engine (Groq)",
-                        "success": True
+                        "success": True,
+                        "all_tickets": all_tickets
                     }
                     if final_ticket and (extracted_train_card or any(k in query.lower() for k in ["trip", "ticket", "train", "flight", "status", "detail", "pnr", "my", "delay", "summary"])):
                         res["structured_ticket"] = final_ticket
@@ -1147,8 +1393,9 @@ def run_ai_chat(
     state = call_expert_engine(state)
     res = {
         "reply": state["response"],
-        "provider": "Voyage AI Engine",
-        "success": True
+        "provider": state.get("provider") or "Voyage AI Engine",
+        "success": True,
+        "all_tickets": all_tickets
     }
     if final_ticket and (extracted_train_card or any(k in query.lower() for k in ["trip", "ticket", "train", "flight", "status", "detail", "pnr", "my", "delay", "summary"])):
         res["structured_ticket"] = final_ticket
@@ -1396,6 +1643,7 @@ Extract the following travel parameters from this uploaded travel document in ST
   "scheduled_arrival": "scheduled arrival time string if available (e.g. 16:45)",
   "delay_minutes": 0,
   "is_cancellation": false,
+  "passenger_name": "Full name of passenger / traveler if printed on document, or null",
   "pnr": "PNR or booking reference number (e.g. VY-88291 or 10-digit IRCTC PNR code)",
   "ticket_cost": 1250.0,
   "currency": "INR",
@@ -1587,8 +1835,9 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
             mode = "train"
         else:
             mode = "flight"
-            carrier = "Air India"
-            if "indigo" in lower or "6e" in lower: carrier = "IndiGo"
+            carrier = "Airline"
+            if "air india" in lower or "airindia" in lower or "air-india" in lower: carrier = "Air India"
+            elif "indigo" in lower or "6e" in lower: carrier = "IndiGo"
             elif "spicejet" in lower or "sg" in lower: carrier = "SpiceJet"
             elif "vistara" in lower or "uk" in lower: carrier = "Vistara"
             elif "british" in lower or "ba" in lower: carrier = "British Airways"
@@ -1600,7 +1849,7 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
             if service_match:
                 service_number = f"{service_match.group(1).upper()} {service_match.group(2)}"
             else:
-                service_number = "6E 521" if "IndiGo" in carrier else ("BA 712" if "British" in carrier else "AI 882")
+                service_number = f"{carrier} Flight"
 
         # PNR extraction
         pnr_match = re.search(r'\bpnr[\s:=-]+([a-z0-9]{6,10})\b', lower)
@@ -1619,7 +1868,7 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
 
         # Fare extraction
         fare_match = re.search(r'(?:rs\.?|inr|₹|\$|€|£)\s*([\d,]+(?:\.\d{2})?)', lower)
-        ticket_cost = 840.0 if mode == "train" else 4850.0
+        ticket_cost = 0.0
         if fare_match:
             try:
                 ticket_cost = float(fare_match.group(1).replace(",", ""))
@@ -1694,10 +1943,20 @@ def parse_document_file(file_bytes: bytes, filename: str = "ticket.pdf", content
     if is_past_journey:
         reason = f"Historical Journey ({travel_date_str or 'Past date'}): Service already completed run"
 
+    # Extract passenger name from AI data or document text
+    extracted_pax = ai_data.get("passenger_name") if ai_data else None
+    if not extracted_pax or str(extracted_pax).strip().lower() in ["passenger", "unknown", "n/a", "null", "none", ""]:
+        pax_regex = re.search(r'(?:passenger|traveler|traveller|name|pax)\s*(?:name)?[\s:=-]+([A-Za-z\s]{2,30})', combined_text, re.IGNORECASE)
+        if pax_regex:
+            cand = pax_regex.group(1).strip()
+            if not any(stopw in cand.lower() for stopw in ["pnr", "ticket", "date", "class", "seat", "coach", "train", "flight", "terminal", "service", "status"]):
+                extracted_pax = cand.title()
+    passenger_name = extracted_pax or "Passenger"
+
     # Build and persist disruption record with verified coordinates & past journey metadata
     disruption_record = {
         "pnr": pnr,
-        "passenger_name": "Elena Vance",
+        "passenger_name": passenger_name,
         "booking_source": f"Parsed Ticket ({filename})",
         "carrier": carrier,
         "service_number": service_number,

@@ -1,0 +1,17 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #6
+TITLE: Hospitality Risk Modeling & Hotel Late Check-In Cutoffs
+SOURCE CORPUS: Global Hotel Reservation Charters & Resort Front-Desk Rules
+================================================================================
+
+1. THE 21:00 / 22:00 FRONT-DESK CLIFF:
+  - European alpine boutique hotels (e.g. Zermatt, St. Moritz, Chamonix) and Indian resort properties
+    routinely close reception desks between 21:00 and 22:00 local time.
+  - Automated 'No-Show' Execution: Unheralded arrivals after 22:00 trigger automated PMS room release.
+  - Financial Penalty: The traveler is charged 100% of the first night or full booking value with zero recourse.
+
+2. VOYAGE DIGITAL TWIN RESILIENCE ACTION:
+  - Trigger Threshold: When cumulative itinerary delay exceeds 45 minutes, or projected arrival slips past 20:45,
+    the autonomous engine initiates a Late Check-In Protection event.
+  - Authenticated Attestation: Dispatches a cryptographically signed delay attestation to the property manager,
+    requesting electronic keycard lockbox codes and extending room holds to 03:00 AM.

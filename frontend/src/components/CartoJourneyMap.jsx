@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plane, Train, Building2, MapPin, Layers, Navigation, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Plane, Train, Building2, MapPin, Layers, Navigation, AlertTriangle, CheckCircle2, CloudRain, Cloud, Sun } from 'lucide-react';
 
 const KNOWN_AIRPORT_COORDS = {
   // Indian Railway Hubs & Junctions
@@ -134,13 +134,33 @@ export default function CartoJourneyMap({
   activeDisruption, 
   disruptedTicket, 
   disruptedTickets = [],
-  itinerary 
+  itinerary,
+  simulatedWeather = null
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [mapType, setMapType] = useState('roadmap'); // 'roadmap' | 'satellite' | 'terrain' | 'carto'
   const hasUploaded = Boolean(disruptedTicket || (disruptedTickets && disruptedTickets.length > 0));
   const [selectedRoute, setSelectedRoute] = useState(hasUploaded ? 'uploaded' : 'empty');
+
+  // Live weather state for map overlays
+  const [waypointWeather, setWaypointWeather] = useState({}); // { hub: { condition, icon, precipitation_mm } }
+  const [showWeatherRadar, setShowWeatherRadar] = useState(true);
+  const [radarPath, setRadarPath] = useState(null);
+
+  // Fetch real-time RainViewer weather radar timestamp
+  useEffect(() => {
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.radar?.past?.length > 0) {
+          const latestPath = data.radar.past[data.radar.past.length - 1].path;
+          setRadarPath(latestPath);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
 
   // Synchronize when disruptedTicket or disruptedTickets change
   useEffect(() => {
@@ -151,7 +171,37 @@ export default function CartoJourneyMap({
     }
   }, [disruptedTicket, disruptedTickets]);
 
+  // Fetch live weather for each major waypoint hub
+  useEffect(() => {
+    const hubs = new Set();
+    // From ticket origin/destination
+    if (disruptedTicket?.origin) hubs.add(disruptedTicket.origin.split(' ')[0].toUpperCase());
+    if (disruptedTicket?.destination) hubs.add(disruptedTicket.destination.split(' ')[0].toUpperCase());
+    disruptedTickets.forEach(t => {
+      if (t.origin) hubs.add(t.origin.split(' ')[0].toUpperCase());
+      if (t.destination) hubs.add(t.destination.split(' ')[0].toUpperCase());
+    });
+    // Always add default route hubs
+    ['BOM', 'DEL', 'LHR', 'ZRH'].forEach(h => hubs.add(h));
+
+    const fetchAll = async () => {
+      const results = {};
+      for (const hub of Array.from(hubs).slice(0, 6)) {
+        try {
+          const res = await fetch(`/api/weather/live?location=${encodeURIComponent(hub)}`);
+          if (res.ok) {
+            const data = await res.json();
+            results[hub] = data;
+          }
+        } catch (_) {}
+      }
+      setWaypointWeather(results);
+    };
+    fetchAll();
+  }, [disruptedTicket, disruptedTickets]);
+
   // Carto API Key from .env if user wants Carto layer
+
   const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
 
   // Dynamic route for uploaded document(s)
@@ -470,13 +520,15 @@ export default function CartoJourneyMap({
         return {
           url: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
           subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-          maxZoom: 20
+          maxZoom: 20,
+          maxNativeZoom: 20
         };
       case 'terrain':
         return {
           url: 'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
           subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-          maxZoom: 20
+          maxZoom: 20,
+          maxNativeZoom: 20
         };
       case 'carto':
         return {
@@ -484,7 +536,8 @@ export default function CartoJourneyMap({
             ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?api_key=${cartoApiKey}`
             : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
           subdomains: ['a', 'b', 'c', 'd'],
-          maxZoom: 19
+          maxZoom: 20,
+          maxNativeZoom: 19
         };
       case 'roadmap':
       default:
@@ -492,7 +545,8 @@ export default function CartoJourneyMap({
         return {
           url: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
           subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-          maxZoom: 20
+          maxZoom: 20,
+          maxNativeZoom: 20
         };
     }
   };
@@ -515,7 +569,7 @@ export default function CartoJourneyMap({
     const map = L.map(container, {
       center: currentRouteData.center,
       zoom: currentRouteData.zoom,
-      minZoom: 3,
+      minZoom: 2,
       maxZoom: 20,
       zoomControl: false,
       attributionControl: false
@@ -524,8 +578,25 @@ export default function CartoJourneyMap({
     // Add Tile Layer (Google Maps by default)
     L.tileLayer(tileConf.url, {
       subdomains: tileConf.subdomains,
-      maxZoom: tileConf.maxZoom
+      maxZoom: 20,
+      maxNativeZoom: tileConf.maxNativeZoom || 20,
+      errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAAElFTkSuQmCC'
     }).addTo(map);
+
+    // Live Precipitation & Cloud Weather Radar Layer (RainViewer Global Radar)
+    // RainViewer API only produces tiles up to zoom level 12.
+    // Setting maxNativeZoom: 12 instructs Leaflet to auto-scale tiles for zoom levels 13-20
+    // completely eliminating the "zoom level not supported" tile error!
+    if (showWeatherRadar && radarPath) {
+      L.tileLayer(`https://tilecache.rainviewer.com${radarPath}/256/{z}/{x}/{y}/2/1_1.png`, {
+        opacity: 0.70,
+        minZoom: 1,
+        maxNativeZoom: 12,
+        maxZoom: 20,
+        zIndex: 100,
+        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAAElFTkSuQmCC'
+      }).addTo(map);
+    }
 
     // Google Maps Style Zoom Controls (Bottom Right)
     L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -604,8 +675,157 @@ export default function CartoJourneyMap({
         const bounds = L.latLngBounds(currentRouteData.waypoints.map(wp => wp.coords));
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
       } catch (err) {
-        console.warn("fitBounds warning:", err);
+        console.warn('fitBounds warning:', err);
       }
+    }
+
+    // ===== WEATHER OVERLAYS =====
+    // Add floating weather emoji badges at each waypoint based on live Open-Meteo data or Digital Twin simulation
+    if (currentRouteData.waypoints && currentRouteData.waypoints.length > 0) {
+      currentRouteData.waypoints.forEach((wp) => {
+        // Try to match this waypoint name to a hub key in waypointWeather
+        const wpLower = (wp.name || '').toLowerCase();
+        let weatherData = null;
+        for (const [hub, wd] of Object.entries(waypointWeather)) {
+          if (wpLower.includes(hub.toLowerCase()) || wpLower.includes(hub.slice(0, 3).toLowerCase())) {
+            weatherData = wd;
+            break;
+          }
+        }
+
+        // Apply simulated weather from Digital Twin if active
+        if (simulatedWeather) {
+          const simRain = simulatedWeather.rainfall ?? 0;
+          const simTemp = simulatedWeather.temperature ?? 24;
+          const simWind = simulatedWeather.windSpeed ?? 20;
+
+          if (simTemp <= 0) {
+            weatherData = {
+              condition: 'Snowfall / Blizzard',
+              precipitation_mm: simRain,
+              temperature_c: simTemp,
+              wind_speed_kmh: simWind
+            };
+          } else if (simRain > 40) {
+            weatherData = {
+              condition: 'Severe Thunderstorm',
+              precipitation_mm: simRain,
+              temperature_c: simTemp,
+              wind_speed_kmh: simWind
+            };
+          } else if (simRain > 0) {
+            weatherData = {
+              condition: 'Rain / Downpour',
+              precipitation_mm: simRain,
+              temperature_c: simTemp,
+              wind_speed_kmh: simWind
+            };
+          } else {
+            weatherData = {
+              condition: 'Clear Sky',
+              precipitation_mm: 0,
+              temperature_c: simTemp,
+              wind_speed_kmh: simWind
+            };
+          }
+        } else if (!weatherData) {
+          weatherData = waypointWeather['BOM'] || { condition: 'Clear Sky', temperature_c: 28, precipitation_mm: 0 };
+        }
+
+        const cond = (weatherData.condition || '').toLowerCase();
+        const isSnow = cond.includes('snow') || cond.includes('blizzard') || cond.includes('sleet') || (weatherData.temperature_c <= 0);
+        const isStorm = cond.includes('thunder') || cond.includes('storm');
+        const isRain = cond.includes('rain') || cond.includes('drizzle') || cond.includes('shower') || (weatherData.precipitation_mm > 0);
+        const isCloudy = cond.includes('cloud') || cond.includes('overcast') || cond.includes('fog') || cond.includes('mist');
+        const isClear = cond.includes('clear') || cond.includes('sunny');
+
+        let emoji = '⛅';
+        let bgColor = '#f0f9ff';
+        let borderColor = '#bae6fd';
+        let extraText = '';
+
+        if (isStorm)  { emoji = '⛈️'; bgColor = '#fdf4ff'; borderColor = '#e879f9'; extraText = `${weatherData.precipitation_mm}mm/h`; }
+        else if (isSnow)  { emoji = '❄️'; bgColor = '#eff6ff'; borderColor = '#93c5fd'; extraText = `Snow ${Math.round(weatherData.temperature_c)}°C`; }
+        else if (isRain)  { emoji = '🌧️'; bgColor = '#eff6ff'; borderColor = '#60a5fa'; extraText = `${weatherData.precipitation_mm}mm/h`; }
+        else if (isCloudy){ emoji = '☁️'; bgColor = '#f8fafc'; borderColor = '#cbd5e1'; extraText = 'Cloudy'; }
+        else if (isClear) { emoji = '☀️'; bgColor = '#fffbeb'; borderColor = '#fcd34d'; extraText = `${Math.round(weatherData.temperature_c || 0)}°C`; }
+
+        const weatherHtml = `
+          <div style="
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: ${bgColor};
+            border: 1.5px solid ${borderColor};
+            border-radius: 10px;
+            padding: 3px 8px 3px 6px;
+            font-size: 13px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-family: system-ui, sans-serif;
+            pointer-events: none;
+          ">
+            <span style="font-size:16px;">${emoji}</span>
+            <span style="font-size:11px; font-weight:800; color:#1f2937;">${extraText}</span>
+          </div>
+        `;
+
+        // Draw atmospheric weather halo around affected waypoints (clouds, rain, snow)
+        if (showWeatherRadar) {
+          let haloColor = '#3b82f6';
+          let haloFill = '#93c5fd';
+          let haloOpacity = 0.25;
+          let haloRadius = 28000; // meters
+
+          if (isStorm) {
+            haloColor = '#9333ea';
+            haloFill = '#c084fc';
+            haloOpacity = 0.35;
+            haloRadius = 38000;
+          } else if (isSnow) {
+            haloColor = '#0284c7';
+            haloFill = '#bae6fd';
+            haloOpacity = 0.32;
+            haloRadius = 32000;
+          } else if (isRain) {
+            haloColor = '#2563eb';
+            haloFill = '#60a5fa';
+            haloOpacity = 0.30;
+            haloRadius = 30000;
+          } else if (isCloudy) {
+            haloColor = '#64748b';
+            haloFill = '#cbd5e1';
+            haloOpacity = 0.22;
+            haloRadius = 25000;
+          } else if (isClear) {
+            haloColor = '#eab308';
+            haloFill = '#fef08a';
+            haloOpacity = 0.20;
+            haloRadius = 22000;
+          }
+
+          L.circle(wp.coords, {
+            radius: haloRadius,
+            color: haloColor,
+            weight: 1.5,
+            fillColor: haloFill,
+            fillOpacity: haloOpacity,
+            dashArray: isRain || isStorm ? '4, 4' : null,
+            interactive: false
+          }).addTo(map);
+        }
+
+        // Place weather badge slightly offset from the waypoint
+        const weatherIcon = L.divIcon({
+          html: weatherHtml,
+          className: 'weather-overlay-badge',
+          iconSize: [85, 30],
+          iconAnchor: [-10, 56]
+        });
+
+        L.marker(wp.coords, { icon: weatherIcon, interactive: false }).addTo(map);
+      });
     }
 
     // Automatic Invalidate Size for Instant Render
@@ -637,13 +857,29 @@ export default function CartoJourneyMap({
         mapInstanceRef.current = null;
       }
     };
-  }, [selectedRoute, activeDisruption, mapType, cartoApiKey, uploadedRoute]);
+  }, [selectedRoute, activeDisruption, mapType, cartoApiKey, uploadedRoute, waypointWeather, simulatedWeather, showWeatherRadar, radarPath]);
+
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
       
       {/* Top Google Maps Bar: Map Layer Controls */}
       <div className="absolute top-3 right-3 z-[400] flex items-center gap-2 pointer-events-none">
+
+        {/* Live Weather Radar Toggle Button */}
+        <div className="pointer-events-auto flex items-center bg-white shadow-md border border-slate-200 rounded-xl px-1 py-1 text-xs">
+          <button
+            onClick={() => setShowWeatherRadar(prev => !prev)}
+            className={`px-2.5 py-1 rounded-lg font-sans font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 ${
+              showWeatherRadar ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 bg-white'
+            }`}
+            title="Toggle Live Precipitation Weather Radar & Clouds (RainViewer API)"
+          >
+            <CloudRain className="w-3.5 h-3.5" />
+            <span>Weather Radar</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${showWeatherRadar ? 'bg-emerald-300 animate-ping' : 'bg-slate-300'}`} />
+          </button>
+        </div>
 
         {/* Map Layer Switcher (Google Roadmap / Satellite / Terrain) */}
         <div className="pointer-events-auto flex items-center bg-white shadow-md border border-slate-200 rounded-xl px-1 py-1 text-xs">
@@ -696,8 +932,16 @@ export default function CartoJourneyMap({
             <span className="font-medium text-[11px]">Transit &amp; Rail</span>
           </span>
           <span className="text-slate-300">|</span>
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/80">
+            <span title="Clear Sky">☀️ Clear</span>
+            <span className="text-slate-300">•</span>
+            <span title="Precipitation / Rain">🌧️ Rain</span>
+            <span className="text-slate-300">•</span>
+            <span title="Snowfall / Frost">❄️ Snow</span>
+          </span>
+          <span className="text-slate-300">|</span>
           <span className="text-slate-500 text-[11px]">
-            Click Google Map pins to view timing &amp; connection status
+            Click pins to view timing &amp; connection status
           </span>
         </div>
       ) : (

@@ -1,0 +1,17 @@
+================================================================================
+NUGEN INTELLIGENCE DOMAIN KNOWLEDGE DOCUMENT #8
+TITLE: Scenario Instruction Q&A Alignment Pairs - Part 1 (Corridors & Air-Rail)
+SOURCE CORPUS: Domain Instruction Fine-Tuning Corpus
+================================================================================
+
+SCENARIO 1:
+Question: If a winter morning flight from JFK to ORD sustains a 55-minute departure delay due to de-icing queues, how does this propagate to a connecting Amtrak train scheduled with 40 minutes of slack?
+Answer: Data-backed analysis from flights.csv reveals JFK-to-ORD winter flights experience average weather delays of 49-55 minutes. With 55m initial delay, even if 10m is gained en-route via tailwind, net arrival delay is +45m. The 40m train connection buffer is completely breached (-5m negative slack). The passenger misses the train. Autonomous recovery must immediately execute a Ghost Hold on the next train departure (e.g. +90m departure) and notify downstream hotel reception.
+
+SCENARIO 2:
+Question: Why do summer thunderstorms at Atlanta (ATL) cause sudden ground stops, and how does the recovery engine respond differently compared to winter blizzards at Chicago (ORD)?
+Answer: Convective thunderstorms at ATL are intense but short-lived (45-90 minutes), characterized by lightning-induced ramp stops. Aircraft ground buffers quickly recover once the squall passes. Recovery favors short-term Ghost Holds on subsequent hourly departures. Conversely, winter blizzards at ORD persist for 6-18 hours with mandatory de-icing queues and reduced runway acceptance, leading to systemic cancellations. Recovery at ORD requires aggressive multi-modal rerouting via high-speed rail or southern hubs.
+
+SCENARIO 3:
+Question: How does dense coastal marine fog at San Francisco (SFO) affect aircraft arrival rates and connecting bank transfers?
+Answer: SFO's parallel runways require 750ft separation, which precludes simultaneous instrument landings during fog. FAA ground delay programs reduce airport arrival acceptance from 60 to 30 aircraft per hour. Inbound flights face rolling 45-60m holding delays. Passengers with tight (<60m) connecting transfers to coastal express shuttles or flights will breach MCT, requiring immediate re-routing via Oakland (OAK) or SJC alternatives.
