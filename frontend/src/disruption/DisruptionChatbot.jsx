@@ -4,7 +4,7 @@ import {
   AlertTriangle, ArrowRight, X, Minimize2, Maximize2, 
   FileText, ShieldCheck, Clock, RefreshCw, Volume2, Copy, Check,
   Settings, Key, Bot, Code, HelpCircle, Trash2, UploadCloud,
-  MessageSquare, Map, ExternalLink, Compass, Layers, Train, Plane,
+  MessageSquare, ExternalLink, Compass, Layers, Train, Plane,
   Bus, Sun, Moon, Sunrise, Sunset, Calendar
 } from 'lucide-react';
 import { getApiUrl } from '../api';
@@ -52,24 +52,25 @@ export default function DisruptionChatbot({
 
   // Helper to deduplicate tickets array by PNR + service number
   const dedupTicketsList = (tickets) => {
-    const m = new Map();
-    (tickets || []).forEach(t => {
+    if (!Array.isArray(tickets)) return [];
+    const dict = {};
+    tickets.forEach(t => {
       if (!t) return;
       const pnr = String(t.pnr ?? '').trim().toUpperCase();
       const svc = String(t.service_number ?? '').trim().toUpperCase();
       const orig = String(t.origin ?? '').trim().toUpperCase();
       const dest = String(t.destination ?? '').trim().toUpperCase();
       const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
-      if (!m.has(key)) {
-        m.set(key, t);
+      if (!dict[key]) {
+        dict[key] = t;
       } else {
-        const ex = m.get(key);
+        const ex = dict[key];
         if (!ex.booking_source && t.booking_source) {
-          m.set(key, { ...ex, ...t });
+          dict[key] = { ...ex, ...t };
         }
       }
     });
-    return Array.from(m.values());
+    return Object.values(dict);
   };
 
   // Helper to reliably detect past dates across varied date formats

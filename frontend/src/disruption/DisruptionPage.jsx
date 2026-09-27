@@ -4,7 +4,7 @@ import {
   RotateCcw, CheckCircle2, Clock, Train, Plane, Building2, 
   FileText, Shield, Sparkles, AlertCircle, Compass, HelpCircle,
   MessageSquare, UploadCloud, ChevronRight, DollarSign, RefreshCw,
-  Search, Link2, Check, Radio, Bus, Navigation, Map, CloudRain,
+  Search, Link2, Check, Radio, Bus, Navigation, Map as MapIcon, CloudRain,
   Sun, Cloud, CloudSnow, Wind, Thermometer, Droplets
 } from 'lucide-react';
 import DemoJourneyGraph from '../components/DemoJourneyGraph';
@@ -203,7 +203,7 @@ export default function DisruptionPage({
       setDisruptedTicket(record);
     }
     const dedup = (list) => {
-      const m = new Map();
+      const dict = {};
       (list || []).forEach(t => {
         if (!t) return;
         const pnr = String(t.pnr ?? '').trim().toUpperCase();
@@ -211,16 +211,16 @@ export default function DisruptionPage({
         const orig = String(t.origin ?? '').trim().toUpperCase();
         const dest = String(t.destination ?? '').trim().toUpperCase();
         const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
-        if (!m.has(key)) {
-          m.set(key, t);
+        if (!dict[key]) {
+          dict[key] = t;
         } else {
-          const ex = m.get(key);
+          const ex = dict[key];
           if (!ex.booking_source && t.booking_source) {
-            m.set(key, { ...ex, ...t });
+            dict[key] = { ...ex, ...t };
           }
         }
       });
-      return Array.from(m.values());
+      return Object.values(dict);
     };
     if (allRecords && allRecords.length > 0) {
       setDisruptedTickets(dedup(allRecords));
@@ -234,7 +234,7 @@ export default function DisruptionPage({
   const handleProceedToMap = (record, allRecords = []) => {
     if (record) setDisruptedTicket(record);
     if (allRecords && allRecords.length > 0) {
-      const m = new Map();
+      const dict = {};
       allRecords.forEach(t => {
         if (!t) return;
         const pnr = String(t.pnr ?? '').trim().toUpperCase();
@@ -242,9 +242,9 @@ export default function DisruptionPage({
         const orig = String(t.origin ?? '').trim().toUpperCase();
         const dest = String(t.destination ?? '').trim().toUpperCase();
         const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
-        if (!m.has(key)) m.set(key, t);
+        if (!dict[key]) dict[key] = t;
       });
-      setDisruptedTickets(Array.from(m.values()));
+      setDisruptedTickets(Object.values(dict));
     }
     setActiveTab('map');
     setTimeout(() => {
@@ -560,7 +560,7 @@ export default function DisruptionPage({
             <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 rounded-2xl border border-blue-100 text-xs shadow-2xs">
               <div className="flex items-center gap-2.5">
                 <span className="p-1.5 rounded-lg bg-blue-100/80 text-blue-700">
-                  <Map className="w-4 h-4" />
+                  <MapIcon className="w-4 h-4" />
                 </span>
                 <span className="text-[#181E4B] font-medium">
                   Explore route connections or simulate disruption scenarios in real-time.

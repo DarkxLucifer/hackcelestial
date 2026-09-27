@@ -345,7 +345,7 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
           {/* Render User's Authentic Uploaded Journey Details */}
           {(() => {
             const raw = ((extractedTickets && extractedTickets.length > 0) ? extractedTickets : (extractedTicket ? [extractedTicket] : []));
-            const dedupMap = new Map();
+            const dict = {};
             raw.forEach(t => {
               if (!t) return;
               const pnr = String(t.pnr ?? '').trim().toUpperCase();
@@ -353,16 +353,16 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
               const orig = String(t.origin ?? '').trim().toUpperCase();
               const dest = String(t.destination ?? '').trim().toUpperCase();
               const key = (pnr && pnr !== 'N/A') ? `${pnr}_${svc}` : `${orig}_${dest}_${svc}`;
-              if (!dedupMap.has(key)) {
-                dedupMap.set(key, t);
+              if (!dict[key]) {
+                dict[key] = t;
               } else {
-                const ex = dedupMap.get(key);
+                const ex = dict[key];
                 if (!ex.booking_source && t.booking_source) {
-                  dedupMap.set(key, { ...ex, ...t });
+                  dict[key] = { ...ex, ...t };
                 }
               }
             });
-            const ticketsToRender = Array.from(dedupMap.values());
+            const ticketsToRender = Object.values(dict);
 
             if (ticketsToRender.length === 0) return null;
 
