@@ -1,9 +1,29 @@
 import React, { useState } from 'react';
-import { Sparkles, Zap, Shield, Moon, Clock, DollarSign, ArrowRight, Check, CheckCircle2, GitCommit, GitBranch, AlertCircle } from 'lucide-react';
+import { 
+  Sparkles, Zap, Shield, Moon, Clock, DollarSign, ArrowRight, Check, 
+  CheckCircle2, GitCommit, GitBranch, AlertCircle, CreditCard, ExternalLink, 
+  Bus, Train, Plane, ShieldCheck, ArrowUpRight 
+} from 'lucide-react';
 
 export default function RecoveryComparison({ recoveryPlans, onSelectPlan, activeDisruption }) {
   const [selectedPlanId, setSelectedPlanId] = useState(recoveryPlans?.[0]?.id || "plan_balanced");
   const [viewMode, setViewMode] = useState("cards"); // "cards" or "git-diff"
+  const [gatewayModalPlan, setGatewayModalPlan] = useState(null);
+  const [redirectToast, setRedirectToast] = useState(null);
+
+  const handleOpenGatewayModal = (planInfo) => {
+    setGatewayModalPlan(planInfo);
+  };
+
+  const handleRedirectToPartnerGateway = (gatewayType, gatewayUrl) => {
+    window.open(gatewayUrl, '_blank', 'noopener,noreferrer');
+    setRedirectToast({
+      gateway: gatewayType,
+      message: `Redirected to ${gatewayType} official secure portal. Itinerary tokens synchronized.`
+    });
+    setTimeout(() => setRedirectToast(null), 7000);
+    setGatewayModalPlan(null);
+  };
 
   if (!recoveryPlans || recoveryPlans.length === 0) return null;
 
@@ -173,14 +193,26 @@ export default function RecoveryComparison({ recoveryPlans, onSelectPlan, active
                     )}
                   </div>
 
-                  {/* Commit Action Button */}
-                  <div className="mt-8 pt-4 border-t border-slate-100">
+                  {/* Action Buttons: Gateway Redirect & Atomic Saga */}
+                  <div className="mt-8 pt-4 border-t border-slate-100 space-y-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenGatewayModal(plan);
+                      }}
+                      className="w-full py-3 rounded-xl font-bold text-xs bg-emerald-700 hover:bg-emerald-800 text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>Proceed to Payment Gateway</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                    </button>
+
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onSelectPlan(plan);
                       }}
-                      className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 ${
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2 ${
                         isSelected
                           ? 'bg-voyare-navy text-white hover:bg-black shadow-voyare-card'
                           : 'bg-slate-100 text-voyare-navy hover:bg-slate-200'
@@ -305,6 +337,177 @@ export default function RecoveryComparison({ recoveryPlans, onSelectPlan, active
         )}
 
       </div>
+
+      {/* Toast Notification when redirected to external gateway */}
+      {redirectToast && (
+        <div className="fixed top-6 right-6 z-50 bg-[#181E4B] text-white p-4 rounded-2xl shadow-2xl border border-amber-400 flex items-center gap-3 animate-fadeIn max-w-md">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-bold text-xs">{redirectToast.gateway} Gateway Initialized</div>
+            <div className="text-[11px] text-slate-300 mt-0.5">{redirectToast.message}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Authenticated Payment Gateway Redirection Modal */}
+      {gatewayModalPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-7 max-h-[90vh] overflow-y-auto">
+            
+            <button
+              onClick={() => setGatewayModalPlan(null)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-lg cursor-pointer transition-colors"
+            >
+              &times;
+            </button>
+
+            <div className="pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-600 uppercase">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Authenticated Payment Gateway Handoff</span>
+              </div>
+              <h3 className="font-volkhov font-bold text-2xl text-[#181E4B] mt-1">
+                Choose Payment Channel
+              </h3>
+              <p className="text-xs text-[#5E6282] mt-0.5">
+                Complete your recovery reservation for <strong>{gatewayModalPlan.archetype || gatewayModalPlan.tagline}</strong>.
+              </p>
+            </div>
+
+            <div className="my-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-slate-900 block">{gatewayModalPlan.archetype}</span>
+                <span className="text-slate-500 text-[11px]">{gatewayModalPlan.tagline}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-bold text-lg text-[#181E4B]">
+                  {gatewayModalPlan.net_out_of_pocket <= 0 ? '€0 (Covered)' : `€${gatewayModalPlan.net_out_of_pocket}`}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-semibold block">Statutory Fare Protected</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-4">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Select Official Partner Gateway to Redirect:
+              </span>
+
+              {/* 1. redBus Payment Gateway */}
+              <button
+                type="button"
+                onClick={() => handleRedirectToPartnerGateway('redBus', 'https://www.redbus.in')}
+                className="w-full p-4 rounded-2xl border border-red-200 bg-red-50/40 hover:bg-red-50 hover:border-red-400 transition-all flex items-center justify-between text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                    <Bus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                      <span>redBus Payment Gateway</span>
+                      <span className="text-[10px] font-mono bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">
+                        Official Partner
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      State MSRTC, Sleeper, and Private Intercity AC Buses. Instant UPI, Cards &amp; NetBanking.
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-5 h-5 text-red-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+              </button>
+
+              {/* 2. IRCTC Official Rail Gateway */}
+              <button
+                type="button"
+                onClick={() => handleRedirectToPartnerGateway('IRCTC', 'https://www.irctc.co.in/nget/train-search')}
+                className="w-full p-4 rounded-2xl border border-blue-200 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-400 transition-all flex items-center justify-between text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-800 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                    <Train className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                      <span>IRCTC Official Rail Gateway</span>
+                      <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
+                        Indian Railways / SBB
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Vande Bharat, Tatkal, Superfast Express reservations &amp; official TDR settlement.
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-5 h-5 text-blue-800 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+              </button>
+
+              {/* 3. Airline Gateway */}
+              <button
+                type="button"
+                onClick={() => handleRedirectToPartnerGateway('Airline Official Gateway', 'https://www.goindigo.in')}
+                className="w-full p-4 rounded-2xl border border-sky-200 bg-sky-50/40 hover:bg-sky-50 hover:border-sky-400 transition-all flex items-center justify-between text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                    <Plane className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                      <span>Airline Official Portal (IndiGo / Swiss / BA)</span>
+                      <span className="text-[10px] font-mono bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full font-bold">
+                        Direct Carrier
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Direct boarding pass issuance, seat allocation, and DGCA / EU261 protection.
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-5 h-5 text-sky-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+              </button>
+
+              {/* 4. Voyage 1-Click Autonomous Saga Gateway */}
+              <button
+                type="button"
+                onClick={() => {
+                  setGatewayModalPlan(null);
+                  onSelectPlan(gatewayModalPlan);
+                }}
+                className="w-full p-4 rounded-2xl border-2 border-amber-400 bg-amber-50/60 hover:bg-amber-100/70 transition-all flex items-center justify-between text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#181E4B] text-amber-400 flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-[#181E4B] flex items-center gap-1.5">
+                      <span>Voyage 1-Click Autonomous Saga</span>
+                      <span className="text-[10px] font-mono bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                        Zero Friction
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Instant compensation settlement, ghost hold lock, and automated rollback guarantee.
+                    </div>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-[#181E4B] group-hover:translate-x-1 transition-transform shrink-0" />
+              </button>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-100 text-center">
+              <span className="text-[11px] text-slate-400">
+                🔒 Protected by 256-bit SSL encryption &amp; certified merchant standards
+              </span>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }
