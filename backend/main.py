@@ -115,6 +115,9 @@ def serve_static_root(file_name: str):
         file_path = os.path.join(DIST_DIR, file_name)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return FileResponse(file_path)
+        index_file = os.path.join(DIST_DIR, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
     raise HTTPException(status_code=404, detail=f"File {file_name} not found")
 
 @app.get("/api/itinerary")
