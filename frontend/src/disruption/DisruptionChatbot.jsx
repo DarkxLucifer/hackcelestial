@@ -363,124 +363,150 @@ export default function DisruptionChatbot({
       }
     ]);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileName = file.name;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileName = file.name;
 
-      if (files.length > 1) {
-        setUploadProgress(`Extracting & analyzing ${i + 1} of ${files.length}: ${fileName}...`);
-      } else {
-        setUploadProgress(`Extracting & analyzing ticket: ${fileName}...`);
-      }
-
-      let parsedRecord = null;
-
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch(getApiUrl('/api/ai/upload-document'), {
-          method: 'POST',
-          body: formData
-        });
-
-        if (response.ok) {
-          const resData = await response.json();
-          parsedRecord = resData.structured_data;
+        if (files.length > 1) {
+          setUploadProgress(`Extracting & analyzing ${i + 1} of ${files.length}: ${fileName}...`);
+        } else {
+          setUploadProgress(`Extracting & analyzing ticket: ${fileName}...`);
         }
-      } catch (err) {
-        console.warn("Server upload attempt error:", err);
-      }
 
-      if (parsedRecord) {
-        newRecords.push(parsedRecord);
-      }
-    }
+        let parsedRecord = null;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 18000);
 
-    if (newRecords.length > 0) {
-      const combinedTickets = dedupTicketsList([...uploadedTickets, ...newRecords]);
-      setUploadedTickets(combinedTickets);
-      const lastRecord = newRecords[newRecords.length - 1];
-      setCurrentDisruption(lastRecord);
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
 
-      // Keep user in chat! Notify DisruptionPage without redirecting!
-      if (onTicketProcessed) {
-        onTicketProcessed(lastRecord, combinedTickets);
-      }
+          const response = await fetch(getApiUrl('/api/ai/upload-document'), {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+          });
 
-      if (newRecords.length === 1) {
-        const parsedRecord = newRecords[0];
-        const carrier = parsedRecord?.carrier || 'Carrier';
-        const service = parsedRecord?.service_number || 'Transit';
-        const origin = parsedRecord?.origin || 'Origin';
-        const destination = parsedRecord?.destination || 'Destination';
-        const delay = typeof parsedRecord?.delay_minutes === 'number' ? parsedRecord.delay_minutes : 0;
-        const isPast = parsedRecord?.is_past_journey === true;
-        const pnr = parsedRecord?.pnr || 'N/A';
-        const fare = (parsedRecord?.ticket_cost && Number(parsedRecord.ticket_cost) > 0)
-          ? `₹${Number(parsedRecord.ticket_cost).toLocaleString()} ${parsedRecord?.currency || 'INR'}`
-          : 'Standard Fare';
+          clearTimeout(timeoutId);
 
-        const statusLine = isPast
-          ? '**Travel Status**: ✅ Historical Journey — Service Already Completed'
-          : parsedRecord?.is_cancellation
-            ? '**Travel Status**: ❌ Service Cancelled'
-            : delay > 0
-              ? `**Reported Disruption**: ⚠️ +${delay} mins delay`
-              : '**Travel Status**: ✅ On Schedule — Running Right Time (+0m delay)';
-
-        const extractedSummaryText = `📄 **Document Successfully Processed & Analyzed!**\n\nHere are the travel details extracted from **${files[0].name}**:\n• **Carrier & Service**: ${carrier} ${service}\n• **Route Corridor**: ${origin} ➔ ${destination}\n• ${statusLine}\n• **PNR / Booking Ref**: ${pnr}\n• **Ticket Fare**: ${fare}\n• **Statutory Protection**: ${isPast ? 'IRCTC TDR Policy — File TDR on IRCTC portal if journey was missed' : 'DGCA CAR Section 3 & EU261 active'}\n\n**What would you like to do next?**\nChoose one of the 3 actions below to upload another document, chat about your trip, or proceed to the travel map:`;
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now() + 1,
-            sender: 'bot',
-            provider: 'Voyage AI Engine',
-            text: extractedSummaryText,
-            structuredCard: parsedRecord,
-            allTickets: combinedTickets,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          if (response.ok) {
+            const resData = await response.json();
+            parsedRecord = resData.structured_data;
+          } else {
+            console.warn("Upload response not OK:", response.status);
           }
-        ]);
+        } catch (err) {
+          clearTimeout(timeoutId);
+          console.warn("Server upload attempt error:", err);
+        }
+
+        if (parsedRecord) {
+          newRecords.push(parsedRecord);
+        }
+      }
+
+      if (newRecords.length > 0) {
+        const combinedTickets = dedupTicketsList([...uploadedTickets, ...newRecords]);
+        setUploadedTickets(combinedTickets);
+        const lastRecord = newRecords[newRecords.length - 1];
+        setCurrentDisruption(lastRecord);
+
+        // Keep user in chat! Notify DisruptionPage without redirecting!
+        try {
+          if (onTicketProcessed) {
+            onTicketProcessed(lastRecord, combinedTickets);
+          }
+        } catch (procErr) {
+          console.warn("onTicketProcessed error:", procErr);
+        }
+
+        if (newRecords.length === 1) {
+          const parsedRecord = newRecords[0];
+          const carrier = parsedRecord?.carrier || 'Carrier';
+          const service = parsedRecord?.service_number || 'Transit';
+          const origin = parsedRecord?.origin || 'Origin';
+          const destination = parsedRecord?.destination || 'Destination';
+          const delay = typeof parsedRecord?.delay_minutes === 'number' ? parsedRecord.delay_minutes : 0;
+          const isPast = parsedRecord?.is_past_journey === true;
+          const pnr = parsedRecord?.pnr || 'N/A';
+          const fare = (parsedRecord?.ticket_cost && Number(parsedRecord.ticket_cost) > 0)
+            ? `₹${Number(parsedRecord.ticket_cost).toLocaleString()} ${parsedRecord?.currency || 'INR'}`
+            : 'Standard Fare';
+
+          const statusLine = isPast
+            ? '**Travel Status**: ✅ Historical Journey — Service Already Completed'
+            : parsedRecord?.is_cancellation
+              ? '**Travel Status**: ❌ Service Cancelled'
+              : delay > 0
+                ? `**Reported Disruption**: ⚠️ +${delay} mins delay`
+                : '**Travel Status**: ✅ On Schedule — Running Right Time (+0m delay)';
+
+          const extractedSummaryText = `📄 **Document Successfully Processed & Analyzed!**\n\nHere are the travel details extracted from **${files[0].name}**:\n• **Carrier & Service**: ${carrier} ${service}\n• **Route Corridor**: ${origin} ➔ ${destination}\n• ${statusLine}\n• **PNR / Booking Ref**: ${pnr}\n• **Ticket Fare**: ${fare}\n• **Statutory Protection**: ${isPast ? 'IRCTC TDR Policy — File TDR on IRCTC portal if journey was missed' : 'DGCA CAR Section 3 & EU261 active'}\n\n**What would you like to do next?**\nChoose one of the 3 actions below to upload another document, chat about your trip, or proceed to the travel map:`;
+
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now() + 1,
+              sender: 'bot',
+              provider: 'Voyage AI Engine',
+              text: extractedSummaryText,
+              structuredCard: parsedRecord,
+              allTickets: combinedTickets,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]);
+        } else {
+          // Multi-document summary card
+          const legSummaries = newRecords.map((r, idx) => 
+            `• **Leg ${idx + 1}**: ${r.carrier} ${r.service_number} (${r.origin} ➔ ${r.destination}) ${r.delay_minutes > 0 ? `• +${r.delay_minutes}m delay` : "• On-Time"}`
+          ).join('\n');
+
+          const multiSummaryText = `📄 **${newRecords.length} Travel Documents Successfully Analyzed & Connected!**\n\nHere is your multi-modal connected itinerary:\n${legSummaries}\n• **Corridor**: ${newRecords[0].origin} ➔ ... ➔ ${newRecords[newRecords.length - 1].destination}\n• **Domino Cascade Risk**: Evaluated via Critical Path Method (CPM)\n\n**What would you like to do next?**\nChoose one of the 3 actions below to upload another document, chat about your trip, or proceed to the travel map:`;
+
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now() + 1,
+              sender: 'bot',
+              provider: 'Voyage AI Engine',
+              text: multiSummaryText,
+              structuredCard: lastRecord,
+              multiLegCard: newRecords,
+              allTickets: combinedTickets,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]);
+        }
       } else {
-        // Multi-document summary card
-        const legSummaries = newRecords.map((r, idx) => 
-          `• **Leg ${idx + 1}**: ${r.carrier} ${r.service_number} (${r.origin} ➔ ${r.destination}) ${r.delay_minutes > 0 ? `• +${r.delay_minutes}m delay` : "• On-Time"}`
-        ).join('\n');
-
-        const multiSummaryText = `📄 **${newRecords.length} Travel Documents Successfully Analyzed & Connected!**\n\nHere is your multi-modal connected itinerary:\n${legSummaries}\n• **Corridor**: ${newRecords[0].origin} ➔ ... ➔ ${newRecords[newRecords.length - 1].destination}\n• **Domino Cascade Risk**: Evaluated via Critical Path Method (CPM)\n\n**What would you like to do next?**\nChoose one of the 3 actions below to upload another document, chat about your trip, or proceed to the travel map:`;
-
         setMessages(prev => [
           ...prev,
           {
             id: Date.now() + 1,
             sender: 'bot',
             provider: 'Voyage AI Engine',
-            text: multiSummaryText,
-            structuredCard: lastRecord,
-            multiLegCard: newRecords,
-            allTickets: combinedTickets,
+            text: `⚠️ **Document Extraction Notice**\nCould not extract travel details from **${fileNames.join(', ')}**. The document parsing service took too long or the AI service encountered rate limits. Please check your network and try again.`,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
       }
-    } else {
+    } catch (unexpectedErr) {
+      console.error("Unexpected upload handler error:", unexpectedErr);
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 1,
           sender: 'bot',
           provider: 'Voyage AI Engine',
-          text: `⚠️ **Document Extraction Notice**\nCould not extract travel details from the uploaded document(s). Please verify that the file contains readable ticket details (such as PNR, train/flight number, passenger name, and route) and that the backend server is reachable.`,
+          text: `⚠️ **Upload Exception**\nAn unexpected client-side error occurred while processing the document. Please try again.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-
-    setIsUploading(false);
-    setUploadProgress('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleFileUpload = (e) => {

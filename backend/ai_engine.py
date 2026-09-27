@@ -183,6 +183,8 @@ def get_gemini_keys(custom_key: Optional[str] = None) -> List[str]:
         if k not in seen:
             seen.add(k)
             uniq.append(k)
+    # Prioritize standard AIza Google AI Studio keys first
+    uniq.sort(key=lambda k: 0 if k.startswith("AIza") else 1)
     return uniq
 
 def get_groq_key(custom_key: Optional[str] = None) -> Optional[str]:
@@ -1851,32 +1853,38 @@ Document Content:
 {extracted_text[:4000]}
 \"\"\"
 """
-    # 1. Try Gemini with multi-key failover
+    # 1. Try Gemini with multi-key failover and strict timeout
     gem_keys = get_gemini_keys()
     if gem_keys and genai is not None:
-        for gk in gem_keys:
+        for gk in gem_keys[:3]:
             try:
                 genai.configure(api_key=gk)
-                # Use cheapest Gemini model for ticket parsing
-                model = genai.GenerativeModel("gemini-3.1-flash-lite")
-                response = model.generate_content(prompt)
-                if response and response.text:
-                    raw = response.text.strip()
-                    if raw.startswith("```"):
-                        raw = re.sub(r'^```(?:json)?\n', '', raw)
-                        raw = re.sub(r'\n```$', '', raw)
-                    data = json.loads(raw)
-                    if isinstance(data, dict) and data.get("origin") and data.get("destination"):
-                        return data
+                for model_id in ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3.1-flash-lite"]:
+                    try:
+                        model = genai.GenerativeModel(model_id)
+                        response = model.generate_content(prompt, request_options={"timeout": 6.0})
+                        if response and response.text:
+                            raw = response.text.strip()
+                            if raw.startswith("```"):
+                                raw = re.sub(r'^```(?:json)?\n', '', raw)
+                                raw = re.sub(r'\n```$', '', raw)
+                            data = json.loads(raw)
+                            if isinstance(data, dict) and data.get("origin") and data.get("destination"):
+                                return data
+                    except Exception as model_err:
+                        err_text = str(model_err).lower()
+                        if "429" in err_text or "quota" in err_text:
+                            break  # Move to next API key immediately
+                        continue
             except Exception:
                 continue
 
-    # 2. Try Groq with multi-key failover
+    # 2. Try Groq with multi-key failover and strict timeout
     gr_keys = get_groq_keys()
     if gr_keys and Groq is not None:
-        for qk in gr_keys:
+        for qk in gr_keys[:3]:
             try:
-                client = Groq(api_key=qk)
+                client = Groq(api_key=qk, timeout=6.0)
                 completion = client.chat.completions.create(
                     model="qwen/qwen3.8-27b",
                     messages=[
@@ -1884,7 +1892,8 @@ Document Content:
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.1,
-                    max_tokens=1000
+                    max_tokens=1000,
+                    timeout=6.0
                 )
                 raw = completion.choices[0].message.content.strip()
                 if raw.startswith("```"):
