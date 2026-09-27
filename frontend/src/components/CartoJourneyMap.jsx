@@ -144,9 +144,8 @@ export default function CartoJourneyMap({
   const hasUploaded = Boolean(disruptedTicket || (disruptedTickets && disruptedTickets.length > 0));
   const [selectedRoute, setSelectedRoute] = useState(hasUploaded ? 'uploaded' : 'empty');
 
-  // Live weather state for map overlays
-  const [waypointWeather, setWaypointWeather] = useState({}); // { hub: { condition, icon, precipitation_mm } }
-  const [showWeatherRadar, setShowWeatherRadar] = useState(true);
+  // Live weather state for map overlays (disabled by default to prevent tile zoom errors)
+  const [showWeatherRadar, setShowWeatherRadar] = useState(false);
   const [radarPath, setRadarPath] = useState(null);
 
   // Fetch real-time RainViewer weather radar timestamp
@@ -585,15 +584,15 @@ export default function CartoJourneyMap({
     }).addTo(map);
 
     // Live Precipitation & Cloud Weather Radar Layer (RainViewer Global Radar)
-    // RainViewer API only produces tiles up to zoom level 12.
-    // Setting maxNativeZoom: 12 instructs Leaflet to auto-scale tiles for zoom levels 13-20
-    // completely eliminating the "zoom level not supported" tile error!
+    // RainViewer produces raw tiles reliably up to zoom level 6.
+    // Setting maxNativeZoom: 6 instructs Leaflet to auto-scale tiles for higher zooms,
+    // completely eliminating the "Zoom level not supported" tile error!
     if (showWeatherRadar && radarPath) {
       L.tileLayer(`https://tilecache.rainviewer.com${radarPath}/256/{z}/{x}/{y}/2/1_1.png`, {
-        opacity: 0.70,
+        opacity: 0.65,
         minZoom: 1,
-        maxNativeZoom: 12,
-        maxZoom: 20,
+        maxNativeZoom: 6,
+        maxZoom: 16,
         zIndex: 100,
         errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAAElFTkSuQmCC'
       }).addTo(map);

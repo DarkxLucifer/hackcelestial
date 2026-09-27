@@ -53,19 +53,19 @@ export default function DisruptionScenarioSimulator({
 
   const currentCorridor = TRANSIT_CORRIDORS.find(c => c.id === selectedCorridorId) || TRANSIT_CORRIDORS[0];
 
-  // The 3 Plan Cards: Cheapest, Medium, Fastest
+  // The 3 Plan Cards: Cheapest, Medium, Fastest (Pure Black & White Theme)
   const SIMULATION_PLANS = [
     {
       id: "cheapest",
       categoryBadge: "🟢 CHEAPEST PLAN",
       categoryTitle: "Budget / Value-First Alternative",
       categoryTheme: {
-        border: "border-emerald-300 hover:border-emerald-400",
-        badgeBg: "bg-emerald-100 text-emerald-800",
-        badgeDot: "bg-emerald-500",
-        priceColor: "text-emerald-700",
-        cardBg: "bg-gradient-to-b from-white to-emerald-50/20",
-        buttonBg: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+        border: "border-black hover:border-neutral-800",
+        badgeBg: "bg-black text-white",
+        badgeDot: "bg-white",
+        priceColor: "text-black",
+        cardBg: "bg-white",
+        buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
       },
       title: "State Bus / Regional Tatkal Rail",
       operator: "MSRTC Shivshahi / Intercity Express",
@@ -91,12 +91,12 @@ export default function DisruptionScenarioSimulator({
       categoryBadge: "⚖️ MEDIUM PLAN",
       categoryTitle: "Balanced Comfort & Reliability",
       categoryTheme: {
-        border: "border-blue-300 hover:border-blue-400",
-        badgeBg: "bg-blue-100 text-blue-800",
-        badgeDot: "bg-blue-500",
-        priceColor: "text-blue-700",
-        cardBg: "bg-gradient-to-b from-white to-blue-50/20",
-        buttonBg: "bg-[#181E4B] hover:bg-[#283177] text-white shadow-[#181E4B]/20"
+        border: "border-black hover:border-neutral-800",
+        badgeBg: "bg-black text-white",
+        badgeDot: "bg-white",
+        priceColor: "text-black",
+        cardBg: "bg-white",
+        buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
       },
       title: "3-Tier AC Superfast / AC Intercity",
       operator: "Indian Railways Superfast (Tatkal Guard)",
@@ -122,12 +122,12 @@ export default function DisruptionScenarioSimulator({
       categoryBadge: "⚡ FASTEST PLAN",
       categoryTitle: "Speed Priority & Earliest Arrival",
       categoryTheme: {
-        border: "border-purple-300 hover:border-purple-400",
-        badgeBg: "bg-purple-100 text-purple-800",
-        badgeDot: "bg-purple-500",
-        priceColor: "text-purple-700",
-        cardBg: "bg-gradient-to-b from-white to-purple-50/20",
-        buttonBg: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-purple-600/20"
+        border: "border-black hover:border-neutral-800",
+        badgeBg: "bg-black text-white",
+        badgeDot: "bg-white",
+        priceColor: "text-black",
+        cardBg: "bg-white",
+        buttonBg: "bg-black hover:bg-neutral-800 text-white shadow-xs"
       },
       title: "Vande Bharat Express / Air Shuttle Bypass",
       operator: "Priority Air Shuttle / Vande Bharat Executive",
@@ -201,17 +201,17 @@ export default function DisruptionScenarioSimulator({
     <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200/90 shadow-sm space-y-6">
       
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-100">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="p-2.5 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-orange-500/20">
+            <span className="p-2.5 rounded-2xl bg-black text-white shadow-xs">
               <Zap className="w-5 h-5" />
             </span>
-            <h3 className="font-volkhov font-bold text-2xl text-[#181E4B]">
+            <h3 className="font-volkhov font-bold text-2xl text-black">
               Simulate Disruption
             </h3>
           </div>
-          <p className="text-xs sm:text-sm text-[#5E6282] mt-1.5 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-neutral-600 mt-1.5 max-w-2xl leading-relaxed">
             Select a disruption scenario below to test real-world delays, view live cascade topology, and unlock recovery routes with instant payment gateway redirection.
           </p>
         </div>
@@ -221,17 +221,17 @@ export default function DisruptionScenarioSimulator({
           <button
             type="button"
             onClick={handleReset}
-            className="px-4 py-2.5 rounded-2xl font-bold text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-all flex items-center gap-2 cursor-pointer shadow-xs self-start sm:self-auto"
+            className="px-4 py-2.5 rounded-2xl font-bold text-xs bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-300 transition-all flex items-center gap-2 cursor-pointer shadow-xs self-start sm:self-auto"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 text-black" />
             <span>Reset Simulation</span>
           </button>
         )}
       </div>
 
-      {/* Corridor Quick Selector */}
+      {/* Corridor Quick Selector (Pure Black & White) */}
       <div className="space-y-2">
-        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 font-mono">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 font-mono">
           Select Travel Corridor
         </label>
         <div className="flex flex-wrap gap-2">
@@ -245,11 +245,11 @@ export default function DisruptionScenarioSimulator({
                 onClick={() => setSelectedCorridorId(corridor.id)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
                   isSelected
-                    ? "bg-[#181E4B] text-white border-[#181E4B] shadow-xs"
-                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200"
+                    ? "bg-black text-white border-black shadow-xs font-bold"
+                    : "bg-white text-black hover:bg-neutral-100 border-neutral-300 font-medium"
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-amber-400" : "text-slate-500"}`} />
+                <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-black"}`} />
                 <span>{corridor.label}</span>
               </button>
             );
@@ -280,7 +280,7 @@ export default function DisruptionScenarioSimulator({
         </div>
       )}
 
-      {/* THREE PLAN CARDS: CHEAPEST, MEDIUM, FASTEST */}
+      {/* THREE PLAN CARDS: CHEAPEST, MEDIUM, FASTEST (Pure Black & White) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch pt-2">
         {SIMULATION_PLANS.map((plan) => {
           const WeatherIcon = plan.weatherIcon;
@@ -290,8 +290,8 @@ export default function DisruptionScenarioSimulator({
           return (
             <div
               key={plan.id}
-              className={`rounded-3xl border-2 ${theme.border} ${theme.cardBg} p-6 flex flex-col justify-between transition-all duration-200 hover:shadow-lg relative group ${
-                isSelected ? "ring-2 ring-amber-400 shadow-md" : ""
+              className={`rounded-3xl border-2 ${theme.border} bg-white p-6 flex flex-col justify-between transition-all duration-200 hover:shadow-xl relative group ${
+                isSelected ? "ring-2 ring-black shadow-lg" : "shadow-xs"
               }`}
             >
               <div>
@@ -301,70 +301,70 @@ export default function DisruptionScenarioSimulator({
                     <span className={`w-2 h-2 rounded-full ${theme.badgeDot} animate-pulse`} />
                     <span>{plan.categoryBadge}</span>
                   </span>
-                  <span className="text-[11px] font-mono font-bold text-slate-700 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-mono font-bold text-black bg-white px-2.5 py-1 rounded-full border border-black shadow-2xs">
                     {plan.netFare} EXTRA
                   </span>
                 </div>
 
                 {/* Title & Operator */}
-                <h4 className="font-volkhov font-bold text-xl text-[#181E4B] mb-1">
+                <h4 className="font-volkhov font-bold text-xl text-black mb-1">
                   {plan.title}
                 </h4>
-                <div className="text-xs text-slate-500 font-medium mb-3">
-                  Operator: <strong className="text-slate-800">{plan.operator}</strong>
+                <div className="text-xs text-neutral-600 font-medium mb-3">
+                  Operator: <strong className="text-black">{plan.operator}</strong>
                 </div>
 
-                <p className="text-xs text-[#5E6282] mb-4 leading-relaxed">
+                <p className="text-xs text-neutral-600 mb-4 leading-relaxed">
                   {plan.categoryTitle}. Ingests simulated {plan.delayMins}m disruption on {currentCorridor.origin} ➔ {currentCorridor.destination}.
                 </p>
 
-                {/* Fare & Delay Decomposition Box */}
-                <div className="p-3.5 rounded-2xl bg-white/90 border border-slate-100 shadow-2xs mb-4 space-y-2">
+                {/* Fare & Delay Decomposition Box (Monochrome) */}
+                <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 mb-4 space-y-2">
                   <div className="flex items-baseline justify-between">
                     <div>
-                      <span className={`font-volkhov font-bold text-2xl ${theme.priceColor}`}>
+                      <span className="font-volkhov font-extrabold text-2xl text-black">
                         {plan.netFare}
                       </span>
-                      <span className="text-[11px] text-slate-400 font-mono ml-1.5">net extra</span>
+                      <span className="text-[11px] text-neutral-500 font-mono ml-1.5">net extra</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-extrabold text-rose-600 font-mono">
+                      <span className="text-xs font-mono font-extrabold text-black bg-neutral-200/80 px-2 py-0.5 rounded border border-neutral-300">
                         +{plan.delayMins}m delay
                       </span>
-                      <span className="block text-[10px] text-slate-400">simulated risk</span>
+                      <span className="block text-[10px] text-neutral-500 mt-0.5">simulated risk</span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-700 font-medium">
-                    <WeatherIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                  <div className="pt-2 border-t border-neutral-200 flex items-center gap-2 text-xs text-neutral-800 font-medium">
+                    <WeatherIcon className="w-4 h-4 text-black shrink-0" />
                     <span className="truncate">{plan.weatherStats}</span>
                   </div>
                 </div>
 
-                {/* Highlights List */}
-                <div className="space-y-2.5 mb-6 text-xs text-[#5E6282] font-poppins">
+                {/* Highlights List (Monochrome) */}
+                <div className="space-y-2.5 mb-6 text-xs text-neutral-700 font-poppins">
                   {plan.highlights.map((highlight, idx) => (
                     <div key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-4 h-4 text-black shrink-0 mt-0.5" />
                       <span className="leading-snug">{highlight}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* 1-Click Action Button */}
+              {/* 1-Click Action Button (Pure Black) */}
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={() => handleTriggerPlan(plan)}
-                  className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.98] ${theme.buttonBg}`}
+                  className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md bg-black hover:bg-neutral-800 text-white transition-all active:scale-[0.98]"
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 text-white" />
                   <span>Simulate {plan.id === 'cheapest' ? 'Cheapest' : (plan.id === 'medium' ? 'Medium' : 'Fastest')} Plan</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 text-white" />
                 </button>
                 <div className="text-center mt-2">
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-[10px] text-neutral-400 font-mono">
                     Instant 1-Click XGBoost &amp; Gateway Redirect
                   </span>
                 </div>

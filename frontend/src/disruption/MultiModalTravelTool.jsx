@@ -187,8 +187,8 @@ export default function MultiModalTravelTool({ extractedTicket, extractedTickets
         )}
       </div>
 
-      {/* Extracted Ticket Context Banner (Clean homepage white styling) */}
-      {extractedTicket && (
+      {/* Extracted Ticket Context Banner (Only shown when browsing specific transport tabs so it doesn't duplicate Uploaded Mode) */}
+      {extractedTicket && activeTab !== 'all' && (
         <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-slate-50 text-[#DF6951] border border-slate-200 flex items-center justify-center font-bold shadow-2xs">
