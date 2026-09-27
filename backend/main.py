@@ -275,6 +275,16 @@ def get_passenger_rights():
     train_node = next((n for n in current_itinerary.nodes if n.mode and n.mode.value == "train"), None)
     # Fallback to first node if no specific mode found
     primary_node = flight_node or train_node or current_itinerary.nodes[0]
+    if hasattr(disruption, "delay_minutes"):
+        delay = disruption.delay_minutes
+        is_canc = getattr(disruption, "is_cancellation", False)
+    elif isinstance(disruption, dict):
+        delay = disruption.get("delay_minutes", 65)
+        is_canc = disruption.get("is_cancellation", False)
+    else:
+        delay = 65
+        is_canc = False
+
     rail_node = train_node or primary_node
 
     eu261 = PassengerRightsEngine.evaluate_eu261(primary_node, delay, is_canc)
