@@ -409,14 +409,56 @@ class RailRadarTracker:
         "CHENNAI_BANGALORE": ["20607", "12027", "12609", "12639"],
         "DELHI_VARANASI": ["22436", "12560", "12428"],
         "VARANASI_DELHI": ["22435", "12559", "12427"],
-        "MUMBAI_GOA": ["22229", "10103", "12051"],
-        "GOA_MUMBAI": ["22230", "10104", "12052"],
+        "MUMBAI_GOA": ["22229", "10103", "12051", "12133", "11003"],
+        "GOA_MUMBAI": ["22230", "10104", "12052", "12134", "11004"],
         "DELHI_AMRITSAR": ["22487", "12013", "12029"],
         "AMRITSAR_DELHI": ["22488", "12014", "12030"],
         "DELHI_LUCKNOW": ["22426", "12004", "12430"],
         "LUCKNOW_DELHI": ["22425", "12003", "12429"],
         "KOLKATA_PURI": ["22895", "12837", "12821"],
-        "PURI_KOLKATA": ["22896", "12838", "12822"]
+        "PURI_KOLKATA": ["22896", "12838", "12822"],
+        # Maharashtra inter-city corridors
+        "PUNE_SOLAPUR": ["12115", "11023", "17617", "11301", "17031"],
+        "SOLAPUR_PUNE": ["12116", "11024", "17618", "11302", "17032"],
+        "PUNE_HYDERABAD": ["12701", "11401", "17032"],
+        "HYDERABAD_PUNE": ["12702", "11402", "17031"],
+        "PUNE_NAGPUR": ["12135", "12149", "22105", "11045"],
+        "NAGPUR_PUNE": ["12136", "12150", "22106", "11046"],
+        "MUMBAI_KOLHAPUR": ["11007", "10103", "11041", "12133"],
+        "KOLHAPUR_MUMBAI": ["11008", "10104", "11042", "12134"],
+        "MUMBAI_HYDERABAD": ["12701", "17031", "11303"],
+        "HYDERABAD_MUMBAI": ["12702", "17032", "11304"],
+        # Pan-India long-distance corridors
+        "CHENNAI_MUMBAI": ["12163", "11042", "16382"],
+        "MUMBAI_CHENNAI": ["12164", "11041", "16381"],
+        "DELHI_HYDERABAD": ["12723", "12713", "12429"],
+        "HYDERABAD_DELHI": ["12724", "12714", "12430"],
+        "BANGALORE_MUMBAI": ["11301", "16590", "12779"],
+        "MUMBAI_BANGALORE": ["11302", "16589", "12780"],
+        "KOLKATA_DELHI": ["12302", "12382", "12304"],
+        "DELHI_KOLKATA": ["12301", "12381", "12303"],
+    }
+
+    # City/station aliases for smarter corridor resolution
+    _CITY_ALIASES: Dict[str, List[str]] = {
+        "MUMBAI": ["MUMBAI", "BOMBAY", "BOM", "CST", "LTT", "CSTM", "MMCT", "BDTS"],
+        "DELHI": ["DELHI", "DEL", "NDLS", "NZM", "DLI", "ANVT", "NEW DELHI"],
+        "PUNE": ["PUNE", "PNE", "PUNE JN"],
+        "SOLAPUR": ["SOLAPUR", "SUR", "SOLAPUR JN"],
+        "GOA": ["GOA", "VASCO", "MADGAON", "MARGAO", "VSG", "MAO", "GOI"],
+        "BANGALORE": ["BANGALORE", "BENGALURU", "BLR", "SBC", "KSR", "BENGALURU"],
+        "HYDERABAD": ["HYDERABAD", "HYD", "SC", "KCG", "SECUNDERABAD"],
+        "CHENNAI": ["CHENNAI", "MADRAS", "MAS", "MSB", "MAA"],
+        "KOLKATA": ["KOLKATA", "CALCUTTA", "HWH", "HOWRAH", "SDAH"],
+        "NAGPUR": ["NAGPUR", "NGP"],
+        "KOLHAPUR": ["KOLHAPUR", "KOP"],
+        "AHMEDABAD": ["AHMEDABAD", "ADI"],
+        "JAIPUR": ["JAIPUR", "JP"],
+        "AMRITSAR": ["AMRITSAR", "ASR"],
+        "LUCKNOW": ["LUCKNOW", "LKO", "LJN"],
+        "VARANASI": ["VARANASI", "BANARAS", "BSB"],
+        "PURI": ["PURI", "PURI JN"],
+        "CHANDIGARH": ["CHANDIGARH", "CDG"],
     }
 
     @classmethod
@@ -427,16 +469,39 @@ class RailRadarTracker:
         """
         orig_clean = (origin or "").strip().upper()
         dest_clean = (destination or "").strip().upper()
-        
-        # Match corridor
-        corr_key = None
-        for k in cls.CORRIDOR_TRAINS:
-            k_orig, k_dest = k.split("_")
-            if (k_orig in orig_clean or orig_clean in k_orig) and (k_dest in dest_clean or dest_clean in k_dest):
-                corr_key = k
-                break
-                
-        train_nums = cls.CORRIDOR_TRAINS.get(corr_key, ["12951", "12953", "12903", "12925"]) if corr_key else ["12951", "12953"]
+
+        def resolve_city(name: str) -> str:
+            """Map any alias/IATA/station code to canonical corridor city name."""
+            for city, aliases in cls._CITY_ALIASES.items():
+                if name in aliases or any(name in a or a in name for a in aliases):
+                    return city
+            return name
+
+        orig_city = resolve_city(orig_clean)
+        dest_city = resolve_city(dest_clean)
+
+        # Match corridor using canonical city names
+        corr_key = f"{orig_city}_{dest_city}"
+        if corr_key not in cls.CORRIDOR_TRAINS:
+            # Try partial match as fallback
+            corr_key = None
+            for k in cls.CORRIDOR_TRAINS:
+                k_orig, k_dest = k.split("_", 1)
+                if (k_orig in orig_city or orig_city in k_orig) and (k_dest in dest_city or dest_city in k_dest):
+                    corr_key = k
+                    break
+
+        train_nums = cls.CORRIDOR_TRAINS.get(corr_key) if corr_key else None
+        if not train_nums:
+            # Last resort: return a generic message instead of wrong corridor trains
+            return [{
+                "train_number": "N/A",
+                "train_name": f"No corridor data for {orig_city} -> {dest_city}",
+                "status": "unavailable",
+                "note": f"Corridor '{orig_city} -> {dest_city}' not in database. Try searching NTES or RailRadar directly.",
+                "source": "unavailable"
+            }]
+
         headers = cls._get_headers()
         live_trains = []
         for num in train_nums:
